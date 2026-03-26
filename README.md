@@ -146,4 +146,3 @@ Total AttnRes overhead: **0.03% parameters**, **<2% latency**.
 
 - [Attention Residuals](https://arxiv.org/abs/2603.15031) — Kimi Team (original paper)
 - [Qwen3](https://arxiv.org/abs/2505.09388) — Qwen Team (base architecture)
-- [qibin0506/Cortex](https://github.com/qibin0506/Cortex) — Independent AttnRes implementation
