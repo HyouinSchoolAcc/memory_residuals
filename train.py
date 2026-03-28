@@ -34,8 +34,8 @@ from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", default="baseline", choices=["baseline", "block", "full"],
-                   help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes)")
+    p.add_argument("--mode", default="baseline", choices=["baseline", "block", "full", "delta"],
+                   help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes), delta (Delta AttnRes)")
     p.add_argument("--hidden_size", type=int, default=512)
     p.add_argument("--num_layers", type=int, default=12)
     p.add_argument("--num_heads", type=int, default=8)
@@ -43,6 +43,9 @@ def parse_args():
     p.add_argument("--intermediate_size", type=int, default=1536)
     p.add_argument("--num_blocks", type=int, default=4,
                    help="Number of AttnRes blocks (for block mode)")
+    p.add_argument("--gate_type", default="bias",
+                   choices=["bias", "sigmoid_scalar", "sigmoid_vector", "learnable_alpha"],
+                   help="Gate type for mixing AttnRes output with residual stream")
     p.add_argument("--dataset", default="HuggingFaceFW/fineweb-edu")
     p.add_argument("--dataset_name", default="default")
     p.add_argument("--seq_len", type=int, default=2048)
@@ -74,7 +77,7 @@ def cosine_with_warmup(step, warmup, total, lr_min_ratio):
 def token_stream(dataset_name, config_name, tokenizer, seq_len, rank, world_size, seed):
     from datasets import load_dataset
     ds = load_dataset(dataset_name, name=config_name, split="train",
-                      streaming=True)
+                      streaming=True, trust_remote_code=True)
     ds = ds.shuffle(seed=seed + rank, buffer_size=10_000)
     ds = ds.skip(rank)
     buf = []
@@ -114,6 +117,7 @@ def build_model(args, device):
             attnres_num_blocks=args.num_blocks,
             attnres_recency_bias_init=0.0,  # zero init — paper default
             attnres_mode=args.mode,
+            attnres_gate_type=args.gate_type,
             **common,
         )
         model = Qwen3AttnResForCausalLM(config)
@@ -165,7 +169,9 @@ def main():
             n_attnres = sum(p.numel() for n, p in model.named_parameters() if "res_" in n)
             print(f"AttnRes params: {n_attnres/1e3:.1f}K")
 
-    model = DDP(model, device_ids=[local_rank])
+    # find_unused_parameters needed when some params aren't in the forward graph
+    find_unused = args.mode in ("delta",) or args.gate_type != "bias"
+    model = DDP(model, device_ids=[local_rank], find_unused_parameters=find_unused)
 
     # ── optimizer ──
     optimizer = AdamW(model.parameters(), lr=args.lr,
