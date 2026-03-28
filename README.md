@@ -24,7 +24,7 @@ An open-source implementation of [Attention Residuals](https://arxiv.org/abs/260
 | Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
 |-------|-----------|----------------|-------------|---------------|
 | Baseline (Standard Residual) | 3.523 | 76.76 | 0.076 | 0.315 |
-| **Attention Residuals** | — | — | — | — |
+| **Attention Residuals** | **3.953** | **73.17** | **0.092** | **0.300** |
 
 For reference, the pretrained Qwen3-0.6B (15T tokens) achieves PPL 20.97, LAMBADA 0.364, HellaSwag 0.410.
 
