@@ -13,8 +13,7 @@ An open-source implementation of [Attention Residuals](https://arxiv.org/abs/260
 | Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
 |-------|-----------|----------------|-------------|---------------|
 | Baseline (Standard Residual) | 3.303 | 60.21 | 0.082 | 0.325 |
-| Block AttnRes (8 blocks) | 3.245 | 53.87 | 0.110 | 0.335 |
-| **AttnRes (paper, per-sublayer)** | **3.350** | **55.69** | **0.114** | **0.340** |
+| **Attention Residuals** | **3.350** | **55.69** | **0.114** | **0.340** |
 
 ### 100M Model (d=512, L=12, 20k steps)
 
@@ -25,8 +24,7 @@ An open-source implementation of [Attention Residuals](https://arxiv.org/abs/260
 | Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
 |-------|-----------|----------------|-------------|---------------|
 | Baseline (Standard Residual) | 3.523 | 76.76 | 0.076 | 0.315 |
-| Block AttnRes (4 blocks) | 3.489 | 70.82 | 0.084 | 0.340 |
-| **AttnRes (paper, per-sublayer)** | *running* | — | — | — |
+| **Attention Residuals** | — | — | — | — |
 
 For reference, the pretrained Qwen3-0.6B (15T tokens) achieves PPL 20.97, LAMBADA 0.364, HellaSwag 0.410.
 
