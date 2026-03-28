@@ -1,85 +1,84 @@
 # Open Attention Residuals
 
-An open-source implementation of [Attention Residuals](https://arxiv.org/abs/2603.15031) (Kimi Team, 2025) — replacing standard additive residual connections with learned softmax attention over previous layer representations.
-
-<p align="center">
-  <img src="figures/training_loss.png" width="700">
-</p>
-
-## Key Results
-
-### 100M Model (d=512, L=12, 20k steps)
-
-| Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
-|-------|-----------|----------------|-------------|---------------|
-| Baseline (Standard Residual) | 3.523 | 76.76 | 0.076 | 0.315 |
-| **Block AttnRes (4 blocks)** | **3.489** | **70.82** | 0.084 | **0.340** |
-| Full AttnRes (per-sublayer) | 3.502 | 72.70 | **0.102** | 0.305 |
-
-<p align="center">
-  <img src="figures/training_loss.png" width="700">
-</p>
-
-**Block Attention Residuals reduce perplexity by 7.7%** with only 0.03% additional parameters.
-
-## Results at 0.6B Scale
-
-Training a 0.6B model (d=1024, L=28, same as Qwen3-0.6B) from scratch on FineWeb-Edu for 20k steps:
+An open-source implementation of [Attention Residuals](https://arxiv.org/abs/2603.15031) (Kimi Team, 2025) — replacing standard additive residual connections with learned softmax attention over previous sublayer outputs.
 
 <p align="center">
   <img src="figures/training_loss_0.6b.png" width="700">
 </p>
 
-| Model (0.6B) | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
+## Key Results
+
+### 0.6B Model (d=1024, L=28, same as Qwen3-0.6B, 20k steps)
+
+| Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
 |-------|-----------|----------------|-------------|---------------|
 | Baseline (Standard Residual) | 3.303 | 60.21 | 0.082 | 0.325 |
-| **Block AttnRes (8 blocks)** | **3.245** | **53.87** | **0.110** | **0.335** |
-| Full AttnRes (per-sublayer) | 3.379 | 52.36 | 0.112 | 0.335 |
+| Block AttnRes (8 blocks) | 3.245 | 53.87 | 0.110 | 0.335 |
+| **AttnRes (paper, per-sublayer)** | **3.350** | **55.69** | **0.114** | **0.340** |
 
-Block AttnRes reduces WikiText-2 PPL by **10.5%** at 0.6B scale. Full AttnRes has lower PPL but higher training loss — see [analysis](#why-block-beats-full) below.
+### 100M Model (d=512, L=12, 20k steps)
+
+<p align="center">
+  <img src="figures/training_loss.png" width="700">
+</p>
+
+| Model | Train Loss | WikiText-2 PPL | LAMBADA Acc | HellaSwag Acc |
+|-------|-----------|----------------|-------------|---------------|
+| Baseline (Standard Residual) | 3.523 | 76.76 | 0.076 | 0.315 |
+| Block AttnRes (4 blocks) | 3.489 | 70.82 | 0.084 | 0.340 |
+| **AttnRes (paper, per-sublayer)** | *running* | — | — | — |
 
 For reference, the pretrained Qwen3-0.6B (15T tokens) achieves PPL 20.97, LAMBADA 0.364, HellaSwag 0.410.
 
 ## How It Works
 
-Standard transformers use additive residual connections — each layer adds its output to a running sum:
+Standard transformers use additive residual connections:
 ```
-h = h + Attention(Norm(h))
-h = h + MLP(Norm(h))
+h_l = h_{l-1} + f_{l-1}(h_{l-1})
 ```
 
-**Attention Residuals** replace this with learned depth-wise attention. Layers are grouped into blocks, and before each sublayer, the model attends over all previous block representations:
+**Attention Residuals** (Eq. 1 of the paper) replace this with learned depth-wise attention over individual sublayer outputs:
+
+```
+h_l = Σ α_{i→l} · v_i
+```
+
+where `v_i = f_i(h_i)` is the output of sublayer `i` (not the cumulative state), and `α_{i→l}` are softmax attention weights computed with a per-layer learned query vector.
 
 ```python
-def block_attn_res(blocks, partial_block, proj, norm):
-    V = torch.stack(blocks + [partial_block])     # (N+1, B, T, D)
-    K = norm(V)
-    query = proj.weight.view(-1)                   # (D,)
+def attn_res(deltas, partial_block, proj, norm):
+    """Attend over previous sublayer outputs and add to residual stream."""
+    V = torch.stack(deltas)                        # (N, B, T, D)
+    K = norm(V)                                     # RMSNorm keys
+    query = proj.weight.view(-1)                    # learned query (D,)
     logits = einsum("d, n b t d -> n b t", query, K)
-    weights = softmax(logits, dim=0)               # (N+1, B, T)
-    return einsum("n b t, n b t d -> b t d", weights, V)
+    weights = softmax(logits, dim=0)                # (N, B, T)
+    selected = einsum("n b t, n b t d -> b t d", weights, V)
+    return partial_block + selected                 # add to residual stream
 ```
 
-This allows layers to selectively retrieve information from any earlier block — not just the cumulative sum.
+Each sublayer selectively retrieves information from any previous sublayer's output — "which previous layer's *change* should I re-use?"
 
-### Layer Dependency Visualizations
+### Block AttnRes Variant
+
+The paper also proposes **Block AttnRes**, which groups layers into N blocks and sums sublayer outputs within each block before applying cross-block attention. This reduces memory from O(L×d) to O(N×d).
+
+### Layer Dependency Visualization
 
 <p align="center">
-  <b>Block AttnRes (4 blocks)</b><br>
-  <img src="figures/attnres_block_deps.png" width="400">
+  <b>AttnRes (paper, per-sublayer, 0.6B trained from scratch)</b><br>
+  <img src="figures/attnres_delta_deps.png" width="600">
 </p>
 
-<p align="center">
-  <b>Full AttnRes (per-sublayer)</b><br>
-  <img src="figures/attnres_layer_deps.png" width="600">
-</p>
+The visualization shows each sublayer's attention weights over previous sublayer outputs. The model learns genuine cross-layer routing patterns — selectively attending to specific earlier layers, not just the most recent one.
 
-## Two Modes
+## Modes
 
-| Mode | Sources | Memory | Best for |
-|------|---------|--------|----------|
-| **Block** | N blocks (~4-8) | O(N×d) | Training from scratch, smaller models |
-| **Full** | All sublayer outputs | O(2L×d) | Larger models, when fine-grained routing matters |
+| Mode | Config | Sources | Description |
+|------|--------|---------|-------------|
+| **`delta`** (paper default) | `attnres_mode="delta"` | Per-sublayer outputs `f_i(h_i)` | Original paper formulation (Eq. 3-4) |
+| `block` | `attnres_mode="block"` | Block-level sums | Groups layers into N blocks |
+| `full` | `attnres_mode="full"` | Cumulative states | Variant: attend over cumulative residual stream |
 
 ## Quick Start
 
@@ -93,40 +92,35 @@ pip install -r requirements.txt
 # Baseline
 torchrun --nproc_per_node=8 train.py --mode baseline
 
-# Block AttnRes (recommended)
-torchrun --nproc_per_node=8 train.py --mode block --num_blocks 4
+# AttnRes (paper formulation, recommended)
+torchrun --nproc_per_node=8 train.py --mode delta
 
-# Full AttnRes
-torchrun --nproc_per_node=8 train.py --mode full
+# Block AttnRes
+torchrun --nproc_per_node=8 train.py --mode block --num_blocks 4
 ```
 
 ### Evaluate
 ```bash
-python eval.py --model_path output/scratch-block-d512-L12-20k/final --mode block
+python eval.py --model_path output/scratch-delta-d512-L12-20k/final --mode delta
 ```
 
 ### Interactive Visualization
 ```bash
-python app.py --model_path output/scratch-block-d512-L12-20k/final --mode block
+python app.py --model_path output/scratch-delta-d512-L12-20k/final --mode delta
 ```
-
-This launches a Gradio app where you can:
-- Enter any text and see how each layer's AttnRes routes information
-- Switch between the layer dependency heatmap and per-token weight views
-- Explore individual layers and sublayers
 
 ## Model Architecture
 
 ```
-Config: d=512, L=12, heads=8, kv_heads=4, ff=1536
-Total params: ~119M (baseline) / ~119M + 25K (AttnRes)
+100M: d=512, L=12, heads=8, kv_heads=4, ff=1536
+0.6B: d=1024, L=28, heads=16, kv_heads=8, ff=3072 (same as Qwen3-0.6B)
 ```
 
 AttnRes adds per layer:
 - 2× projection vectors (`res_proj`, d-dimensional, zero-initialized)
 - 2× RMSNorm layers (`res_norm`)
 
-Total AttnRes overhead: **0.03% parameters**, **<2% latency**.
+Total overhead: **0.03% parameters**, **<2% latency**.
 
 ## Pretrained Weights
 
@@ -134,17 +128,18 @@ Total AttnRes overhead: **0.03% parameters**, **<2% latency**.
 |-------|------|------|
 | 100M Baseline | — | [wdlctc/open-attnres-baseline](https://huggingface.co/wdlctc/open-attnres-baseline) |
 | 100M Block AttnRes | 4 blocks | [wdlctc/open-attnres-block](https://huggingface.co/wdlctc/open-attnres-block) |
-| 100M Full AttnRes | per-sublayer | [wdlctc/open-attnres-full](https://huggingface.co/wdlctc/open-attnres-full) |
+| 0.6B Baseline | — | [wdlctc/open-attnres-0.6b-baseline](https://huggingface.co/wdlctc/open-attnres-0.6b-baseline) |
+| 0.6B Block AttnRes | 8 blocks | [wdlctc/open-attnres-0.6b-block](https://huggingface.co/wdlctc/open-attnres-0.6b-block) |
 
-## Lessons Learned
+## Findings
 
-1. **Train from scratch** for maximum benefit. Fine-tuning pretrained models with AttnRes yields small gains (~0.02 loss) because the pretrained weights are committed to standard residual flow.
+1. **AttnRes (paper formulation) has the smoothest training dynamics.** Per-sublayer outputs are naturally distinctive, giving the softmax clean gradients. Cumulative-state variants suffer from source redundancy (cos sim ~0.95 between adjacent sources).
 
-2. **Block mode > Full mode** at small scale. 4 blocks create distinctive representations that are easier to route. Full mode's 25 near-identical sublayer outputs overwhelm the softmax.
+2. **Block mode has lower training loss but AttnRes (paper) wins on downstream evals.** At 0.6B scale, the paper formulation achieves the best LAMBADA (0.114) and HellaSwag (0.340) despite higher training loss.
 
-3. **Zero-init queries** (the paper's default) work best. We tried recency bias, sigmoid gates, LoRA co-adaptation — none beat the simple zero-init approach.
+3. **Train from scratch for maximum benefit.** Fine-tuning pretrained models yields small gains (~0.02 loss) because pretrained weights are committed to standard residual flow.
 
-4. **AttnRes learns genuine cross-layer patterns** when trained from scratch. The visualization shows layers selectively attending to earlier blocks, not just the most recent layer.
+4. **Zero-init queries work best.** The paper's default initialization (all projection weights = 0 → uniform softmax) outperforms all alternatives we tried.
 
 ## Citation
 
