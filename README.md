@@ -33,28 +33,32 @@ h_l = Σ α_{i→l} · v_i
 where `v_i = f_i(h_i)` is the output of sublayer `i` (not the cumulative state), and `α_{i→l}` are softmax attention weights computed with a per-layer learned query vector.
 
 ```python
-def attn_res(deltas, partial_block, proj, norm):
-    """Attend over previous sublayer outputs and add to residual stream."""
-    V = torch.stack(deltas)                        # (N, B, T, D)
-    K = norm(V)                                     # RMSNorm keys
-    query = proj.weight.view(-1)                    # learned query (D,)
+def block_attn_res(blocks, partial_block, proj, norm, recency_bias):
+    """Attend over block representations + current partial block."""
+    V = torch.stack(blocks + [partial_block])       # (N+1, B, T, D)
+    K = norm(V)                                      # RMSNorm keys
+    query = proj.weight.view(-1)                     # learned query (D,)
     logits = einsum("d, n b t d -> n b t", query, K)
-    weights = softmax(logits, dim=0)                # (N, B, T)
-    selected = einsum("n b t, n b t d -> b t d", weights, V)
-    return partial_block + selected                 # add to residual stream
+    logits[-1] += recency_bias                       # boost current block
+    weights = softmax(logits, dim=0)                 # (N+1, B, T)
+    return einsum("n b t, n b t d -> b t d", weights, V)
 ```
 
-Each sublayer selectively retrieves information from any previous sublayer's output — "which previous layer's *change* should I re-use?"
+Each layer selectively attends over previous block representations — "which block's information should I re-use?"
 
-### Block AttnRes Variant
+### Block AttnRes
 
-The paper also proposes **Block AttnRes**, which groups layers into N blocks and sums sublayer outputs within each block before applying cross-block attention. This reduces memory from O(L×d) to O(N×d).
+**Block AttnRes** groups layers into N blocks and sums sublayer outputs within each block before applying cross-block attention. This reduces memory from O(L×d) to O(N×d).
+
+### Full AttnRes
+
+**Full AttnRes** attends over all cumulative hidden states (one per sublayer), providing the finest-grained routing at the cost of O(L²d) compute.
 
 ### Layer Dependency Visualization
 
 <p align="center">
-  <b>AttnRes (paper, per-sublayer, 0.6B trained from scratch)</b><br>
-  <img src="figures/attnres_delta_deps.png" width="600">
+  <b>AttnRes (0.6B trained from scratch)</b><br>
+  <img src="figures/attnres_deps.png" width="600">
 </p>
 
 The visualization shows each sublayer's attention weights over previous sublayer outputs. The model learns genuine cross-layer routing patterns — selectively attending to specific earlier layers, not just the most recent one.
@@ -63,9 +67,8 @@ The visualization shows each sublayer's attention weights over previous sublayer
 
 | Mode | Config | Sources | Description |
 |------|--------|---------|-------------|
-| **`delta`** (paper default) | `attnres_mode="delta"` | Per-sublayer outputs `f_i(h_i)` | Original paper formulation (Eq. 3-4) |
-| `block` | `attnres_mode="block"` | Block-level sums | Groups layers into N blocks |
-| `full` | `attnres_mode="full"` | Cumulative states | Variant: attend over cumulative residual stream |
+| **`block`** (default) | `attnres_mode="block"` | Block-level sums | Groups layers into N blocks |
+| `full` | `attnres_mode="full"` | Cumulative states | Attend over all cumulative hidden states |
 
 ## Quick Start
 
@@ -79,21 +82,21 @@ pip install -r requirements.txt
 # Baseline
 torchrun --nproc_per_node=8 train.py --mode baseline
 
-# AttnRes (paper formulation, recommended)
-torchrun --nproc_per_node=8 train.py --mode delta
-
-# Block AttnRes
+# Block AttnRes (recommended)
 torchrun --nproc_per_node=8 train.py --mode block --num_blocks 4
+
+# Full AttnRes
+torchrun --nproc_per_node=8 train.py --mode full
 ```
 
 ### Evaluate
 ```bash
-python eval.py --model_path output/scratch-delta-d512-L12-20k/final --mode delta
+python eval.py --model_path output/scratch-block-d512-L12-20k/final --mode block
 ```
 
 ### Interactive Visualization
 ```bash
-python app.py --model_path output/scratch-delta-d512-L12-20k/final --mode delta
+python app.py --model_path output/scratch-block-d512-L12-20k/final --mode block
 ```
 
 ## Model Architecture
@@ -120,9 +123,9 @@ Total overhead: **0.03% parameters**, **<2% latency**.
 
 ## Findings
 
-1. **AttnRes (paper formulation) has the smoothest training dynamics.** Per-sublayer outputs are naturally distinctive, giving the softmax clean gradients. Cumulative-state variants suffer from source redundancy (cos sim ~0.95 between adjacent sources).
+1. **Block AttnRes achieves the best training loss.** Block-level sums are distinctive (cos sim ~0.69), giving the softmax clean gradients.
 
-2. **Block mode has lower training loss but AttnRes (paper) wins on downstream evals.** At 0.6B scale, the paper formulation achieves the best LAMBADA (0.114) and HellaSwag (0.340) despite higher training loss.
+2. **Full AttnRes wins on downstream evals despite higher training loss.** At 0.6B scale, Full AttnRes achieves the best LAMBADA (0.114) and HellaSwag (0.340).
 
 3. **Train from scratch for maximum benefit.** Fine-tuning pretrained models yields small gains (~0.02 loss) because pretrained weights are committed to standard residual flow.
 

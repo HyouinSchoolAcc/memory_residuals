@@ -34,8 +34,8 @@ from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", default="baseline", choices=["baseline", "block", "full", "delta"],
-                   help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes), delta (Delta AttnRes)")
+    p.add_argument("--mode", default="baseline", choices=["baseline", "block", "full"],
+                   help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes)")
     p.add_argument("--hidden_size", type=int, default=512)
     p.add_argument("--num_layers", type=int, default=12)
     p.add_argument("--num_heads", type=int, default=8)
@@ -170,7 +170,7 @@ def main():
             print(f"AttnRes params: {n_attnres/1e3:.1f}K")
 
     # find_unused_parameters needed when some params aren't in the forward graph
-    find_unused = args.mode in ("delta",) or args.gate_type != "bias"
+    find_unused = args.gate_type != "bias"
     model = DDP(model, device_ids=[local_rank], find_unused_parameters=find_unused)
 
     # ── optimizer ──

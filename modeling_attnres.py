@@ -62,7 +62,6 @@ class Qwen3AttnResConfig(Qwen3Config):
         self.attnres_num_blocks = attnres_num_blocks
         self.attnres_recency_bias_init = attnres_recency_bias_init
         # "block" = Block AttnRes (grouped), "full" = Full AttnRes (per-sublayer)
-        # "delta" = Delta AttnRes (attend over sublayer outputs, not cumulative states)
         self.attnres_mode = attnres_mode
         # Gate type: "bias" (recency bias on softmax logit),
         #            "sigmoid_scalar" (scalar sigmoid gate between residual & attnres),
@@ -111,58 +110,6 @@ def block_attn_res(
     if return_entropy:
         # Entropy: -sum(w * log(w)), averaged over batch and tokens
         # Higher entropy = more diverse attention (good)
-        entropy = -(weights * (weights + 1e-8).log()).sum(dim=0).mean()
-        return h, entropy
-
-    return h
-
-
-def delta_attn_res(
-    deltas: list[torch.Tensor],   # previous sublayer outputs (deltas)  [B, T, D] each
-    partial_block: torch.Tensor,  # current residual stream  [B, T, D]
-    proj: nn.Linear,
-    norm: Qwen3RMSNorm,
-    recency_bias: nn.Parameter,
-    return_entropy: bool = False,
-) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
-    """
-    Attend over previous sublayer deltas and add selected information to
-    the current residual stream.
-
-    Unlike block_attn_res which does weighted sum of cumulative states,
-    delta_attn_res selects which previous layer *changes* to re-apply:
-        h = partial_block + weighted_sum(deltas)
-
-    This avoids the redundancy problem where cumulative states are nearly
-    identical (cos sim ~0.95), since deltas from different sublayers
-    (attention vs MLP, different layers) are naturally distinctive.
-    """
-    if not deltas:
-        # No deltas yet (first sublayer) — return partial_block unchanged
-        if return_entropy:
-            return partial_block, torch.tensor(0.0, device=partial_block.device)
-        return partial_block
-
-    # Stack deltas: shape [N, B, T, D]
-    V = torch.stack(deltas, dim=0)
-
-    # Keys = normalised deltas
-    K = norm(V)
-
-    # Query from current residual stream context
-    query = proj.weight.view(-1)                              # (D,)
-    logits = torch.einsum("d, n b t d -> n b t", query, K)   # (N, B, T)
-
-    # Softmax across delta dimension
-    weights = logits.softmax(dim=0)                           # (N, B, T)
-
-    # Weighted sum of deltasif
-    selected = torch.einsum("n b t, n b t d -> b t d", weights, V)  # (B, T, D)
-
-    # Add selected deltas to current residual stream
-    h = partial_block + selected
-
-    if return_entropy:
         entropy = -(weights * (weights + 1e-8).log()).sum(dim=0).mean()
         return h, entropy
 
@@ -282,52 +229,7 @@ class Qwen3AttnResDecoderLayer(GradientCheckpointingLayer):
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
         entropy_accum = kwargs.pop("entropy_accum", None)
 
-        if self.attnres_mode == "delta":
-            # ---- Delta mode: attend over previous sublayer outputs (deltas) ----
-            # `blocks` stores deltas [attn_out_0, mlp_out_0, attn_out_1, ...]
-            # `partial_block` is the current residual stream
-
-            # Attention sublayer
-            if entropy_accum is not None:
-                h_attn, ent = delta_attn_res(blocks, partial_block,
-                                             self.attn_res_proj, self.attn_res_norm,
-                                             self.attn_res_bias, return_entropy=True)
-                entropy_accum.append(ent)
-            else:
-                h_attn = delta_attn_res(blocks, partial_block,
-                                        self.attn_res_proj, self.attn_res_norm, self.attn_res_bias)
-            h = self._apply_gate(partial_block, h_attn, "attn")
-
-            attn_out, _ = self.self_attn(
-                hidden_states=self.input_layernorm(h),
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_values=past_key_values,
-                use_cache=use_cache,
-                cache_position=cache_position,
-                position_embeddings=position_embeddings,
-            )
-            partial_block = partial_block + attn_out
-            blocks = blocks + [attn_out]
-
-            # MLP sublayer
-            if entropy_accum is not None:
-                h_attn, ent = delta_attn_res(blocks, partial_block,
-                                             self.mlp_res_proj, self.mlp_res_norm,
-                                             self.mlp_res_bias, return_entropy=True)
-                entropy_accum.append(ent)
-            else:
-                h_attn = delta_attn_res(blocks, partial_block,
-                                        self.mlp_res_proj, self.mlp_res_norm, self.mlp_res_bias)
-            h = self._apply_gate(partial_block, h_attn, "mlp")
-
-            mlp_out = self.mlp(self.post_attention_layernorm(h))
-            partial_block = partial_block + mlp_out
-            blocks = blocks + [mlp_out]
-
-            return blocks, partial_block
-
-        # ---- Block / Full mode (original behavior) ----
+        # ---- Block / Full mode ----
 
         # ---- Attention sublayer ----
         if entropy_accum is not None:
