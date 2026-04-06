@@ -13,9 +13,6 @@ equivalent to standard Qwen3.  During training the bias and proj weights
 co-adapt, letting the model learn cross-block attention.
 """
 
-from collections.abc import Callable
-from typing import Optional
-
 import torch
 import torch.nn as nn
 
@@ -37,8 +34,6 @@ from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutpu
 from transformers.utils import can_return_tuple, auto_docstring
 from transformers.utils.generic import merge_with_config_defaults
 from transformers.utils.output_capturing import capture_outputs
-from transformers.processing_utils import Unpack
-from transformers.utils import TransformersKwargs
 
 
 # ---------------------------------------------------------------------------
@@ -228,8 +223,6 @@ class Qwen3AttnResDecoderLayer(GradientCheckpointingLayer):
         **kwargs,
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
         entropy_accum = kwargs.pop("entropy_accum", None)
-
-        # ---- Block / Full mode ----
 
         # ---- Attention sublayer ----
         if entropy_accum is not None:

@@ -24,13 +24,13 @@ Standard transformers use additive residual connections:
 h_l = h_{l-1} + f_{l-1}(h_{l-1})
 ```
 
-**Attention Residuals** (Eq. 1 of the paper) replace this with learned depth-wise attention over individual sublayer outputs:
+**Attention Residuals** (Eq. 1 of the paper) replace this with learned depth-wise attention over previous representations:
 
 ```
-h_l = Σ α_{i→l} · v_i
+h_l = Σ α_{i→l} · s_i
 ```
 
-where `v_i = f_i(h_i)` is the output of sublayer `i` (not the cumulative state), and `α_{i→l}` are softmax attention weights computed with a per-layer learned query vector.
+where `s_i` are source representations (block-level sums or cumulative states), and `α_{i→l}` are softmax attention weights computed with a per-layer learned query vector.
 
 ```python
 def block_attn_res(blocks, partial_block, proj, norm, recency_bias):
@@ -46,13 +46,10 @@ def block_attn_res(blocks, partial_block, proj, norm, recency_bias):
 
 Each layer selectively attends over previous block representations — "which block's information should I re-use?"
 
-### Block AttnRes
+### Modes
 
-**Block AttnRes** groups layers into N blocks and sums sublayer outputs within each block before applying cross-block attention. This reduces memory from O(L×d) to O(N×d).
-
-### Full AttnRes
-
-**Full AttnRes** attends over all cumulative hidden states (one per sublayer), providing the finest-grained routing at the cost of O(L²d) compute.
+- **Block AttnRes** (default): Groups layers into N blocks and sums sublayer outputs within each block before applying cross-block attention. This reduces memory from O(L×d) to O(N×d).
+- **Full AttnRes**: Attends over all cumulative hidden states (one per sublayer), providing the finest-grained routing at the cost of O(L²d) compute.
 
 ### Layer Dependency Visualization
 
@@ -62,13 +59,6 @@ Each layer selectively attends over previous block representations — "which bl
 </p>
 
 The visualization shows each sublayer's attention weights over previous sublayer outputs. The model learns genuine cross-layer routing patterns — selectively attending to specific earlier layers, not just the most recent one.
-
-## Modes
-
-| Mode | Config | Sources | Description |
-|------|--------|---------|-------------|
-| **`block`** (default) | `attnres_mode="block"` | Block-level sums | Groups layers into N blocks |
-| `full` | `attnres_mode="full"` | Cumulative states | Attend over all cumulative hidden states |
 
 ## Quick Start
 

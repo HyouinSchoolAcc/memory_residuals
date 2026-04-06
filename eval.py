@@ -2,9 +2,9 @@
 Evaluate from-scratch models on held-out data and simple benchmarks.
 
 Usage:
-    python eval_scratch.py --model_path output/scratch-baseline-d512-L12-20k/final --mode baseline
-    python eval_scratch.py --model_path output/scratch-block-d512-L12-20k/final --mode block
-    python eval_scratch.py --model_path output/scratch-full-d512-L12-20k/final --mode full
+    python eval.py --model_path output/scratch-baseline-d512-L12-20k/final --mode baseline
+    python eval.py --model_path output/scratch-block-d512-L12-20k/final --mode block
+    python eval.py --model_path output/scratch-full-d512-L12-20k/final --mode full
 """
 
 import argparse

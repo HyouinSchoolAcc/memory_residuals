@@ -3,13 +3,13 @@ Train Qwen3 / Qwen3-AttnRes from scratch on FineWeb-Edu.
 
 Usage:
     # Baseline (no AttnRes)
-    torchrun --nproc_per_node=8 train_scratch.py --mode baseline
+    torchrun --nproc_per_node=8 train.py --mode baseline
 
     # Block AttnRes
-    torchrun --nproc_per_node=8 train_scratch.py --mode block
+    torchrun --nproc_per_node=8 train.py --mode block
 
     # Full AttnRes
-    torchrun --nproc_per_node=8 train_scratch.py --mode full
+    torchrun --nproc_per_node=8 train.py --mode full
 """
 
 import argparse

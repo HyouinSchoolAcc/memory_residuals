@@ -7,8 +7,8 @@ X-axis: source blocks (Embed, Block 1, ..., Block N, Partial)
 Color:  viridis, showing Residual Magnitude (softmax weight)
 
 Usage:
-    python visualize_attnres_paper.py \
-        --model_path output/qwen3-attnres-0.6b-bias0frozen-fineweb-10k/step-9500
+    python visualize.py \
+        --model_path output/scratch-block-d1024-L28-20k/step-18000
 """
 
 import argparse
