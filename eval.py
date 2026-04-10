@@ -5,31 +5,35 @@ Usage:
     python eval.py --model_path output/scratch-baseline-d512-L12-20k/final --mode baseline
     python eval.py --model_path output/scratch-block-d512-L12-20k/final --mode block
     python eval.py --model_path output/scratch-full-d512-L12-20k/final --mode full
+    python eval.py --model_path output/scratch-memory-d512-L12-20k/final --mode memory
 """
 
 import argparse
-import sys
-import os
 import math
+import os
+import sys
 
 import torch
+from datasets import load_dataset
 from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
-
-# Local import
-from modeling_attnres import Qwen3AttnResForCausalLM, Qwen3AttnResConfig
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
-from datasets import load_dataset
+
+from modeling_attnres import Qwen3AttnResConfig, Qwen3AttnResForCausalLM
+from modeling_memory_residuals import MemResForCausalLM
 
 
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--model_path", required=True)
-    p.add_argument("--mode", required=True, choices=["baseline", "block", "full"])
+    p.add_argument(
+        "--mode", required=True, choices=["baseline", "block", "full", "memory"]
+    )
     p.add_argument("--seq_len", type=int, default=2048)
-    p.add_argument("--num_samples", type=int, default=200,
-                   help="Number of evaluation samples")
+    p.add_argument(
+        "--num_samples", type=int, default=200, help="Number of evaluation samples"
+    )
     p.add_argument("--device", default="cuda:0")
     return p.parse_args()
 
@@ -37,16 +41,30 @@ def parse_args():
 def load_model(model_path, mode, device):
     if mode == "baseline":
         model = Qwen3ForCausalLM.from_pretrained(
-            model_path, torch_dtype=torch.bfloat16, device_map={"": device})
+            model_path, torch_dtype=torch.bfloat16, device_map={"": device}
+        )
+    elif mode == "memory":
+        model = MemResForCausalLM.from_pretrained(
+            model_path, torch_dtype=torch.bfloat16, device_map={"": device}
+        )
     else:
         model = Qwen3AttnResForCausalLM.from_pretrained(
-            model_path, torch_dtype=torch.bfloat16, device_map={"": device})
+            model_path, torch_dtype=torch.bfloat16, device_map={"": device}
+        )
     model.eval()
     return model
 
 
-def eval_perplexity(model, tokenizer, seq_len, num_samples, device, dataset_name="wikitext",
-                    dataset_config="wikitext-2-raw-v1", split="test"):
+def eval_perplexity(
+    model,
+    tokenizer,
+    seq_len,
+    num_samples,
+    device,
+    dataset_name="wikitext",
+    dataset_config="wikitext-2-raw-v1",
+    split="test",
+):
     """Compute perplexity on a dataset."""
     ds = load_dataset(dataset_name, dataset_config, split=split)
     text = "\n\n".join(ds["text"])
@@ -71,8 +89,9 @@ def eval_perplexity(model, tokenizer, seq_len, num_samples, device, dataset_name
         shift_labels = chunk[:, 1:].contiguous()
 
         loss_fct = CrossEntropyLoss(reduction="sum")
-        nll = loss_fct(shift_logits.view(-1, shift_logits.size(-1)),
-                       shift_labels.view(-1))
+        nll = loss_fct(
+            shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+        )
         nlls.append(nll.item())
         total_tokens += shift_labels.numel()
 
@@ -130,8 +149,9 @@ def eval_hellaswag(model, tokenizer, device, max_samples=200):
         scores = []
         for ending in endings:
             text = ctx + " " + ending
-            input_ids = tokenizer(text, return_tensors="pt", truncation=True,
-                                  max_length=512)["input_ids"].to(device)
+            input_ids = tokenizer(
+                text, return_tensors="pt", truncation=True, max_length=512
+            )["input_ids"].to(device)
 
             with torch.no_grad():
                 outputs = model(input_ids=input_ids)
@@ -141,11 +161,13 @@ def eval_hellaswag(model, tokenizer, device, max_samples=200):
             ctx_ids = tokenizer(ctx, return_tensors="pt")["input_ids"]
             ctx_len = ctx_ids.size(1)
 
-            shift_logits = logits[:, ctx_len-1:-1, :]
+            shift_logits = logits[:, ctx_len - 1 : -1, :]
             shift_labels = input_ids[:, ctx_len:]
 
             log_probs = torch.nn.functional.log_softmax(shift_logits, dim=-1)
-            token_log_probs = log_probs.gather(2, shift_labels.unsqueeze(-1)).squeeze(-1)
+            token_log_probs = log_probs.gather(2, shift_labels.unsqueeze(-1)).squeeze(
+                -1
+            )
             score = token_log_probs.mean().item()
             scores.append(score)
 
@@ -154,6 +176,63 @@ def eval_hellaswag(model, tokenizer, device, max_samples=200):
         total += 1
 
     acc = correct / total if total > 0 else 0
+    return acc, correct, total
+
+
+def eval_memory_recall(
+    model, tokenizer, device, max_samples: int = 100
+) -> tuple[float, int, int]:
+    """
+    Multi-session memory recall evaluation.
+
+    Tests whether the model can answer factual questions about information
+    introduced in a previous session.  Each probe consists of:
+      - history: "User: My [attribute] is [value]."
+      - query:   "User: What is my [attribute]? Assistant:"
+      - target:  the [value] token(s)
+
+    The model runs with history_ids → M_c → query, and we check whether the
+    top-1 predicted next token matches the first token of [value].
+    """
+    probes = [
+        ("My name is Alice.", "What is my name? Assistant:", "Alice"),
+        (
+            "My favourite colour is blue.",
+            "What is my favourite colour? Assistant:",
+            "blue",
+        ),
+        ("I live in Paris.", "Where do I live? Assistant:", "Paris"),
+        ("My job is a doctor.", "What is my job? Assistant:", "doctor"),
+        ("My cat is called Whiskers.", "What is my cat called? Assistant:", "Whiskers"),
+        ("I was born in 1990.", "What year was I born? Assistant:", "1990"),
+        ("My hobby is painting.", "What is my hobby? Assistant:", "painting"),
+        ("I drive a Toyota.", "What car do I drive? Assistant:", "Toyota"),
+    ]
+
+    correct = 0
+    total = 0
+
+    for history_text, query_text, target_word in probes[:max_samples]:
+        history_ids = tokenizer("User: " + history_text, return_tensors="pt")[
+            "input_ids"
+        ].to(device)
+        query_ids = tokenizer("User: " + query_text, return_tensors="pt")[
+            "input_ids"
+        ].to(device)
+        target_ids = tokenizer(" " + target_word, add_special_tokens=False)["input_ids"]
+
+        if len(target_ids) == 0:
+            continue
+
+        with torch.no_grad():
+            out = model(input_ids=query_ids, history_ids=history_ids)
+            predicted = out.logits[0, -1, :].argmax().item()
+
+        if predicted == target_ids[0]:
+            correct += 1
+        total += 1
+
+    acc = correct / total if total > 0 else 0.0
     return acc, correct, total
 
 
@@ -173,7 +252,8 @@ def main():
     print("WikiText-2 Perplexity")
     print("=" * 50)
     nll, ppl, n_tokens = eval_perplexity(
-        model, tokenizer, args.seq_len, args.num_samples, args.device)
+        model, tokenizer, args.seq_len, args.num_samples, args.device
+    )
     print(f"  Loss: {nll:.4f} | PPL: {ppl:.2f} | Tokens: {n_tokens}")
     print()
 
@@ -193,6 +273,18 @@ def main():
     print(f"  Accuracy: {acc_hs:.4f} ({correct_hs}/{total_hs})")
     print()
 
+    # 4. Memory recall (memory mode only — tests cross-session information retrieval)
+    acc_mem, correct_mem, total_mem = 0.0, 0, 0
+    if args.mode == "memory":
+        print("=" * 50)
+        print("Memory Recall (multi-session, PAPER.md eval)")
+        print("=" * 50)
+        acc_mem, correct_mem, total_mem = eval_memory_recall(
+            model, tokenizer, args.device
+        )
+        print(f"  Accuracy: {acc_mem:.4f} ({correct_mem}/{total_mem})")
+        print()
+
     # Summary
     print("=" * 50)
     print(f"SUMMARY ({args.mode})")
@@ -200,6 +292,8 @@ def main():
     print(f"  WikiText-2 PPL: {ppl:.2f}")
     print(f"  LAMBADA Acc:    {acc:.4f}")
     print(f"  HellaSwag Acc:  {acc_hs:.4f}")
+    if args.mode == "memory":
+        print(f"  Memory Recall:  {acc_mem:.4f} ({correct_mem}/{total_mem})")
 
 
 if __name__ == "__main__":
