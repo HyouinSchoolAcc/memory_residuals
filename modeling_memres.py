@@ -77,26 +77,32 @@ def memory_attn_res(
     Per-token queries from partial_block attend over the full pool.
     """
     B, T, D = partial_block.shape
-    K = memory_state.shape[1]
-
-    # M_c is (B, K, D) — broadcast each vector across T to match block shape
-    mem_expanded = memory_state.unsqueeze(2).expand(B, K, T, D)  # (B, K, T, D)
-    mem_expanded = mem_expanded.permute(1, 0, 2, 3)              # (K, B, T, D)
+    N = len(blocks)
+    scale = math.sqrt(D)
 
     depth_stack = torch.stack(blocks + [partial_block], dim=0)   # (N+1, B, T, D)
-    pool = torch.cat([depth_stack, mem_expanded], dim=0)         # (N+1+K, B, T, D)
-
-    keys = k_proj(norm(pool))                                    # (N+1+K, B, T, D)
     queries = q_proj(partial_block)                              # (B, T, D)
 
-    logits = torch.einsum("b t d, n b t d -> n b t", queries, keys)
+    # Depth logits: per-token queries attend over block history
+    depth_keys = k_proj(norm(depth_stack))                       # (N+1, B, T, D)
+    logits_depth = torch.einsum("b t d, n b t d -> n b t", queries, depth_keys) / scale
 
-    # Recency bias on partial_block (index N, just before memory slots)
-    N = len(blocks)
-    logits[N] = logits[N] + recency_bias
+    # Memory logits: queries attend over M_c without expanding across T
+    memory_keys = k_proj(norm(memory_state))                     # (B, K, D)
+    logits_mem = torch.einsum("b t d, b k d -> k b t", queries, memory_keys) / scale
 
+    logits_depth[N] = logits_depth[N] + recency_bias
+
+    # Single softmax over depth + memory jointly
+    logits = torch.cat([logits_depth, logits_mem], dim=0)        # (N+1+K, B, T)
     weights = logits.softmax(dim=0)
-    h_tilde = torch.einsum("n b t, n b t d -> b t d", weights, pool)
+
+    depth_weights = weights[:N + 1]
+    mem_weights = weights[N + 1:]
+
+    h_depth = torch.einsum("n b t, n b t d -> b t d", depth_weights, depth_stack)
+    h_mem = torch.einsum("k b t, b k d -> b t d", mem_weights, memory_state)
+    h_tilde = h_depth + h_mem
 
     # Sigmoid gate as training scaffold — at init σ(-2)≈0.12, mostly passes through partial_block
     alpha = torch.sigmoid(gate(partial_block))
@@ -374,15 +380,6 @@ class Qwen3MemResDecoderLayer(Qwen3AttnResDecoderLayer):
                 config.hidden_size, gate_init, norm_eps
             )
 
-        # Legacy: kept for backward compat with old checkpoints
-        if apply_at in ("attn", "both"):
-            self.mem_cross_attn = MemoryResidualCrossAttn(
-                config.hidden_size, num_heads, gate_init, norm_eps
-            )
-        if apply_at in ("mlp", "both"):
-            self.mem_cross_attn_mlp = MemoryResidualCrossAttn(
-                config.hidden_size, num_heads, gate_init, norm_eps
-            )
 
     def forward(
         self,
@@ -568,21 +565,12 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             gate_init = getattr(self.config, "memres_gate_init", -2.0)
             apply_at = getattr(self.config, "memres_apply_at", "attn")
 
-            # Unified pool projections
             for attr in ("mem_attn_proj", "mem_mlp_proj"):
                 if hasattr(module, attr):
                     proj = getattr(module, attr)
                     nn.init.zeros_(proj.gate.weight)
                     nn.init.constant_(proj.gate.bias, gate_init)
                     proj.recency_bias.data.fill_(0.0)
-
-            # Legacy cross-attention gates
-            if apply_at in ("attn", "both") and hasattr(module, "mem_cross_attn"):
-                nn.init.zeros_(module.mem_cross_attn.gate_proj.weight)
-                nn.init.constant_(module.mem_cross_attn.gate_proj.bias, gate_init)
-            if apply_at in ("mlp", "both") and hasattr(module, "mem_cross_attn_mlp"):
-                nn.init.zeros_(module.mem_cross_attn_mlp.gate_proj.weight)
-                nn.init.constant_(module.mem_cross_attn_mlp.gate_proj.bias, gate_init)
 
         elif isinstance(module, MemoryBlock):
             # Keep memory queries at zero init (per AttnRes convention — uniform attention at start)
