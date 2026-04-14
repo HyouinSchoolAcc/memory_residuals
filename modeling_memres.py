@@ -4,20 +4,22 @@ Qwen3 with Memory Residuals (MemRes).
 Extends Block Attention Residuals with cross-session episodic memory.
 Previous conversation history is compressed into a fixed-size latent
 state M_c via a learnable summarizing memory block, then reintroduced
-into the residual stream via a dynamically gated cross-attention at
-each decoder layer.
+into the attention residual stream via a unified pool — M_c and local
+depth history compete in a single softmax, enabling implicit cognitive
+routing (Section 2.2 of the paper).
 
 Architecture:
     - MemoryBlock: C ∈ R^(N×d)  →  M_c ∈ R^(K×d)
       Cross-attention with K learnable query vectors M_in.
       Applied once per session transition (offline compression).
 
-    - MemoryResidualCrossAttn: per-layer gated cross-attention to M_c.
-      MemUpdate = CrossAttn(H_l, M_c, M_c)
-      α = σ(W_g H_l + b_g)          ← input-dependent per-dim gate
-      residual += α ⊙ MemUpdate
+    - memory_attn_res: per-layer unified depth + memory attention.
+      V_pool = [blocks... || partial_block || M_c]
+      α = Softmax(H W_Q (V_pool W_K)^T / √d)
+      H_tilde = α V_pool
+      Gated output for training stability (cold-start scaffold).
 
-    - When memory_state is None, the model is identical to AttnRes.
+    - When memory_state is None, falls back to standard block_attn_res.
 
 Session workflow:
     # After session 1
@@ -52,6 +54,65 @@ from modeling_attnres import (
     Qwen3PreTrainedModel,
     block_attn_res,
 )
+
+
+# ---------------------------------------------------------------------------
+# Unified pool: depth history + memory in one softmax (paper Section 2.2)
+# ---------------------------------------------------------------------------
+
+def memory_attn_res(
+    blocks: list[torch.Tensor],
+    partial_block: torch.Tensor,
+    memory_state: torch.Tensor,
+    q_proj: nn.Linear,
+    k_proj: nn.Linear,
+    norm: Qwen3RMSNorm,
+    recency_bias: nn.Parameter,
+    gate: nn.Linear,
+) -> torch.Tensor:
+    """
+    Unified attention over depth history AND episodic memory in a single softmax.
+
+    V_pool = [blocks..., partial_block, M_c_1, ..., M_c_K]
+    Per-token queries from partial_block attend over the full pool.
+    """
+    B, T, D = partial_block.shape
+    K = memory_state.shape[1]
+
+    # M_c is (B, K, D) — broadcast each vector across T to match block shape
+    mem_expanded = memory_state.unsqueeze(2).expand(B, K, T, D)  # (B, K, T, D)
+    mem_expanded = mem_expanded.permute(1, 0, 2, 3)              # (K, B, T, D)
+
+    depth_stack = torch.stack(blocks + [partial_block], dim=0)   # (N+1, B, T, D)
+    pool = torch.cat([depth_stack, mem_expanded], dim=0)         # (N+1+K, B, T, D)
+
+    keys = k_proj(norm(pool))                                    # (N+1+K, B, T, D)
+    queries = q_proj(partial_block)                              # (B, T, D)
+
+    logits = torch.einsum("b t d, n b t d -> n b t", queries, keys)
+
+    # Recency bias on partial_block (index N, just before memory slots)
+    N = len(blocks)
+    logits[N] = logits[N] + recency_bias
+
+    weights = logits.softmax(dim=0)
+    h_tilde = torch.einsum("n b t, n b t d -> b t d", weights, pool)
+
+    # Sigmoid gate as training scaffold — at init σ(-2)≈0.12, mostly passes through partial_block
+    alpha = torch.sigmoid(gate(partial_block))
+    return (1 - alpha) * partial_block + alpha * h_tilde
+
+
+class MemoryAttnResProjections(nn.Module):
+    def __init__(self, hidden_size: int, gate_init: float = -2.0, norm_eps: float = 1e-6):
+        super().__init__()
+        self.q_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.k_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.norm = Qwen3RMSNorm(hidden_size, eps=norm_eps)
+        self.recency_bias = nn.Parameter(torch.tensor(0.0))
+        self.gate = nn.Linear(hidden_size, hidden_size, bias=True)
+        nn.init.zeros_(self.gate.weight)
+        nn.init.constant_(self.gate.bias, gate_init)
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +364,17 @@ class Qwen3MemResDecoderLayer(Qwen3AttnResDecoderLayer):
 
         self.memres_apply_at = apply_at
 
-        # Add memory cross-attention modules at the requested sublayer(s)
+        # Unified pool projections (paper Section 2.2)
+        if apply_at in ("attn", "both"):
+            self.mem_attn_proj = MemoryAttnResProjections(
+                config.hidden_size, gate_init, norm_eps
+            )
+        if apply_at in ("mlp", "both"):
+            self.mem_mlp_proj = MemoryAttnResProjections(
+                config.hidden_size, gate_init, norm_eps
+            )
+
+        # Legacy: kept for backward compat with old checkpoints
         if apply_at in ("attn", "both"):
             self.mem_cross_attn = MemoryResidualCrossAttn(
                 config.hidden_size, num_heads, gate_init, norm_eps
@@ -323,25 +394,32 @@ class Qwen3MemResDecoderLayer(Qwen3AttnResDecoderLayer):
         use_cache: bool | None = False,
         cache_position: torch.LongTensor | None = None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,
-        memory_state: torch.Tensor | None = None,   # (B, K, d) or None
+        memory_state: torch.Tensor | None = None,
         **kwargs,
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
         entropy_accum = kwargs.pop("entropy_accum", None)
 
         # ---- Attention sublayer ----
-        if entropy_accum is not None:
-            h_attn, ent = block_attn_res(
-                blocks, partial_block,
-                self.attn_res_proj, self.attn_res_norm, self.attn_res_bias,
-                return_entropy=True,
+        if memory_state is not None and self.memres_apply_at in ("attn", "both"):
+            p = self.mem_attn_proj
+            h = memory_attn_res(
+                blocks, partial_block, memory_state,
+                p.q_proj, p.k_proj, p.norm, p.recency_bias, p.gate,
             )
-            entropy_accum.append(ent)
         else:
-            h_attn = block_attn_res(
-                blocks, partial_block,
-                self.attn_res_proj, self.attn_res_norm, self.attn_res_bias,
-            )
-        h = self._apply_gate(partial_block, h_attn, "attn")
+            if entropy_accum is not None:
+                h_attn, ent = block_attn_res(
+                    blocks, partial_block,
+                    self.attn_res_proj, self.attn_res_norm, self.attn_res_bias,
+                    return_entropy=True,
+                )
+                entropy_accum.append(ent)
+            else:
+                h_attn = block_attn_res(
+                    blocks, partial_block,
+                    self.attn_res_proj, self.attn_res_norm, self.attn_res_bias,
+                )
+            h = self._apply_gate(partial_block, h_attn, "attn")
 
         attn_out, _ = self.self_attn(
             hidden_states=self.input_layernorm(h),
@@ -354,35 +432,33 @@ class Qwen3MemResDecoderLayer(Qwen3AttnResDecoderLayer):
         )
         partial_block = partial_block + attn_out
 
-        # Memory cross-attention after attention sublayer
-        if memory_state is not None and self.memres_apply_at in ("attn", "both"):
-            partial_block = partial_block + self.mem_cross_attn(partial_block, memory_state)
-
-        # Full mode: record post-attention state in history
         if self.attnres_mode == "full":
             blocks = blocks + [partial_block]
 
         # ---- MLP sublayer ----
-        if entropy_accum is not None:
-            h_attn, ent = block_attn_res(
-                blocks, partial_block,
-                self.mlp_res_proj, self.mlp_res_norm, self.mlp_res_bias,
-                return_entropy=True,
+        if memory_state is not None and self.memres_apply_at in ("mlp", "both"):
+            p = self.mem_mlp_proj
+            h = memory_attn_res(
+                blocks, partial_block, memory_state,
+                p.q_proj, p.k_proj, p.norm, p.recency_bias, p.gate,
             )
-            entropy_accum.append(ent)
         else:
-            h_attn = block_attn_res(
-                blocks, partial_block,
-                self.mlp_res_proj, self.mlp_res_norm, self.mlp_res_bias,
-            )
-        h = self._apply_gate(partial_block, h_attn, "mlp")
+            if entropy_accum is not None:
+                h_attn, ent = block_attn_res(
+                    blocks, partial_block,
+                    self.mlp_res_proj, self.mlp_res_norm, self.mlp_res_bias,
+                    return_entropy=True,
+                )
+                entropy_accum.append(ent)
+            else:
+                h_attn = block_attn_res(
+                    blocks, partial_block,
+                    self.mlp_res_proj, self.mlp_res_norm, self.mlp_res_bias,
+                )
+            h = self._apply_gate(partial_block, h_attn, "mlp")
 
         mlp_out = self.mlp(self.post_attention_layernorm(h))
         partial_block = partial_block + mlp_out
-
-        # Memory cross-attention after MLP sublayer
-        if memory_state is not None and self.memres_apply_at in ("mlp", "both"):
-            partial_block = partial_block + self.mem_cross_attn_mlp(partial_block, memory_state)
 
         if self.attnres_mode == "full" or self.is_block_boundary:
             blocks = blocks + [partial_block]
@@ -489,9 +565,18 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                 module.attn_res_bias.data.fill_(bias_init)
                 module.mlp_res_bias.data.fill_(bias_init)
 
-            # MemRes sigmoid gate initialization — re-apply after parent resets biases to 0
             gate_init = getattr(self.config, "memres_gate_init", -2.0)
             apply_at = getattr(self.config, "memres_apply_at", "attn")
+
+            # Unified pool projections
+            for attr in ("mem_attn_proj", "mem_mlp_proj"):
+                if hasattr(module, attr):
+                    proj = getattr(module, attr)
+                    nn.init.zeros_(proj.gate.weight)
+                    nn.init.constant_(proj.gate.bias, gate_init)
+                    proj.recency_bias.data.fill_(0.0)
+
+            # Legacy cross-attention gates
             if apply_at in ("attn", "both") and hasattr(module, "mem_cross_attn"):
                 nn.init.zeros_(module.mem_cross_attn.gate_proj.weight)
                 nn.init.constant_(module.mem_cross_attn.gate_proj.bias, gate_init)
