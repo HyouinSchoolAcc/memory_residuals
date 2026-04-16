@@ -1,7 +1,5 @@
 # Memory Residuals
 
-## Quick test
-
 ## Train
 
 ```bash
@@ -13,6 +11,8 @@ torchrun --nproc_per_node=1 train_memres.py \
     --history_len 256 --current_len 128 \
     --steps 200 --batch_size 2 --out_dir output/test_memres
 ```
+
+## Quick test
 
 ```bash
 python eval_memres.py --model_path output/test_memres/final \
