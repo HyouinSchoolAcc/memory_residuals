@@ -1,33 +1,22 @@
 """
 Train Qwen3-MemRes on paired (history, current) conversation data.
 
-Memory Residuals require multi-session data: each training example
-is a (history_ids, current_ids) pair where the model must use compressed
-history to predict current_ids.
-
 Data format (JSONL, one conversation-pair per line):
     {"history": "...", "current": "..."}
 
 If no paired data is available, --simulate_sessions synthesizes pairs
-by splitting FineWeb-Edu documents: the first half is treated as history,
-the second half as the current session. This is an approximation but
-trains the memory mechanism end-to-end.
+by splitting documents: first half = history, second half = current.
 
 Usage:
-    # With simulated sessions (no paired data needed)
     torchrun --nproc_per_node=8 train_memres.py --simulate_sessions
-
-    # With real multi-session data
     torchrun --nproc_per_node=8 train_memres.py --data_path conversations.jsonl
-
-    # Memory + AttnRes (both depth-wise and cross-session)
-    torchrun --nproc_per_node=8 train_memres.py --simulate_sessions --attnres_mode block
 """
 
 import argparse
 import json
 import math
 import os
+import random
 import time
 
 import torch
@@ -43,48 +32,29 @@ from transformers import AutoTokenizer
 def parse_args():
     p = argparse.ArgumentParser()
 
-    # Data
-    p.add_argument("--data_path", default=None,
-                   help="Path to JSONL file with {history, current} pairs. "
-                        "If None, uses --dataset with --simulate_sessions.")
-    p.add_argument("--simulate_sessions", action="store_true",
-                   help="Simulate sessions by splitting FineWeb-Edu documents.")
+    p.add_argument("--data_path", default=None)
+    p.add_argument("--simulate_sessions", action="store_true")
     p.add_argument("--dataset", default="HuggingFaceFW/fineweb-edu")
     p.add_argument("--dataset_name", default="default")
 
-    # Model
     p.add_argument("--hidden_size", type=int, default=512)
     p.add_argument("--num_layers", type=int, default=12)
     p.add_argument("--num_heads", type=int, default=8)
     p.add_argument("--num_kv_heads", type=int, default=4)
     p.add_argument("--intermediate_size", type=int, default=1536)
+    p.add_argument("--head_dim", type=int, default=None)
 
-    # AttnRes (depth-wise)
-    p.add_argument("--attnres_mode", default="block", choices=["block", "full"],
-                   help="Depth-wise AttnRes mode.")
-    p.add_argument("--attnres_num_blocks", type=int, default=4)
-    p.add_argument("--attnres_gate_type", default="bias",
-                   choices=["bias", "sigmoid_scalar", "sigmoid_vector", "learnable_alpha"])
+    p.add_argument("--memres_num_memory_vectors", type=int, default=128)
+    p.add_argument("--memres_num_memory_heads", type=int, default=8)
+    p.add_argument("--memres_apply_at", default="both", choices=["attn", "mlp", "both"])
+    p.add_argument("--memres_use_gate", action="store_true")
+    p.add_argument("--memres_gate_init", type=float, default=-2.0)
 
-    # MemRes (cross-session)
-    p.add_argument("--memres_num_memory_vectors", type=int, default=128,
-                   help="K: number of latent memory slots.")
-    p.add_argument("--memres_num_heads", type=int, default=8,
-                   help="Attention heads in MemoryBlock and per-layer cross-attention.")
-    p.add_argument("--memres_apply_at", default="attn", choices=["attn", "mlp", "both"],
-                   help="Which sublayer to inject memory cross-attention.")
-    p.add_argument("--memres_gate_init", type=float, default=-2.0,
-                   help="Initial gate logit (σ(-2) ≈ 0.12 — near-zero at start).")
+    p.add_argument("--history_len", type=int, default=1024)
+    p.add_argument("--current_len", type=int, default=1024)
 
-    # Sequence lengths
-    p.add_argument("--history_len", type=int, default=1024,
-                   help="Token length of history sequence fed to MemoryBlock.")
-    p.add_argument("--current_len", type=int, default=1024,
-                   help="Token length of current session (predicted).")
-
-    # Training
     p.add_argument("--steps", type=int, default=20_000)
-    p.add_argument("--batch_size", type=int, default=4, help="per-GPU")
+    p.add_argument("--batch_size", type=int, default=4)
     p.add_argument("--grad_accum", type=int, default=2)
     p.add_argument("--lr", type=float, default=6e-4)
     p.add_argument("--lr_min", type=float, default=6e-5)
@@ -108,275 +78,324 @@ def cosine_with_warmup(step, warmup, total, lr_min_ratio):
     return lr_min_ratio + (1 - lr_min_ratio) * cos
 
 
-def jsonl_session_stream(data_path, tokenizer, history_len, current_len, rank, world_size, seed):
-    """Stream (history_ids, current_ids) pairs from a JSONL file."""
-    import random
-    rng = random.Random(seed + rank)
+class SessionStream:
+    """Base for (history_ids, current_ids) producers, sharded across ranks."""
 
-    with open(data_path) as f:
-        lines = f.readlines()
+    def __init__(self, tokenizer, history_len, current_len, rank, world_size, seed):
+        self.tokenizer = tokenizer
+        self.history_len = history_len
+        self.current_len = current_len
+        self.rank = rank
+        self.world_size = world_size
+        self.seed = seed
 
-    rng.shuffle(lines)
-    lines = lines[rank::world_size]  # shard by rank
+    def __iter__(self):
+        raise NotImplementedError
 
-    while True:
+
+class JsonlSessionStream(SessionStream):
+    def __init__(self, data_path, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data_path = data_path
+
+    def __iter__(self):
+        rng = random.Random(self.seed + self.rank)
+        with open(self.data_path) as f:
+            lines = f.readlines()
         rng.shuffle(lines)
-        for line in lines:
-            obj = json.loads(line)
-            history_text = obj.get("history", "")
-            current_text = obj.get("current", "")
-            if not history_text or not current_text:
+        lines = lines[self.rank :: self.world_size]
+
+        tok = self.tokenizer
+        H, C = self.history_len, self.current_len
+        while True:
+            rng.shuffle(lines)
+            for line in lines:
+                obj = json.loads(line)
+                ht, ct = obj.get("history", ""), obj.get("current", "")
+                if not ht or not ct:
+                    continue
+                h_ids = tok.encode(ht, add_special_tokens=False)[:H]
+                c_ids = tok.encode(ct, add_special_tokens=False)[: C + 1]
+                if len(h_ids) < 16 or len(c_ids) < 2:
+                    continue
+                h_ids = h_ids + [tok.eos_token_id] * (H - len(h_ids))
+                yield (
+                    torch.tensor(h_ids[:H], dtype=torch.long),
+                    torch.tensor(c_ids[: C + 1], dtype=torch.long),
+                )
+
+
+class SimulatedSessionStream(SessionStream):
+    """Split streamed documents into first-half/second-half pairs."""
+
+    def __init__(self, dataset_name, config_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset_name = dataset_name
+        self.config_name = config_name
+
+    def __iter__(self):
+        from datasets import load_dataset
+
+        total_len = self.history_len + self.current_len + 1
+        ds = load_dataset(
+            self.dataset_name, name=self.config_name, split="train", streaming=True
+        )
+        ds = ds.shuffle(seed=self.seed, buffer_size=10_000)
+        ds = ds.shard(num_shards=self.world_size, index=self.rank)
+
+        buf = []
+        for sample in ds:
+            text = sample.get("text") or sample.get("content") or ""
+            if not text:
                 continue
+            ids = self.tokenizer.encode(text, add_special_tokens=False)
+            ids.append(self.tokenizer.eos_token_id)
+            buf.extend(ids)
 
-            h_ids = tokenizer.encode(history_text, add_special_tokens=False)[:history_len]
-            c_ids = tokenizer.encode(current_text, add_special_tokens=False)[:current_len + 1]
+            while len(buf) >= total_len:
+                chunk = buf[:total_len]
+                buf = buf[total_len:]
+                yield (
+                    torch.tensor(chunk[: self.history_len], dtype=torch.long),
+                    torch.tensor(chunk[self.history_len :], dtype=torch.long),
+                )
 
-            if len(h_ids) < 16 or len(c_ids) < 2:
-                continue
 
-            # Pad history to history_len
-            h_ids = h_ids + [tokenizer.eos_token_id] * (history_len - len(h_ids))
-            yield (
-                torch.tensor(h_ids[:history_len], dtype=torch.long),
-                torch.tensor(c_ids[:current_len + 1], dtype=torch.long),
+class Trainer:
+    def __init__(self, args):
+        self.args = args
+        self._init_distributed()
+        self._resolve_names()
+        torch.manual_seed(args.seed + self.rank)
+
+        self.use_wandb = self._init_wandb()
+        self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+        self.model = self._build_model()
+        self._log_param_counts()
+        self.ddp = DDP(
+            self.model, device_ids=[self.local_rank], find_unused_parameters=True
+        )
+        self.optimizer, self.scheduler = self._build_optimizer()
+        self.stream = self._build_stream()
+        os.makedirs(args.out_dir, exist_ok=True)
+
+    def _init_distributed(self):
+        dist.init_process_group("nccl")
+        self.rank = dist.get_rank()
+        self.world_size = dist.get_world_size()
+        self.local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        self.device = torch.device(f"cuda:{self.local_rank}")
+        torch.cuda.set_device(self.device)
+        self.is_main = self.rank == 0
+
+    def _resolve_names(self):
+        a = self.args
+        if a.run_name is None:
+            a.run_name = (
+                f"memres-d{a.hidden_size}-L{a.num_layers}"
+                f"-K{a.memres_num_memory_vectors}-{a.steps // 1000}k"
+            )
+        if a.out_dir is None:
+            a.out_dir = f"./output/{a.run_name}"
+
+    def _init_wandb(self):
+        if not self.is_main:
+            return False
+        try:
+            import wandb
+
+            wandb.init(
+                project=self.args.wandb_project,
+                entity=self.args.wandb_entity,
+                name=self.args.run_name,
+                config=vars(self.args),
+            )
+            return True
+        except Exception as e:
+            print(f"W&B init failed ({e}), continuing without logging")
+            return False
+
+    def _build_model(self):
+        a = self.args
+        head_dim = a.head_dim or (a.hidden_size // a.num_heads)
+        config = Qwen3MemResConfig(
+            vocab_size=151936,
+            hidden_size=a.hidden_size,
+            num_hidden_layers=a.num_layers,
+            num_attention_heads=a.num_heads,
+            num_key_value_heads=a.num_kv_heads,
+            intermediate_size=a.intermediate_size,
+            max_position_embeddings=(a.history_len + a.current_len) * 2,
+            rms_norm_eps=1e-6,
+            tie_word_embeddings=True,
+            head_dim=head_dim,
+            memres_num_memory_vectors=a.memres_num_memory_vectors,
+            memres_num_memory_heads=a.memres_num_memory_heads,
+            memres_apply_at=a.memres_apply_at,
+            memres_use_gate=a.memres_use_gate,
+            memres_gate_init=a.memres_gate_init,
+        )
+        model = Qwen3MemResForCausalLM(config)
+        return model.to(dtype=torch.bfloat16, device=self.device)
+
+    def _log_param_counts(self):
+        if not self.is_main:
+            return
+        a = self.args
+        n_total = sum(p.numel() for p in self.model.parameters()) / 1e6
+        n_memres = sum(
+            p.numel()
+            for n, p in self.model.named_parameters()
+            if "memory_block" in n or "memres_attn" in n or "memres_mlp" in n
+        )
+        print(f"Model: {n_total:.1f}M total | MemRes: {n_memres / 1e3:.1f}K")
+        print(
+            f"K={a.memres_num_memory_vectors} | history_len={a.history_len} | "
+            f"current_len={a.current_len}"
+        )
+
+    def _build_optimizer(self):
+        a = self.args
+        optimizer = AdamW(
+            self.ddp.parameters(),
+            lr=a.lr,
+            betas=(0.9, 0.95),
+            weight_decay=0.1,
+            eps=1e-8,
+        )
+        lr_min_ratio = a.lr_min / a.lr
+        scheduler = LambdaLR(
+            optimizer,
+            lr_lambda=lambda s: cosine_with_warmup(s, a.warmup, a.steps, lr_min_ratio),
+        )
+        return optimizer, scheduler
+
+    def _build_stream(self):
+        a = self.args
+        common = dict(
+            tokenizer=self.tokenizer,
+            history_len=a.history_len,
+            current_len=a.current_len,
+            rank=self.rank,
+            world_size=self.world_size,
+            seed=a.seed,
+        )
+        if a.data_path is not None:
+            return iter(JsonlSessionStream(a.data_path, **common))
+        if a.simulate_sessions:
+            return iter(SimulatedSessionStream(a.dataset, a.dataset_name, **common))
+        raise ValueError("Provide --data_path or --simulate_sessions")
+
+    def _compute_memory_state(self, history_ids):
+        # History encoder runs without grad; compress_history keeps grad
+        # on the MemoryBlock so it learns end-to-end.
+        with torch.no_grad():
+            h_out = self.ddp.module.model(input_ids=history_ids)
+        return self.ddp.module.model.compress_history(h_out.last_hidden_state.detach())
+
+    def _train_step(self, history_ids, current_ids):
+        input_ids = current_ids[:, :-1]
+        labels = input_ids
+        memory_state = self._compute_memory_state(history_ids)
+        out = self.ddp(input_ids=input_ids, labels=labels, memory_state=memory_state)
+        loss = out.loss / self.args.grad_accum
+        loss.backward()
+        return loss.item()
+
+    def _log(self, step, accum_loss, grad_norm, tokens_seen, t0):
+        loss_t = torch.tensor(accum_loss, device=self.device)
+        dist.all_reduce(loss_t, op=dist.ReduceOp.AVG)
+        if not self.is_main:
+            return
+        elapsed = time.time() - t0
+        tok_sec = tokens_seen * self.world_size / elapsed
+        lr_now = self.scheduler.get_last_lr()[0]
+        avg_loss = loss_t.item()
+        print(
+            f"step {step:6d} | loss {avg_loss:.4f} | lr {lr_now:.2e} | "
+            f"grad_norm {grad_norm:.3f} | {tok_sec / 1e3:.1f}k tok/s"
+        )
+        if self.use_wandb:
+            import wandb
+
+            wandb.log(
+                {
+                    "train/loss": avg_loss,
+                    "train/lr": lr_now,
+                    "train/grad_norm": grad_norm,
+                    "train/tok_per_s": tok_sec,
+                },
+                step=step,
             )
 
+    def _save(self, tag: str):
+        if not self.is_main:
+            return
+        ckpt_dir = os.path.join(self.args.out_dir, tag)
+        self.ddp.module.save_pretrained(ckpt_dir)
+        self.tokenizer.save_pretrained(ckpt_dir)
+        print(f"Saved checkpoint -> {ckpt_dir}")
 
-def simulated_session_stream(dataset_name, config_name, tokenizer,
-                             history_len, current_len, rank, world_size, seed):
-    """
-    Simulate multi-session pairs by splitting FineWeb-Edu documents.
-    First half → history, second half → current session.
-    This trains the memory mechanism without requiring paired dialogue data.
-    """
-    from datasets import load_dataset
+    def fit(self):
+        a = self.args
+        self.ddp.train()
+        self.optimizer.zero_grad()
 
-    total_len = history_len + current_len + 1  # +1 for label shift
-    ds = load_dataset(dataset_name, name=config_name, split="train",
-                      streaming=True, trust_remote_code=True)
-    ds = ds.shuffle(seed=seed + rank, buffer_size=10_000)
-    ds = ds.skip(rank)
+        global_step = 0
+        accum_step = 0
+        accum_loss = 0.0
+        tokens_seen = 0
+        t0 = time.time()
+        batch_h, batch_c = [], []
 
-    buf = []
-    for sample in ds:
-        text = sample.get("text") or sample.get("content") or ""
-        if not text:
-            continue
-        ids = tokenizer.encode(text, add_special_tokens=False)
-        ids.append(tokenizer.eos_token_id)
-        buf.extend(ids)
+        for history_ids, current_ids in self.stream:
+            if global_step >= a.steps:
+                break
 
-        while len(buf) >= total_len:
-            chunk = buf[:total_len]
-            buf = buf[world_size * total_len:]
+            batch_h.append(history_ids)
+            batch_c.append(current_ids)
+            if len(batch_h) < a.batch_size:
+                continue
 
-            h_ids = chunk[:history_len]
-            c_ids = chunk[history_len:]  # length current_len + 1
+            hist = torch.stack(batch_h).to(self.device)
+            curr = torch.stack(batch_c).to(self.device)
+            batch_h, batch_c = [], []
 
-            yield (
-                torch.tensor(h_ids, dtype=torch.long),
-                torch.tensor(c_ids, dtype=torch.long),
+            accum_loss += self._train_step(hist, curr)
+            accum_step += 1
+            tokens_seen += a.current_len * a.batch_size
+
+            if accum_step < a.grad_accum:
+                continue
+
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                self.ddp.parameters(), a.max_norm
             )
+            self.optimizer.step()
+            self.scheduler.step()
+            self.optimizer.zero_grad()
+            global_step += 1
+            accum_step = 0
 
+            if global_step % a.log_every == 0:
+                self._log(global_step, accum_loss, grad_norm, tokens_seen, t0)
+                tokens_seen = 0
+                t0 = time.time()
+            accum_loss = 0.0
 
-def build_model(args, device):
-    common = dict(
-        vocab_size=151936,
-        hidden_size=args.hidden_size,
-        num_hidden_layers=args.num_layers,
-        num_attention_heads=args.num_heads,
-        num_key_value_heads=args.num_kv_heads,
-        intermediate_size=args.intermediate_size,
-        max_position_embeddings=(args.history_len + args.current_len) * 2,
-        rms_norm_eps=1e-6,
-        tie_word_embeddings=True,
-        head_dim=args.hidden_size // args.num_heads,
-        # AttnRes
-        attnres_num_blocks=args.attnres_num_blocks,
-        attnres_recency_bias_init=0.0,
-        attnres_mode=args.attnres_mode,
-        attnres_gate_type=args.attnres_gate_type,
-        # MemRes
-        memres_num_memory_vectors=args.memres_num_memory_vectors,
-        memres_num_heads=args.memres_num_heads,
-        memres_apply_at=args.memres_apply_at,
-        memres_gate_init=args.memres_gate_init,
-    )
+            if global_step % a.save_every == 0:
+                self._save(f"step-{global_step}")
 
-    config = Qwen3MemResConfig(**common)
-    model = Qwen3MemResForCausalLM(config)
-    return model.to(dtype=torch.bfloat16, device=device)
+        self._save("final")
+        if self.is_main and self.use_wandb:
+            import wandb
+
+            wandb.finish()
+        dist.destroy_process_group()
 
 
 def main():
-    args = parse_args()
-
-    if args.run_name is None:
-        args.run_name = (
-            f"memres-d{args.hidden_size}-L{args.num_layers}"
-            f"-K{args.memres_num_memory_vectors}-{args.steps // 1000}k"
-        )
-    if args.out_dir is None:
-        args.out_dir = f"./output/{args.run_name}"
-
-    dist.init_process_group("nccl")
-    rank = dist.get_rank()
-    world_size = dist.get_world_size()
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    device = torch.device(f"cuda:{local_rank}")
-    torch.cuda.set_device(device)
-    is_main = rank == 0
-
-    torch.manual_seed(args.seed + rank)
-
-    use_wandb = False
-    if is_main:
-        try:
-            import wandb
-            wandb.init(
-                project=args.wandb_project,
-                entity=args.wandb_entity,
-                name=args.run_name,
-                config=vars(args),
-            )
-            use_wandb = True
-        except Exception as e:
-            print(f"W&B init failed ({e}), continuing without logging")
-
-    if is_main:
-        print(f"Building MemRes model...")
-
-    model = build_model(args, device)
-    n_params = sum(p.numel() for p in model.parameters()) / 1e6
-
-    if is_main:
-        n_memres = sum(p.numel() for n, p in model.named_parameters()
-                       if "memory_block" in n or "mem_cross" in n)
-        print(f"Model: {n_params:.1f}M total params | MemRes params: {n_memres / 1e3:.1f}K")
-        print(f"Memory vectors K={args.memres_num_memory_vectors} | "
-              f"history_len={args.history_len} | current_len={args.current_len}")
-
-    find_unused = args.attnres_gate_type != "bias"
-    model = DDP(model, device_ids=[local_rank], find_unused_parameters=find_unused)
-
-    optimizer = AdamW(
-        model.parameters(), lr=args.lr,
-        betas=(0.9, 0.95), weight_decay=0.1, eps=1e-8,
-    )
-    lr_min_ratio = args.lr_min / args.lr
-    scheduler = LambdaLR(
-        optimizer,
-        lr_lambda=lambda s: cosine_with_warmup(s, args.warmup, args.steps, lr_min_ratio),
-    )
-
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
-
-    if args.data_path is not None:
-        stream = jsonl_session_stream(
-            args.data_path, tokenizer,
-            args.history_len, args.current_len,
-            rank, world_size, args.seed,
-        )
-    elif args.simulate_sessions:
-        stream = simulated_session_stream(
-            args.dataset, args.dataset_name, tokenizer,
-            args.history_len, args.current_len,
-            rank, world_size, args.seed,
-        )
-    else:
-        raise ValueError("Provide --data_path or --simulate_sessions")
-
-    os.makedirs(args.out_dir, exist_ok=True)
-    model.train()
-    optimizer.zero_grad()
-
-    global_step = 0
-    accum_step = 0
-    accum_loss = 0.0
-    t0 = time.time()
-    tokens_seen = 0
-
-    for history_ids, current_ids in stream:
-        if global_step >= args.steps:
-            break
-
-        history_ids = history_ids.unsqueeze(0).to(device)   # (1, history_len)
-        current_ids = current_ids.unsqueeze(0).to(device)   # (1, current_len + 1)
-        input_ids = current_ids[:, :-1]                     # (1, current_len)
-        labels = input_ids
-
-        # Step 1: encode history → M_c
-        # We run a forward pass over history_ids with no memory to get hidden states,
-        # then compress them via MemoryBlock.
-        with torch.no_grad():
-            history_out = model.module.model(input_ids=history_ids)
-            memory_state = model.module.model.compress_history(
-                history_out.last_hidden_state
-            )  # (1, K, d)
-
-        # Step 2: train on current session conditioned on M_c
-        out = model(input_ids=input_ids, labels=labels, memory_state=memory_state)
-        loss = out.loss / args.grad_accum
-        loss.backward()
-
-        accum_loss += loss.item()
-        accum_step += 1
-        tokens_seen += args.current_len
-
-        if accum_step < args.grad_accum:
-            continue
-
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
-        optimizer.step()
-        scheduler.step()
-        optimizer.zero_grad()
-
-        global_step += 1
-        accum_step = 0
-
-        if global_step % args.log_every == 0:
-            loss_t = torch.tensor(accum_loss, device=device)
-            dist.all_reduce(loss_t, op=dist.ReduceOp.AVG)
-
-            if is_main:
-                elapsed = time.time() - t0
-                tok_sec = tokens_seen * world_size / elapsed
-                avg_loss = loss_t.item()
-                lr_now = scheduler.get_last_lr()[0]
-                print(
-                    f"step {global_step:6d} | loss {avg_loss:.4f} | "
-                    f"lr {lr_now:.2e} | grad_norm {grad_norm:.3f} | "
-                    f"{tok_sec / 1e3:.1f}k tok/s"
-                )
-                if use_wandb:
-                    import wandb
-                    wandb.log({
-                        "train/loss": avg_loss,
-                        "train/lr": lr_now,
-                        "train/grad_norm": grad_norm,
-                        "train/tok_per_s": tok_sec,
-                    }, step=global_step)
-
-                tokens_seen = 0
-                t0 = time.time()
-        accum_loss = 0.0
-
-        if is_main and global_step % args.save_every == 0:
-            ckpt_dir = os.path.join(args.out_dir, f"step-{global_step}")
-            model.module.save_pretrained(ckpt_dir)
-            tokenizer.save_pretrained(ckpt_dir)
-            print(f"Saved checkpoint → {ckpt_dir}")
-
-    if is_main:
-        final_dir = os.path.join(args.out_dir, "final")
-        model.module.save_pretrained(final_dir)
-        tokenizer.save_pretrained(final_dir)
-        print(f"Training done. Final model → {final_dir}")
-        if use_wandb:
-            import wandb
-            wandb.finish()
-
-    dist.destroy_process_group()
+    Trainer(parse_args()).fit()
 
 
 if __name__ == "__main__":

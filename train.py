@@ -34,18 +34,29 @@ from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", default="baseline", choices=["baseline", "block", "full"],
-                   help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes)")
+    p.add_argument(
+        "--mode",
+        default="baseline",
+        choices=["baseline", "block", "full"],
+        help="baseline (standard Qwen3), block (Block AttnRes), full (Full AttnRes)",
+    )
     p.add_argument("--hidden_size", type=int, default=512)
     p.add_argument("--num_layers", type=int, default=12)
     p.add_argument("--num_heads", type=int, default=8)
     p.add_argument("--num_kv_heads", type=int, default=4)
     p.add_argument("--intermediate_size", type=int, default=1536)
-    p.add_argument("--num_blocks", type=int, default=4,
-                   help="Number of AttnRes blocks (for block mode)")
-    p.add_argument("--gate_type", default="bias",
-                   choices=["bias", "sigmoid_scalar", "sigmoid_vector", "learnable_alpha"],
-                   help="Gate type for mixing AttnRes output with residual stream")
+    p.add_argument(
+        "--num_blocks",
+        type=int,
+        default=4,
+        help="Number of AttnRes blocks (for block mode)",
+    )
+    p.add_argument(
+        "--gate_type",
+        default="bias",
+        choices=["bias", "sigmoid_scalar", "sigmoid_vector", "learnable_alpha"],
+        help="Gate type for mixing AttnRes output with residual stream",
+    )
     p.add_argument("--dataset", default="HuggingFaceFW/fineweb-edu")
     p.add_argument("--dataset_name", default="default")
     p.add_argument("--seq_len", type=int, default=2048)
@@ -63,6 +74,11 @@ def parse_args():
     p.add_argument("--wandb_entity", default="wdlctc_abr")
     p.add_argument("--run_name", default=None)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        help="Quick smoke-test: tiny model, 20 steps, no W&B",
+    )
     return p.parse_args()
 
 
@@ -76,8 +92,13 @@ def cosine_with_warmup(step, warmup, total, lr_min_ratio):
 
 def token_stream(dataset_name, config_name, tokenizer, seq_len, rank, world_size, seed):
     from datasets import load_dataset
-    ds = load_dataset(dataset_name, name=config_name, split="train",
-                      streaming=True, trust_remote_code=True)
+
+    ds = load_dataset(
+        dataset_name,
+        name=config_name,
+        split="train",
+        streaming=True,
+    )
     ds = ds.shuffle(seed=seed + rank, buffer_size=10_000)
     ds = ds.skip(rank)
     buf = []
@@ -89,8 +110,8 @@ def token_stream(dataset_name, config_name, tokenizer, seq_len, rank, world_size
         ids.append(tokenizer.eos_token_id)
         buf.extend(ids)
         while len(buf) >= seq_len + 1:
-            chunk = buf[:seq_len + 1]
-            buf = buf[world_size * seq_len:]
+            chunk = buf[: seq_len + 1]
+            buf = buf[world_size * seq_len :]
             yield torch.tensor(chunk, dtype=torch.long)
 
 
@@ -129,29 +150,56 @@ def build_model(args, device):
 def main():
     args = parse_args()
 
+    if args.debug:
+        args.hidden_size = 128
+        args.num_layers = 4
+        args.num_heads = 4
+        args.num_kv_heads = 2
+        args.intermediate_size = 256
+        args.num_blocks = 2
+        args.steps = 20
+        args.seq_len = 128
+        args.batch_size = 2
+        args.grad_accum = 1
+        args.save_every = 999_999
+        args.log_every = 1
+        args.wandb_project = None
+
     if args.run_name is None:
-        args.run_name = f"scratch-{args.mode}-d{args.hidden_size}-L{args.num_layers}-{args.steps//1000}k"
+        args.run_name = f"scratch-{args.mode}-d{args.hidden_size}-L{args.num_layers}-{args.steps // 1000}k"
     if args.out_dir is None:
-        args.out_dir = f"./output/scratch-{args.mode}-d{args.hidden_size}-L{args.num_layers}-{args.steps//1000}k"
+        args.out_dir = f"./output/scratch-{args.mode}-d{args.hidden_size}-L{args.num_layers}-{args.steps // 1000}k"
 
     # ── distributed ──
-    dist.init_process_group("nccl")
-    rank = dist.get_rank()
-    world_size = dist.get_world_size()
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    device = torch.device(f"cuda:{local_rank}")
-    torch.cuda.set_device(device)
+    _distributed = "RANK" in os.environ
+    if _distributed:
+        dist.init_process_group("nccl")
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    else:
+        rank = 0
+        world_size = 1
+        local_rank = 0
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        torch.cuda.set_device(device)
     is_main = rank == 0
 
     torch.manual_seed(args.seed + rank)
 
     # ── W&B ──
     use_wandb = False
-    if is_main:
+    if is_main and not args.debug:
         try:
             import wandb
-            wandb.init(project=args.wandb_project, entity=args.wandb_entity,
-                       name=args.run_name, config=vars(args))
+
+            wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                name=args.run_name,
+                config=vars(args),
+            )
             use_wandb = True
         except Exception as e:
             print(f"W&B init failed ({e}), continuing without logging")
@@ -164,28 +212,45 @@ def main():
 
     n_params = sum(p.numel() for p in model.parameters()) / 1e6
     if is_main:
-        print(f"Model: {n_params:.1f}M params | mode={args.mode} | d={args.hidden_size} L={args.num_layers}")
+        print(
+            f"Model: {n_params:.1f}M params | mode={args.mode} | d={args.hidden_size} L={args.num_layers}"
+        )
         if args.mode != "baseline":
-            n_attnres = sum(p.numel() for n, p in model.named_parameters() if "res_" in n)
-            print(f"AttnRes params: {n_attnres/1e3:.1f}K")
+            n_attnres = sum(
+                p.numel() for n, p in model.named_parameters() if "res_" in n
+            )
+            print(f"AttnRes params: {n_attnres / 1e3:.1f}K")
 
     # find_unused_parameters needed when some params aren't in the forward graph
     find_unused = args.gate_type != "bias"
-    model = DDP(model, device_ids=[local_rank], find_unused_parameters=find_unused)
+    if _distributed:
+        model = DDP(model, device_ids=[local_rank], find_unused_parameters=find_unused)
+
+    _model = model.module if _distributed else model
 
     # ── optimizer ──
-    optimizer = AdamW(model.parameters(), lr=args.lr,
-                      betas=(0.9, 0.95), weight_decay=0.1, eps=1e-8)
+    optimizer = AdamW(
+        model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1, eps=1e-8
+    )
     lr_min_ratio = args.lr_min / args.lr
     scheduler = LambdaLR(
         optimizer,
-        lr_lambda=lambda s: cosine_with_warmup(s, args.warmup, args.steps, lr_min_ratio),
+        lr_lambda=lambda s: cosine_with_warmup(
+            s, args.warmup, args.steps, lr_min_ratio
+        ),
     )
 
     # ── data ──
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
-    stream = token_stream(args.dataset, args.dataset_name, tokenizer,
-                          args.seq_len, rank, world_size, args.seed)
+    stream = token_stream(
+        args.dataset,
+        args.dataset_name,
+        tokenizer,
+        args.seq_len,
+        rank,
+        world_size,
+        args.seed,
+    )
 
     # ── training ──
     os.makedirs(args.out_dir, exist_ok=True)
@@ -200,6 +265,7 @@ def main():
 
     for chunk in stream:
         if global_step >= args.steps:
+            stream.close()
             break
 
         input_ids = chunk[:-1].unsqueeze(0).to(device)
@@ -226,25 +292,32 @@ def main():
 
         if global_step % args.log_every == 0:
             loss_t = torch.tensor(accum_loss, device=device)
-            dist.all_reduce(loss_t, op=dist.ReduceOp.AVG)
+            if _distributed:
+                dist.all_reduce(loss_t, op=dist.ReduceOp.AVG)
 
             if is_main:
                 elapsed = time.time() - t0
                 tok_sec = tokens_seen * world_size / elapsed
                 avg_loss = loss_t.item()
                 lr_now = scheduler.get_last_lr()[0]
-                print(f"step {global_step:6d} | loss {avg_loss:.4f} | "
-                      f"lr {lr_now:.2e} | grad_norm {grad_norm:.3f} | "
-                      f"{tok_sec/1e3:.1f}k tok/s")
+                print(
+                    f"step {global_step:6d} | loss {avg_loss:.4f} | "
+                    f"lr {lr_now:.2e} | grad_norm {grad_norm:.3f} | "
+                    f"{tok_sec / 1e3:.1f}k tok/s"
+                )
 
                 if use_wandb:
                     import wandb
-                    wandb.log({
-                        "train/loss": avg_loss,
-                        "train/lr": lr_now,
-                        "train/grad_norm": grad_norm,
-                        "train/tok_per_s": tok_sec,
-                    }, step=global_step)
+
+                    wandb.log(
+                        {
+                            "train/loss": avg_loss,
+                            "train/lr": lr_now,
+                            "train/grad_norm": grad_norm,
+                            "train/tok_per_s": tok_sec,
+                        },
+                        step=global_step,
+                    )
 
                 tokens_seen = 0
                 t0 = time.time()
@@ -252,20 +325,22 @@ def main():
 
         if is_main and global_step % args.save_every == 0:
             ckpt_dir = os.path.join(args.out_dir, f"step-{global_step}")
-            model.module.save_pretrained(ckpt_dir)
+            _model.save_pretrained(ckpt_dir)
             tokenizer.save_pretrained(ckpt_dir)
             print(f"Saved checkpoint → {ckpt_dir}")
 
     if is_main:
         final_dir = os.path.join(args.out_dir, "final")
-        model.module.save_pretrained(final_dir)
+        _model.save_pretrained(final_dir)
         tokenizer.save_pretrained(final_dir)
         print(f"Training done. Final model → {final_dir}")
         if use_wandb:
             import wandb
+
             wandb.finish()
 
-    dist.destroy_process_group()
+    if _distributed:
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":
