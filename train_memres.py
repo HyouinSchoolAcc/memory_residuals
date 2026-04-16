@@ -36,6 +36,12 @@ def parse_args():
     p.add_argument("--simulate_sessions", action="store_true")
     p.add_argument("--dataset", default="HuggingFaceFW/fineweb-edu")
     p.add_argument("--dataset_name", default="default")
+    p.add_argument(
+        "--pretrained",
+        default=None,
+        help="HF model id or path to load pretrained Qwen3 weights onto; "
+        "MemRes params stay randomly initialized. Ignores size flags.",
+    )
 
     p.add_argument("--hidden_size", type=int, default=512)
     p.add_argument("--num_layers", type=int, default=12)
@@ -217,25 +223,42 @@ class Trainer:
 
     def _build_model(self):
         a = self.args
-        head_dim = a.head_dim or (a.hidden_size // a.num_heads)
-        config = Qwen3MemResConfig(
-            vocab_size=151936,
-            hidden_size=a.hidden_size,
-            num_hidden_layers=a.num_layers,
-            num_attention_heads=a.num_heads,
-            num_key_value_heads=a.num_kv_heads,
-            intermediate_size=a.intermediate_size,
-            max_position_embeddings=(a.history_len + a.current_len) * 2,
-            rms_norm_eps=1e-6,
-            tie_word_embeddings=True,
-            head_dim=head_dim,
+        memres_kwargs = dict(
             memres_num_memory_vectors=a.memres_num_memory_vectors,
             memres_num_memory_heads=a.memres_num_memory_heads,
             memres_apply_at=a.memres_apply_at,
             memres_use_gate=a.memres_use_gate,
             memres_gate_init=a.memres_gate_init,
         )
-        model = Qwen3MemResForCausalLM(config)
+
+        if a.pretrained:
+            from transformers import AutoConfig
+
+            base_cfg = AutoConfig.from_pretrained(a.pretrained)
+            base_dict = base_cfg.to_dict()
+            base_dict["tie_word_embeddings"] = False
+            config = Qwen3MemResConfig(**{**base_dict, **memres_kwargs})
+            model = Qwen3MemResForCausalLM.from_pretrained(
+                a.pretrained, config=config, dtype=torch.bfloat16
+            )
+            if self.is_main:
+                print(f"Loaded pretrained base: {a.pretrained}")
+        else:
+            head_dim = a.head_dim or (a.hidden_size // a.num_heads)
+            config = Qwen3MemResConfig(
+                vocab_size=151936,
+                hidden_size=a.hidden_size,
+                num_hidden_layers=a.num_layers,
+                num_attention_heads=a.num_heads,
+                num_key_value_heads=a.num_kv_heads,
+                intermediate_size=a.intermediate_size,
+                max_position_embeddings=(a.history_len + a.current_len) * 2,
+                rms_norm_eps=1e-6,
+                tie_word_embeddings=True,
+                head_dim=head_dim,
+                **memres_kwargs,
+            )
+            model = Qwen3MemResForCausalLM(config)
         return model.to(dtype=torch.bfloat16, device=self.device)
 
     def _log_param_counts(self):
