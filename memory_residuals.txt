@@ -1,0 +1,204 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{xcolor}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Innate Working Memory via Memory Residuals},
+}
+
+\title{\textbf{Memory Residuals}}
+\author{
+    \textbf{Yueze Liu} \\
+    Independent Researcher  \\
+    \href{mailto:yuezel2@illinois.edu}{yuezel2@illinois.edu} 
+    \and
+    \textbf{Call for Collaboration} \\
+    Seeking Academic Partnership
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Modern Large Language Models (LLMs) deployed as conversational agents are constrained by their inability to maintain lifelong, multi-session memory. Current paradigms rely on either concatenating ever-expanding chat histories (leading to context dilution and massive compute overhead) or bolting on external Vector-DB Retrieval-Augmented Generation (RAG) and text summarization systems. Both approaches lack innate cognitive routing—the ability to implicitly choose \textit{what} to remember from the past and \textit{when} to actively recall it. Drawing inspiration from human episodic memory, we propose Memory Residuals. By forcing multi-turn conversation logs through a recurrent, learnable summarizing memory block, we create a dense latent state of user persona and history. Rather than appending this state to the sequence context window, we inject it directly into the depth-wise residual stream, allowing models to seamlessly bypass memory during standard dialogue and sample it heavily during historical callbacks. This position paper outlines the mathematical formulation of Memory Residuals as an elegant replacement for rigid external state-tracking, and calls for collaborative empirical validation.
+\end{abstract}
+
+\vspace{0.5cm}
+
+\section{Introduction}
+The current trajectory of memory scaling in Transformer-based architectures \cite{vaswani2017attention} fails to address the unique demands of lifelong conversational AI. To give agents persistent memory across thousands of distinct conversational turns, developers either brute-force the context window (expanding sequence length $N$ and suffering from $O(N^2)$ scaling limits), or they rely on rigid, non-differentiable workarounds like text-summarization loops and external Retrieval-Augmented Generation (RAG) databases \cite{lewis2020retrieval}. 
+
+These approaches are fundamentally inefficient. Appending 50 past chat sessions to a system prompt is computationally wasteful for a simple greeting turn, and semantic search often fails to capture evolving implicit user preferences. Human cognition does not perfectly retain raw conversational transcripts, nor does it search a disconnected database to maintain a relationship. Instead:
+\begin{enumerate}
+    \item \textbf{Human episodic memory is finite and latent} (compressing raw dialogue into dense, high-level semantic abstractions and state).
+    \item \textbf{Human memory retrieval is top-down and attention-driven}; we innately route our cognition, bypassing memory for casual conversational filler, and heavily querying past interactions by dynamically weighing them into our active thoughts.
+\end{enumerate}
+
+We argue that this dynamic, information-choosing behavior should be baked natively into the architecture. In this paper, we propose a mechanism that merges finite latent space compression with recent advancements in depth-wise attention routing \cite{du2026attention}, creating a persistent, differentiable memory state for multi-session AI.
+
+\section{The Core Paradigm: Memory Residuals}
+We introduce \textbf{Memory Residuals}, an end-to-end differentiable working memory mechanism. It operates by breaking down lifelong conversational tracking into two key architectural advances: the recurrent, incremental construction of a latent episodic memory block, and the dynamic, single-pass querying of that block via the model's internal residual stream.
+
+\subsection{Key Advance 1: Recurrent Updates via Two-Stage QKV Competition}
+A naive approach to memory compression might attempt to attend over all historical tokens at once, but this recreates the very $O(N^2)$ context limits we seek to avoid. Furthermore, compressing thousands of conversational turns into a fixed latent bottleneck risks catastrophic forgetting, where conversational filler from a new session overwrites critical persona data established sessions ago.
+
+To resolve this, we formulate the episodic memory block as an incrementally updated matrix $M_{\text{c}} \in \mathbb{R}^{K \times d}$ (where $K$ is a small, fixed number of latent vectors, e.g., 128, and $d$ is the hidden dimension). We update this state using a \textbf{Two-Stage QKV Pipeline}, separating the tasks of information \textit{extraction} and information \textit{judgment}.
+
+Let $M_{\text{c}}^{t-1} \in \mathbb{R}^{K \times d}$ be the persistent latent memory state prior to session $t$, and let $C_t \in \mathbb{R}^{N_t \times d}$ be the raw tokens of the newly completed session.
+
+\paragraph{Stage 1: The Extraction Layer (Compression)}
+First, we compress the local session into a dense candidate state $E_t \in \mathbb{R}^{K \times d}$. Using a set of fixed, learnable extraction queries $M_{\text{in}}$, the model pulls only the salient features from the raw session tokens:
+\begin{equation}
+    E_t = \text{Softmax}\left(\frac{M_{\text{in}} W_Q^{\text{ext}} (C_t W_K^{\text{ext}})^\top}{\sqrt{d}}\right) C_t W_V^{\text{ext}}
+\end{equation}
+
+\paragraph{Stage 2: The Judging Layer (QKV Competition)}
+We now possess two identically sized latent matrices representing the old knowledge ($M_{\text{c}}^{t-1}$) and the newly extracted candidate knowledge ($E_t$). We concatenate them into a combined judgment pool $P_{\text{judge}} =[M_{\text{c}}^{t-1} \parallel E_t] \in \mathbb{R}^{2K \times d}$.
+
+To update the memory, we employ a second cross-attention block governed by a distinct set of persistent, learnable judging queries $M_{\text{judge}} \in \mathbb{R}^{K \times d}$. These queries evaluate the combined pool:
+\begin{equation}
+    M_{\text{c}}^{t} = \text{Softmax}\left(\frac{M_{\text{judge}} W_Q^{\text{judge}} (P_{\text{judge}} W_K^{\text{judge}})^\top}{\sqrt{d}}\right) P_{\text{judge}} W_V^{\text{judge}}
+\end{equation}
+
+\textit{The Forgetting Defense Insight:} Because the Softmax is computed across the $2K$ dimension, the old memory and the new candidate memory are forced into a zero-sum semantic competition. If the new session $C_t$ contains only mundane conversational filler, $E_t$ will lack predictive semantic value. The Judging Queries will recognize this and shift their attention distribution heavily onto the keys of $M_{\text{c}}^{t-1}$, effectively routing the old memory untouched into the next state. Conversely, if $E_t$ contains a critical state-change, the queries will strongly attend to the new representation, implicitly overwriting outdated information.
+
+\subsubsection{On Judging Depth: Multi-Layer Competition as an Ablation Axis}
+\label{sec:judging_depth}
+
+The single-layer formulation above assumes that a lone cross-attention pass over $P_{\text{judge}}$ is sufficient to determine what knowledge to retain and what to discard. In practice, deciding \textit{what matters} is a highly non-linear judgment. A user mentioning "my sister" in Session 12 is mundane in isolation, but becomes critical if Session 3 established a family conflict.
+
+We therefore identify \textbf{judging depth} $L_J$ as a primary ablation axis for empirical study. We generalize to a deeper judging stack by iteratively refining the judgment:
+
+\begin{equation}
+    P_{\text{judge}}^{(0)} =[M_{\text{c}}^{t-1} \parallel E_t]
+\end{equation}
+\begin{equation}
+    P_{\text{judge}}^{(\ell)} = P_{\text{judge}}^{(\ell-1)} + \text{CrossAttn}^{(\ell)}\!\left(M_{\text{judge}},\; P_{\text{judge}}^{(\ell-1)}\right), \quad \ell = 1, \dots, L_J
+\end{equation}
+
+The final memory state is then read out from the refined pool:
+\begin{equation}
+    M_{\text{c}}^{t} = \text{Softmax}\left(\frac{M_{\text{judge}} W_Q^{\text{read}} (P_{\text{judge}}^{(L_J)} W_K^{\text{read}})^\top}{\sqrt{d}}\right) P_{\text{judge}}^{(L_J)} W_V^{\text{read}}
+\end{equation}
+
+We deliberately present $L_J = 1$ as the baseline architecture. Deeper stacks ($L_J = 2\text{--}8$) provide non-linear refinement capacity for complex, multi-hop callbacks, but must be empirically justified against the risk of overfitting to training-distribution dialogue patterns.
+
+\subsection{Key Advance 2: Implicit Retrieval via the Depth-Wise Residual Stream}
+
+Our second advance defines how the active model queries the persistent state $M_{\text{c}}^t$ during a live conversation. Treating memory retrieval as a standard token-level attention operation over a concatenated pool would reintroduce an $O((N+K)^2)$ bottleneck. To avoid sequence-length bloat, we register the episodic memory block directly into the model's \emph{depth-wise} residual stream, utilizing the principles of Attention Residuals \cite{du2026attention}.
+
+\paragraph{Compressing Memory into a Source Vector.}
+Depth-wise routing frameworks expect inputs as single $d$-dimensional vectors per layer. To interface seamlessly with this structure, we compress the $K$-row memory matrix $M_{\text{c}}^t$ into a unified episodic vector via a learned, session-invariant readout query $r \in \mathbb{R}^d$:
+
+\begin{equation}
+    m^t = \text{Softmax}\!\left(\frac{r^\top (M_{\text{c}}^t)^\top}{\sqrt{d}}\right) M_{\text{c}}^t \in \mathbb{R}^d
+\end{equation}
+
+This readout produces a single dense vector $m^t$ that acts as the model's holistic "feeling" of the past. Because $r$ is a learned parameter rather than derived from the current conversational input, it ensures memory retrieval remains structurally decoupled from local token generation.
+
+\paragraph{Registering Memory as the Foundational Layer.}
+Let a model have $L$ layers. In a depth-wise attention system, layer outputs act as source vectors $v_1, \ldots, v_{L-1}$ that can be queried by subsequent layers. We introduce our compressed memory as the foundational source at index 0:
+
+\begin{equation}
+    v_0 := m^t
+\end{equation}
+
+The input to any downstream layer $l$ is computed as a depth-wise softmax attention over all preceding sources, \textit{including} the episodic memory:
+
+\begin{equation}
+    h_l = \sum_{i=0}^{l-1} \alpha_{i \to l} \cdot v_i,
+    \qquad
+    \alpha_{i \to l} = \frac{\phi(w_l,\, k_i)}{\sum_{j=0}^{l-1} \phi(w_l,\, k_j)}
+    \label{eq:memres_attn}
+\end{equation}
+
+where $\phi(q, k) = \exp\!\left(q^\top \operatorname{RMSNorm}(k)\right)$ and $w_l \in \mathbb{R}^d$ is a learned pseudo-query for layer $l$. The keys are defined simply as:
+
+\begin{equation}
+    k_i = v_i =
+    \begin{cases}
+        m^t & i = 0 \quad \text{(episodic memory)} \\
+        f_i(h_i) & 1 \leq i \leq l-1 \quad \text{(layer outputs)}
+    \end{cases}
+\end{equation}
+
+\paragraph{Implicit Cognitive Routing.}
+By integrating memory directly into the layer-to-layer residual stream, the model gains the ability to implicitly control memory recall without gating heuristics. During a content-rich conversational turn, the recent hidden states ($v_1, \ldots, v_{l-1}$) will naturally dominate the softmax competition, suppressing $\alpha_{0 \to l}$ and bypassing historical memory. Conversely, during a sparse or ambiguous turn (e.g., a bare pronoun callback like "Did you ask her yet?"), the absence of dominant local features allows the memory source $v_0$ to attract higher attention weight. This structurally replicates the selective, top-down nature of human cognitive retrieval.
+
+\section{Distinction from Existing Paradigms}
+While our approach shares philosophical DNA with several recent works, it uniquely resolves the limitations of modern agentic workflows:
+\begin{itemize}
+    \item \textbf{Versus Standard RAG and MemGPT:} Memory Residuals are entirely end-to-end differentiable. The model learns \textit{how} to encode implicit user preferences based on backpropagated loss, eliminating the need for rigid vector databases and lossy text-summarization prompts.
+    \item \textbf{Versus Attention Residuals \cite{du2026attention}:} While recent work replaces uniform depth-wise addition with a softmax attention mechanism over \textit{internal} layer outputs, Memory Residuals expand this paradigm to the \textit{external} temporal domain. By injecting the cross-session episodic vector $m^t$ as the foundational source token ($v_0$), we bridge the gap between intra-session depth routing and lifelong memory retrieval.
+    \item \textbf{Versus Perceiver IO \cite{jaegle2021perceiver}:} While Perceiver uses cross-attention bottlenecks to handle large inputs, Memory Residuals embed this bottleneck specifically as a \textit{softmax-weighted depth source}, allowing context-dependent querying on a turn-by-turn basis.
+    \item \textbf{Versus Recurrent Memory Transformer (RMT) \cite{bulatov2022recurrent}:} Models like RMT prepend memory embeddings directly to the context window. Memory Residuals remove memory from the standard $O(N^2)$ sequence entirely, isolating it in the orthogonal depth-wise routing pool.
+\end{itemize}
+
+\section{Empirical Roadmap: Training via Episodic TV Scripts}
+A significant bottleneck in lifelong conversational AI research is the lack of high-quality, long-horizon dialogue data exhibiting true implicit memory recall. Synthetic datasets lack emotional depth, and real-world assistant logs are frequently restricted by privacy constraints.
+
+To empirically validate Memory Residuals, we propose utilizing \textbf{Episodic TV Show Transcripts} (e.g., sitcoms and long-form dramas) as our primary training and benchmarking corpus. TV scripts represent the gold standard of multi-session human dialogue. They are defined by stable character personas, long contexts, and explicitly scripted "callbacks" (e.g., a thematic reference in Season 3 that relies entirely on a brief interaction from Season 1).
+
+By feeding transcripts episode-by-episode into the model and updating $M_{\text{c}}$ sequentially, we can evaluate the model's ability to execute a semantic callback across massive token spans. Successfully retrieving the context of a Season 1 event during a Season 3 generation—while ignoring hundreds of intervening episodes of casual filler—will empirically prove that the Memory Residuals mechanism accurately mimics human selective recall.
+
+\section{Conclusion and Call for Collaboration}
+The Memory Residuals architecture presents a mathematically elegant solution to the exploding context constraints and rigid external memory systems of multi-turn AI agents. By combining a recurrent, competition-driven episodic memory block with depth-wise residual routing, we provide a blueprint for models that innately understand when to ignore the past, and when to actively retrieve it.
+
+I have established the theoretical framework and foundational mathematics for this approach. I am currently seeking an academic laboratory or partner with compute resources to collaborate on scaling this architecture. Future work will execute the TV-script training curriculum to validate the activation of the memory attention weights ($\alpha$), with the ultimate goal of co-authoring a formal publication for upcoming AI conferences (e.g., NeurIPS, ICLR).
+
+% ==========================================
+% REFERENCES
+% ==========================================
+\begin{thebibliography}{99}
+
+\bibitem{vaswani2017attention}
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, \L{}., \& Polosukhin, I. (2017). 
+\textit{Attention is all you need}. 
+Advances in Neural Information Processing Systems, 30.
+
+\bibitem{liu2024lost}
+Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F., \& Liang, P. (2024). 
+\textit{Lost in the middle: How language models use long contexts}. 
+Transactions of the Association for Computational Linguistics, 12, 157--173.
+
+\bibitem{lewis2020retrieval}
+Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., K\"{u}ttler, H., Lewis, M., Yih, W., Rockt\"{a}schel, T., Riedel, S., \& Kiela, D. (2020). 
+\textit{Retrieval-augmented generation for knowledge-intensive NLP tasks}. 
+Advances in Neural Information Processing Systems, 33, 9459--9474.
+
+\bibitem{du2026attention}
+Kimi Team (Du, Y., et al.). (2026). 
+\textit{Attention Residuals}. 
+arXiv preprint arXiv:2603.15031.
+
+\bibitem{jaegle2021perceiver}
+Jaegle, A., Borgeaud, S., Alayrac, J.-B., Doersch, C., Ionescu, C., Ding, D., Koppula, S., Zoran, D., Brock, A., Shelhamer, E., \& H\'{e}naff, O. (2021). 
+\textit{Perceiver IO: A General Architecture for Structured Inputs \& Outputs}. 
+International Conference on Learning Representations (ICLR).
+
+\bibitem{bulatov2022recurrent}
+Bulatov, A., Kuratov, Y., \& Burtsev, M. S. (2022). 
+\textit{Recurrent Memory Transformer}. 
+Advances in Neural Information Processing Systems, 35, 11079--11091.
+
+\bibitem{chevalier2023adapting}
+Chevalier, A., Wettig, A., Ajith, A., \& Chen, D. (2023). 
+\textit{Adapting Language Models to Compress Contexts}. 
+Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP).
+
+\end{thebibliography}
+
+\end{document}

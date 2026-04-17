@@ -1,15 +1,14 @@
 """
-Memory Residual probe: measure α-mass routed to M_c.
+Memory Residual probe: measure alpha-mass routed to m^t (v_0) per layer.
 
 Builds paired prompts from a history:
   - "callback":  explicit callback to the history ("Remember when we...")
   - "filler":    generic non-callback continuation ("The quick brown fox...")
 
-Both share the same `memory_state = compress_history(history)`. We run the
-model with `collect_alpha_trace=True` and report mean α-mass on M_c
-(per layer × sublayer) for each prompt type. Positive callback-vs-filler Δ
-means the model routes more mass to memory when the prompt calls back to
-the history.
+Both share the same m_t = readout(compress(history)).  We run the model with
+collect_alpha_trace=True and report mean alpha_{0->l} (per routing layer)
+for each prompt type.  Positive callback-vs-filler delta means the model
+routes more mass to memory when the prompt calls back to the history.
 
 Usage:
     python probe_memres.py --model_path output/smoke_memres/final \\
@@ -66,11 +65,11 @@ class RoutingProbe:
         ids_t = torch.tensor(
             ids[: self.history_len], dtype=torch.long, device=self.device
         ).unsqueeze(0)
-        h = self.model.model(input_ids=ids_t).last_hidden_state
-        return self.model.model.compress_history(h)
+        _, m_t = self.model.model.compute_memory(ids_t)
+        return m_t
 
     @torch.no_grad()
-    def alpha_mass_for_suffix(self, suffix_text: str, memory_state: torch.Tensor):
+    def alpha_mass_for_suffix(self, suffix_text: str, m_t: torch.Tensor):
         ids = self.tokenizer.encode(suffix_text, add_special_tokens=False)[
             : self.probe_len
         ]
@@ -78,8 +77,9 @@ class RoutingProbe:
             return None
         ids_t = torch.tensor(ids, dtype=torch.long, device=self.device).unsqueeze(0)
         out = self.model(
-            input_ids=ids_t, memory_state=memory_state, collect_alpha_trace=True
+            input_ids=ids_t, m_t=m_t, collect_alpha_trace=True
         )
+        # alpha_trace: list of (B, S) tensors, one per routing layer
         return [a.squeeze(0).mean().item() for a in out.alpha_trace]
 
     def run(self, samples):
@@ -87,15 +87,15 @@ class RoutingProbe:
         for i, sample in enumerate(samples):
             if not sample.get("history"):
                 continue
-            m_c = self.compress(sample["history"])
-            if m_c is None:
+            m_t = self.compress(sample["history"])
+            if m_t is None:
                 continue
 
             cb_suffix = self.CALLBACK_SUFFIXES[i % len(self.CALLBACK_SUFFIXES)]
             fl_suffix = self.FILLER_SUFFIXES[i % len(self.FILLER_SUFFIXES)]
 
-            cb = self.alpha_mass_for_suffix(cb_suffix, m_c)
-            fl = self.alpha_mass_for_suffix(fl_suffix, m_c)
+            cb = self.alpha_mass_for_suffix(cb_suffix, m_t)
+            fl = self.alpha_mass_for_suffix(fl_suffix, m_t)
             if cb is None or fl is None:
                 continue
             callback_traces.append(cb)
@@ -131,12 +131,12 @@ def report(callback_traces, filler_traces):
     cb_per_site = [sum(t[s] for t in callback_traces) / n for s in range(n_sites)]
     fl_per_site = [sum(t[s] for t in filler_traces) / n for s in range(n_sites)]
 
-    print(f"n samples = {n}, n MemRes sites = {n_sites}")
-    print(f"{'site':>6}  {'callback α→M_c':>15}  {'filler α→M_c':>15}  {'Δ':>8}")
+    print(f"n samples = {n}, n routing layers = {n_sites}")
+    print(f"{'layer':>6}  {'callback α→m_t':>15}  {'filler α→m_t':>15}  {'Δ':>8}")
     for s in range(n_sites):
         delta = cb_per_site[s] - fl_per_site[s]
         print(
-            f"{s:>6}  {cb_per_site[s]:>15.4f}  {fl_per_site[s]:>15.4f}  {delta:>+8.4f}"
+            f"{s + 1:>6}  {cb_per_site[s]:>15.4f}  {fl_per_site[s]:>15.4f}  {delta:>+8.4f}"
         )
 
     mean_cb = sum(cb_per_site) / n_sites

@@ -1,33 +1,48 @@
 """
-Qwen3 with Memory Residuals (MemRes).
+Memory Residuals — faithful to the paper's architecture.
 
-A MemoryBlock compresses a long history C ∈ R^(N×d) into a fixed-size
-M_c ∈ R^(K×d) via cross-attention with K learnable latent queries.
+Two key architectural advances over standard Qwen3:
 
-Each decoder layer then pools hidden states with M_c:
-    V_pool = [H || M_c],  α = softmax(H W_Q · (V_pool W_K)^T / √d)
-    H_tilde = α · V_pool,  H_out = H_tilde + SelfAttn(LN(H_tilde))
+1. MemoryBlock — Two-Stage QKV Competition (Section 2.1):
 
-Causal mask covers the local S×S block only; memory columns are globally
-visible. When memory_state is None the model reduces to vanilla Qwen3.
+   Stage 1 (Extraction, Eq. 1):
+       E_t = Softmax(M_in W_Q^ext (C_t W_K^ext)^T / sqrt(d)) C_t W_V^ext
+
+   Stage 2 (Judging, Eq. 2):
+       P_judge = [M_c^{t-1} || E_t]
+       M_c^t   = Softmax(M_judge W_Q^judge (P_judge W_K^judge)^T / sqrt(d)) P_judge W_V^judge
+
+   The softmax across the 2K dimension creates zero-sum competition between
+   old memory and new extraction (the Forgetting Defense).
+
+   Optional multi-layer judging depth L_J (Section 2.1.1, Eq. 3-5).
+
+2. Depth-Wise Residual Stream Injection (Section 2.2):
+
+   Readout (Eq. 6):
+       m^t = Softmax(r^T (M_c^t)^T / sqrt(d)) M_c^t   in R^d
+
+   Register as foundational source (Eq. 7):
+       v_0 := m^t
+
+   Depth-wise attention (Eq. 8):
+       h_l = sum_{i=0}^{l-1} alpha_{i->l} * v_i
+       alpha_{i->l} = phi(w_l, k_i) / sum_j phi(w_l, k_j)
+       phi(q, k) = exp(q^T RMSNorm(k))
+
+   Each layer's input is a softmax-weighted mix of ALL preceding layer
+   outputs plus the memory vector.  During filler turns the local layer
+   outputs dominate; during callbacks mass shifts onto v_0 = m^t.
+
+When no memory is provided (m_t is None) the model reduces to vanilla Qwen3.
 """
 
 from __future__ import annotations
-
-import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
-from transformers.models.qwen3.modeling_qwen3 import (
-    Qwen3Attention,
-    Qwen3MLP,
-    Qwen3PreTrainedModel,
-    Qwen3RMSNorm,
-    Qwen3RotaryEmbedding,
-)
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.generation import GenerationMixin
 from transformers.masking_utils import (
@@ -39,218 +54,262 @@ from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
+from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+from transformers.models.qwen3.modeling_qwen3 import (
+    Qwen3Attention,
+    Qwen3MLP,
+    Qwen3PreTrainedModel,
+    Qwen3RMSNorm,
+    Qwen3RotaryEmbedding,
+)
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.utils.generic import merge_with_config_defaults
 from transformers.utils.output_capturing import capture_outputs
 
 
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+
 class Qwen3MemResConfig(Qwen3Config):
+    """Qwen3Config extended with Memory Residuals hyper-parameters."""
+
     model_type = "qwen3_memres"
 
     def __init__(
         self,
-        memres_num_memory_vectors: int = 128,
-        memres_num_memory_heads: int = 8,
-        memres_apply_at: str = "both",
-        memres_use_gate: bool = False,
-        memres_gate_init: float = -2.0,
+        memres_num_vectors: int = 128,
+        memres_judging_depth: int = 1,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.memres_num_memory_vectors = memres_num_memory_vectors
-        self.memres_num_memory_heads = memres_num_memory_heads
-        self.memres_apply_at = memres_apply_at
-        self.memres_use_gate = memres_use_gate
-        self.memres_gate_init = memres_gate_init
+        self.memres_num_vectors = memres_num_vectors
+        self.memres_judging_depth = memres_judging_depth
+
+
+# ---------------------------------------------------------------------------
+# Cross-attention primitive
+# ---------------------------------------------------------------------------
+
+
+class CrossAttention(nn.Module):
+    """Single cross-attention: queries attend to context key-values."""
+
+    def __init__(self, hidden_size: int):
+        super().__init__()
+        self.scale = hidden_size**-0.5
+        self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
+
+    def forward(self, queries: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        Q = self.W_Q(queries)
+        K = self.W_K(context)
+        V = self.W_V(context)
+        attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
+        return attn @ V
+
+
+# ---------------------------------------------------------------------------
+# Memory Block: Two-Stage QKV Competition  (Section 2.1)
+# ---------------------------------------------------------------------------
 
 
 class MemoryBlock(nn.Module):
-    """Compress C ∈ R^(B×N×d) into M_c ∈ R^(B×K×d) via multi-head cross-attention
-    with K learnable latent queries."""
+    """
+    Two-Stage QKV Competition (Section 2.1).
 
-    def __init__(
-        self,
-        hidden_size: int,
-        num_memory_vectors: int,
-        num_heads: int,
-        norm_eps: float = 1e-6,
-    ):
+    Stage 1 — Extraction (Eq. 1):
+        Compress raw session C_t into a candidate E_t via learnable
+        extraction queries M_in.
+
+    Stage 2 — Judging (Eq. 2):
+        Concatenate old memory and new candidate into a judgment pool
+        P_judge = [M_c^{t-1} || E_t].  Learnable judging queries M_judge
+        attend over P_judge so old and new compete in a zero-sum softmax.
+
+    Optional multi-layer judging (Eq. 3-5) with depth L_J.
+    """
+
+    def __init__(self, hidden_size: int, num_vectors: int, judging_depth: int = 1):
         super().__init__()
-        if hidden_size % num_heads != 0:
-            raise ValueError(
-                f"hidden_size ({hidden_size}) must be divisible by num_heads ({num_heads})"
+        self.hidden_size = hidden_size
+        self.num_vectors = num_vectors
+        self.judging_depth = judging_depth
+
+        # Stage 1: learnable extraction queries M_in  (K x d)
+        self.M_in = nn.Parameter(torch.empty(num_vectors, hidden_size))
+        nn.init.normal_(self.M_in, std=hidden_size**-0.5)
+        self.extraction = CrossAttention(hidden_size)
+
+        # Stage 2: learnable judging queries M_judge  (K x d)
+        self.M_judge = nn.Parameter(torch.empty(num_vectors, hidden_size))
+        nn.init.normal_(self.M_judge, std=hidden_size**-0.5)
+
+        if judging_depth <= 1:
+            # Single-layer judging (Eq. 2)
+            self.judging = CrossAttention(hidden_size)
+        else:
+            # Multi-layer refinement (Eq. 3-4) + final readout (Eq. 5)
+            self.judging_layers = nn.ModuleList(
+                [CrossAttention(hidden_size) for _ in range(judging_depth)]
             )
-        self.hidden_size = hidden_size
-        self.num_memory_vectors = num_memory_vectors
-        self.num_heads = num_heads
-        self.head_dim = hidden_size // num_heads
+            self.readout = CrossAttention(hidden_size)
 
-        self.memory_queries = nn.Parameter(torch.zeros(num_memory_vectors, hidden_size))
-        self.q_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.k_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.v_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.out_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.out_norm = Qwen3RMSNorm(hidden_size, eps=norm_eps)
+    def extract(self, C: torch.Tensor) -> torch.Tensor:
+        """Stage 1: E_t = CrossAttn(M_in, C_t) — Eq. 1."""
+        B = C.size(0)
+        M_in = self.M_in.unsqueeze(0).expand(B, -1, -1)
+        return self.extraction(M_in, C)
 
-    def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
-        b, l, _ = x.shape
-        return x.view(b, l, self.num_heads, self.head_dim).transpose(1, 2)
+    def judge(self, M_c_prev: torch.Tensor, E_t: torch.Tensor) -> torch.Tensor:
+        """Stage 2: compete old vs new over P_judge — Eq. 2 or Eq. 3-5."""
+        B = E_t.size(0)
+        P_judge = torch.cat([M_c_prev, E_t], dim=1)  # (B, 2K, d)
+        M_judge = self.M_judge.unsqueeze(0).expand(B, -1, -1)
 
-    def _merge_heads(self, x: torch.Tensor) -> torch.Tensor:
-        b, h, l, dh = x.shape
-        return x.transpose(1, 2).contiguous().view(b, l, h * dh)
+        if self.judging_depth <= 1:
+            return self.judging(M_judge, P_judge)
 
-    def forward(self, history_hidden: torch.Tensor) -> torch.Tensor:
-        b = history_hidden.shape[0]
-        queries = self.memory_queries.unsqueeze(0).expand(b, -1, -1)
-
-        q = self._split_heads(self.q_proj(queries))
-        k = self._split_heads(self.k_proj(history_hidden))
-        v = self._split_heads(self.v_proj(history_hidden))
-
-        scale = 1.0 / math.sqrt(self.head_dim)
-        weights = F.softmax(torch.matmul(q, k.transpose(-2, -1)) * scale, dim=-1)
-        out = self.out_proj(self._merge_heads(torch.matmul(weights, v)))
-        return self.out_norm(out)
-
-    @torch.no_grad()
-    def blend(
-        self,
-        existing_memory: torch.Tensor,
-        new_hidden: torch.Tensor,
-        blend_alpha: float = 0.5,
-    ) -> torch.Tensor:
-        """Inference-time incremental update: M_c' = (1-α) M_c + α compress(new)."""
-        return (1.0 - blend_alpha) * existing_memory + blend_alpha * self.forward(
-            new_hidden
-        )
-
-
-class MemResProjections(nn.Module):
-    """Memory-residual attention site: pools hidden_states with memory_state
-    through a softmax over [H || M_c], with causal mask on the local block."""
-
-    def __init__(
-        self,
-        hidden_size: int,
-        use_gate: bool,
-        gate_init: float,
-        norm_eps: float,
-    ):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.q_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.k_proj = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.pre_norm = Qwen3RMSNorm(hidden_size, eps=norm_eps)
-
-        self.use_gate = use_gate
-        if use_gate:
-            self.gate = nn.Linear(hidden_size, hidden_size, bias=True)
-            nn.init.zeros_(self.gate.weight)
-            nn.init.constant_(self.gate.bias, gate_init)
-
-    def _attention_logits(
-        self, normed: torch.Tensor, memory_state: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        v_pool = torch.cat([normed, memory_state], dim=1)
-        q = self.q_proj(normed)
-        k = self.k_proj(v_pool)
-        scale = 1.0 / math.sqrt(self.hidden_size)
-        return torch.matmul(q, k.transpose(-2, -1)) * scale, v_pool
-
-    @staticmethod
-    def _apply_causal_mask(logits: torch.Tensor, S: int, K: int) -> torch.Tensor:
-        local = torch.ones(S, S, dtype=torch.bool, device=logits.device).tril()
-        mem = torch.ones(S, K, dtype=torch.bool, device=logits.device)
-        mask = torch.cat([local, mem], dim=1)
-        return logits.masked_fill(~mask, float("-inf"))
+        # Multi-layer refinement (Eq. 3-4)
+        for layer in self.judging_layers:
+            P_judge = P_judge + layer(M_judge, P_judge)
+        # Final readout (Eq. 5)
+        return self.readout(M_judge, P_judge)
 
     def forward(
         self,
-        hidden_states: torch.Tensor,
-        memory_state: torch.Tensor,
-        attention_mask: torch.Tensor | None = None,
+        C: torch.Tensor,
+        M_c_prev: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        B, S, _ = hidden_states.shape
-        K = memory_state.shape[1]
-        normed = self.pre_norm(hidden_states)
+        """
+        Full two-stage memory update.
 
-        logits, v_pool = self._attention_logits(normed, memory_state)
-        if S > 1:
-            logits = self._apply_causal_mask(logits, S, K)
-        if attention_mask is not None:
-            am = (
-                attention_mask.squeeze(1)
-                if attention_mask.dim() == 4
-                else attention_mask
-            )
-            pad = torch.zeros(B, S, K, dtype=am.dtype, device=am.device)
-            logits = logits + torch.cat([am, pad], dim=-1)
+        Args:
+            C: (B, N, d) — session token representations.
+            M_c_prev: (B, K, d) — prior memory state; None -> zeros.
+        Returns:
+            M_c: (B, K, d) — updated memory state.
+        """
+        E_t = self.extract(C)
+        if M_c_prev is None:
+            M_c_prev = torch.zeros_like(E_t)
+        return self.judge(M_c_prev, E_t)
 
-        h_tilde = torch.matmul(F.softmax(logits, dim=-1), v_pool)
 
-        if self.use_gate:
-            alpha = torch.sigmoid(self.gate(hidden_states))
-            return (1.0 - alpha) * hidden_states + alpha * h_tilde
-        return h_tilde
+# ---------------------------------------------------------------------------
+# Memory Readout  (Section 2.2, Eq. 6)
+# ---------------------------------------------------------------------------
 
-    @torch.no_grad()
-    def memory_mass(
-        self, hidden_states: torch.Tensor, memory_state: torch.Tensor
-    ) -> torch.Tensor:
-        """Per-position fraction of α routed to M_c columns. Returns (B, S)."""
-        S = hidden_states.shape[1]
-        K = memory_state.shape[1]
-        normed = self.pre_norm(hidden_states)
-        logits, _ = self._attention_logits(normed, memory_state)
-        logits = self._apply_causal_mask(logits, S, K)
-        return F.softmax(logits, dim=-1)[..., S:].sum(dim=-1)
+
+class MemoryReadout(nn.Module):
+    """Compress M_c in R^{K x d} -> m^t in R^d via learned readout query r.
+
+    m^t = Softmax(r^T (M_c)^T / sqrt(d)) M_c
+    """
+
+    def __init__(self, hidden_size: int):
+        super().__init__()
+        self.scale = hidden_size**-0.5
+        self.r = nn.Parameter(torch.empty(hidden_size))
+        nn.init.normal_(self.r, std=hidden_size**-0.5)
+
+    def forward(self, M_c: torch.Tensor) -> torch.Tensor:
+        """(B, K, d) -> (B, d)"""
+        scores = torch.einsum("d,bkd->bk", self.r, M_c) * self.scale
+        attn = F.softmax(scores, dim=-1)
+        return torch.einsum("bk,bkd->bd", attn, M_c)
+
+
+# ---------------------------------------------------------------------------
+# Depth-Wise Router  (Section 2.2, Eq. 7-9)
+# ---------------------------------------------------------------------------
+
+
+class DepthWiseRouter(nn.Module):
+    """
+    Depth-wise attention routing (Eq. 8).
+
+    h_l = sum_{i=0}^{l-1}  alpha_{i->l} * v_i
+
+    alpha_{i->l} = phi(w_l, k_i) / sum_j phi(w_l, k_j)
+    phi(q, k)    = exp(q^T RMSNorm(k))
+
+    w_l in R^d is a learned pseudo-query for routing layer l.
+    """
+
+    def __init__(self, hidden_size: int, num_routing_layers: int, eps: float = 1e-6):
+        super().__init__()
+        self.w = nn.ParameterList(
+            [nn.Parameter(torch.empty(hidden_size)) for _ in range(num_routing_layers)]
+        )
+        for w in self.w:
+            nn.init.normal_(w, std=0.01)
+        self.norm = Qwen3RMSNorm(hidden_size, eps=eps)
+
+    def route(
+        self,
+        router_idx: int,
+        sources: list[torch.Tensor],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute h_l and memory-attention mass alpha_{0->l}.
+
+        Args:
+            router_idx: index into self.w  (0 for the second decoder layer,
+                        1 for the third, etc.)
+            sources: [v_0, v_1, ..., v_l] where v_0 = m^t (B,S,d) and the
+                     rest are layer outputs (B,S,d).
+        Returns:
+            h_l:       (B, S, d) — routed input for the next layer.
+            alpha_mem: (B, S)    — attention mass on v_0 (memory).
+        """
+        w = self.w[router_idx]  # (d,)
+
+        # Stack sources -> (B, S, num_sources, d)
+        stacked = torch.stack(sources, dim=2)
+
+        # phi(w, k_i) = exp(w^T RMSNorm(v_i))
+        normed = self.norm(stacked)
+        scores = torch.einsum("d,bsnd->bsn", w, normed)  # (B, S, N_src)
+
+        # softmax over sources for each (batch, position)
+        alphas = F.softmax(scores, dim=-1)  # (B, S, N_src)
+
+        # weighted sum
+        h_l = torch.einsum("bsn,bsnd->bsd", alphas, stacked)  # (B, S, d)
+
+        # memory mass = alpha on source 0
+        alpha_mem = alphas[:, :, 0]  # (B, S)
+
+        return h_l, alpha_mem
+
+
+# ---------------------------------------------------------------------------
+# Decoder Layer
+# ---------------------------------------------------------------------------
 
 
 class Qwen3MemResDecoderLayer(GradientCheckpointingLayer):
-    """Standard Qwen3 decoder layer with memory-residual attention inserted
-    before self-attention and/or MLP."""
+    """Standard Qwen3 decoder layer (self-attention + MLP with internal
+    residual connections).  Depth-wise routing across layers is handled by
+    the model backbone, not by individual layers."""
 
     def __init__(self, config: Qwen3MemResConfig, layer_idx: int):
         super().__init__()
-        self.layer_idx = layer_idx
         self.hidden_size = config.hidden_size
+        self.layer_idx = layer_idx
 
         self.self_attn = Qwen3Attention(config=config, layer_idx=layer_idx)
         self.mlp = Qwen3MLP(config)
-        self.input_layernorm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = Qwen3RMSNorm(
+            config.hidden_size, eps=config.rms_norm_eps
+        )
         self.post_attention_layernorm = Qwen3RMSNorm(
             config.hidden_size, eps=config.rms_norm_eps
         )
         self.attention_type = config.layer_types[layer_idx]
-
-        apply_at = config.memres_apply_at
-        self.use_memres_attn = apply_at in ("attn", "both")
-        self.use_memres_mlp = apply_at in ("mlp", "both")
-
-        proj_kwargs = dict(
-            hidden_size=config.hidden_size,
-            use_gate=config.memres_use_gate,
-            gate_init=config.memres_gate_init,
-            norm_eps=config.rms_norm_eps,
-        )
-        if self.use_memres_attn:
-            self.memres_attn = MemResProjections(**proj_kwargs)
-        if self.use_memres_mlp:
-            self.memres_mlp = MemResProjections(**proj_kwargs)
-
-    def _maybe_memres(
-        self,
-        projections: MemResProjections | None,
-        hidden_states: torch.Tensor,
-        memory_state: torch.Tensor | None,
-        alpha_trace: list | None,
-    ) -> torch.Tensor:
-        if memory_state is None or projections is None:
-            return hidden_states
-        if alpha_trace is not None:
-            alpha_trace.append(projections.memory_mass(hidden_states, memory_state))
-        return projections(hidden_states, memory_state)
 
     def forward(
         self,
@@ -261,18 +320,11 @@ class Qwen3MemResDecoderLayer(GradientCheckpointingLayer):
         use_cache: bool | None = False,
         cache_position: torch.LongTensor | None = None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,
-        memory_state: torch.Tensor | None = None,
-        alpha_trace: list | None = None,
         **kwargs,
     ) -> torch.Tensor:
-        pre_attn = self._maybe_memres(
-            getattr(self, "memres_attn", None) if self.use_memres_attn else None,
-            hidden_states,
-            memory_state,
-            alpha_trace,
-        )
+        # ── Attention sublayer with residual ──
         attn_out, _ = self.self_attn(
-            hidden_states=self.input_layernorm(pre_attn),
+            hidden_states=self.input_layernorm(hidden_states),
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -280,18 +332,23 @@ class Qwen3MemResDecoderLayer(GradientCheckpointingLayer):
             cache_position=cache_position,
             position_embeddings=position_embeddings,
         )
-        hidden_states = pre_attn + attn_out
+        hidden_states = hidden_states + attn_out
 
-        pre_mlp = self._maybe_memres(
-            getattr(self, "memres_mlp", None) if self.use_memres_mlp else None,
-            hidden_states,
-            memory_state,
-            alpha_trace,
+        # ── MLP sublayer with residual ──
+        hidden_states = hidden_states + self.mlp(
+            self.post_attention_layernorm(hidden_states)
         )
-        return pre_mlp + self.mlp(self.post_attention_layernorm(pre_mlp))
+        return hidden_states
+
+
+# ---------------------------------------------------------------------------
+# Model backbone
+# ---------------------------------------------------------------------------
 
 
 class Qwen3MemResModel(Qwen3PreTrainedModel):
+    """Qwen3 backbone with Memory Residuals (Sections 2.1 + 2.2)."""
+
     config_class = Qwen3MemResConfig
 
     def __init__(self, config: Qwen3MemResConfig):
@@ -311,64 +368,58 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         self.norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3RotaryEmbedding(config=config)
 
+        # ── Memory components ──
         self.memory_block = MemoryBlock(
-            hidden_size=config.hidden_size,
-            num_memory_vectors=config.memres_num_memory_vectors,
-            num_heads=config.memres_num_memory_heads,
-            norm_eps=config.rms_norm_eps,
+            config.hidden_size,
+            config.memres_num_vectors,
+            config.memres_judging_depth,
+        )
+        self.memory_readout = MemoryReadout(config.hidden_size)
+        self.depth_router = DepthWiseRouter(
+            config.hidden_size,
+            num_routing_layers=max(config.num_hidden_layers - 1, 0),
+            eps=config.rms_norm_eps,
         )
 
         self.gradient_checkpointing = False
         self.has_sliding_layers = "sliding_attention" in self.config.layer_types
+
         self.post_init()
 
-    def compress_history(self, history_hidden: torch.Tensor) -> torch.Tensor:
-        return self.memory_block(history_hidden)
+    # -- convenience helpers ------------------------------------------------
 
-    def blend_memory(
+    def compress_session(
         self,
-        existing_memory: torch.Tensor,
-        new_hidden: torch.Tensor,
-        blend_alpha: float = 0.5,
+        C: torch.Tensor,
+        M_c_prev: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        return self.memory_block.blend(existing_memory, new_hidden, blend_alpha)
+        """Two-stage compression: extract + judge. Returns M_c (B, K, d)."""
+        return self.memory_block(C, M_c_prev)
 
-    def _init_weights(self, module):
-        super()._init_weights(module)
-        # Zero-init on BOTH W_Q^res and W_K^res yields ∇W_Q = ∇W_K = 0 at step 0
-        # (bilinear dead zone). Parent's small-normal init is kept for q/k.
-        if isinstance(module, MemResProjections):
-            if module.use_gate:
-                nn.init.zeros_(module.gate.weight)
-                nn.init.constant_(module.gate.bias, self.config.memres_gate_init)
-        elif isinstance(module, MemoryBlock):
-            std = getattr(self.config, "initializer_range", 0.02)
-            nn.init.normal_(module.memory_queries, mean=0.0, std=std)
+    def readout_memory(self, M_c: torch.Tensor) -> torch.Tensor:
+        """M_c (B, K, d) -> m^t (B, d)."""
+        return self.memory_readout(M_c)
 
-    def _build_causal_mask(
+    def compute_memory(
         self,
-        attention_mask,
-        inputs_embeds,
-        cache_position,
-        past_key_values,
-        position_ids,
-    ):
-        if isinstance(attention_mask, dict):
-            return attention_mask
-        mask_kwargs = dict(
-            config=self.config,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=position_ids,
-        )
-        mapping = {"full_attention": create_causal_mask(**mask_kwargs)}
-        if self.has_sliding_layers:
-            mapping["sliding_attention"] = create_sliding_window_causal_mask(
-                **mask_kwargs
-            )
-        return mapping
+        history_ids: torch.Tensor,
+        M_c_prev: torch.Tensor | None = None,
+        detach_embeddings: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """history_ids (B, N) -> (M_c, m_t).
+
+        When detach_embeddings is True the embedding lookup is detached so
+        gradients flow through the memory block but not through the shared
+        embedding table for the history tokens (saves memory).
+        """
+        C = self.embed_tokens(history_ids)
+        if detach_embeddings:
+            C = C.detach()
+        M_c = self.compress_session(C, M_c_prev)
+        m_t = self.readout_memory(M_c)
+        return M_c, m_t
+
+    # -- forward ------------------------------------------------------------
 
     @merge_with_config_defaults
     @capture_outputs
@@ -382,16 +433,24 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         inputs_embeds: torch.FloatTensor | None = None,
         use_cache: bool | None = None,
         cache_position: torch.LongTensor | None = None,
-        memory_state: torch.Tensor | None = None,
+        history_ids: torch.LongTensor | None = None,
+        M_c: torch.Tensor | None = None,
+        m_t: torch.Tensor | None = None,
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> BaseModelOutputWithPast:
         """
         Args:
-            memory_state: optional (B, K, d) compressed memory. When None the
-                layer stack reduces to plain Qwen3.
+            history_ids: (B, N) token ids of past session(s).  Embedded and
+                compressed into M_c / m_t by the MemoryBlock + Readout.
+                Ignored when M_c or m_t is passed directly.
+            M_c: (B, K, d) pre-computed memory matrix.  Takes precedence
+                over history_ids.  Readout is still computed.
+            m_t: (B, d) pre-computed readout vector.  Takes precedence over
+                both M_c and history_ids — used for efficient multi-turn
+                generation where you pre-compute once.
             collect_alpha_trace: when True, attach ``alpha_trace`` (list of
-                (B, S) tensors, one per MemRes site) to the output.
+                (B, S) tensors, one per routing layer) to the output.
         """
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("Specify exactly one of input_ids or inputs_embeds")
@@ -399,6 +458,15 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        # ── Resolve memory: history_ids -> M_c -> m_t ──
+        if m_t is None:
+            if M_c is None and history_ids is not None:
+                C = self.embed_tokens(history_ids)
+                M_c = self.compress_session(C)
+            if M_c is not None:
+                m_t = self.readout_memory(M_c)
+
+        # ── Standard cache / position setup ──
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache(config=self.config)
 
@@ -411,17 +479,51 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                 past_seen + inputs_embeds.shape[1],
                 device=inputs_embeds.device,
             )
+
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)
 
-        causal_mask_mapping = self._build_causal_mask(
-            attention_mask, inputs_embeds, cache_position, past_key_values, position_ids
-        )
+        # ── Causal mask ──
+        if not isinstance(causal_mask_mapping := attention_mask, dict):
+            mask_kwargs = dict(
+                config=self.config,
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                position_ids=position_ids,
+            )
+            causal_mask_mapping = {"full_attention": create_causal_mask(**mask_kwargs)}
+            if self.has_sliding_layers:
+                causal_mask_mapping["sliding_attention"] = (
+                    create_sliding_window_causal_mask(**mask_kwargs)
+                )
+
         position_embeddings = self.rotary_emb(inputs_embeds, position_ids)
 
+        # ── Forward through layers with depth-wise routing ──
+        B, S, d = inputs_embeds.shape
+        use_routing = m_t is not None
         alpha_trace: list | None = [] if collect_alpha_trace else None
+
+        if use_routing:
+            # v_0 = m^t broadcast to (B, S, d) — Eq. 7
+            v_0 = m_t.unsqueeze(1).expand(B, S, d)
+            sources: list[torch.Tensor] = [v_0]
+
+        # Layer 0 always receives embeddings directly
         hidden_states = inputs_embeds
-        for layer in self.layers:
+
+        for layer_idx, layer in enumerate(self.layers):
+            # Depth-wise routing for layers 1+ when memory is present (Eq. 8)
+            if use_routing and layer_idx > 0:
+                hidden_states, alpha_mem = self.depth_router.route(
+                    layer_idx - 1, sources
+                )
+                if alpha_trace is not None:
+                    alpha_trace.append(alpha_mem)
+
+            # Run standard transformer layer
             layer_mask = causal_mask_mapping[layer.attention_type]
             if self.gradient_checkpointing and self.training:
                 hidden_states = self._gradient_checkpointing_func(
@@ -433,7 +535,6 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                     use_cache,
                     cache_position,
                     position_embeddings,
-                    memory_state,
                 )
             else:
                 hidden_states = layer(
@@ -444,11 +545,14 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     position_embeddings=position_embeddings,
-                    memory_state=memory_state,
-                    alpha_trace=alpha_trace,
                 )
 
+            # Store layer output as source v_{l+1} for subsequent routing
+            if use_routing:
+                sources.append(hidden_states)
+
         hidden_states = self.norm(hidden_states)
+
         out = BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=past_key_values if use_cache else None,
@@ -458,15 +562,27 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         return out
 
 
+# ---------------------------------------------------------------------------
+# Causal LM head
+# ---------------------------------------------------------------------------
+
+
 class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
-    """Qwen3 causal-LM with Memory Residuals.
+    """Qwen3 causal LM with Memory Residuals.
 
-    Typical multi-session usage::
+    Quick-start::
 
-        with torch.no_grad():
-            h = model.model(input_ids=session1_ids).last_hidden_state
-        m_c = model.model.compress_history(h.detach())
-        out = model(input_ids=session2_ids, labels=session2_ids, memory_state=m_c)
+        # Training (history_ids automatically compressed)
+        out = model(input_ids=current, labels=current, history_ids=prev_session)
+
+        # Efficient multi-turn generation (pre-compute m_t once)
+        M_c, m_t = model.model.compute_memory(history_ids)
+        tokens = model.generate(input_ids=prompt, m_t=m_t, max_new_tokens=200)
+
+        # Recurrent multi-session update
+        M_c_1, _ = model.model.compute_memory(session_1_ids)
+        M_c_2, m_t = model.model.compute_memory(session_2_ids, M_c_prev=M_c_1)
+        tokens = model.generate(input_ids=prompt, m_t=m_t, max_new_tokens=200)
     """
 
     config_class = Qwen3MemResConfig
@@ -492,14 +608,18 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         use_cache: bool | None = None,
         cache_position: torch.LongTensor | None = None,
         logits_to_keep: int | torch.Tensor = 0,
-        memory_state: torch.Tensor | None = None,
+        history_ids: torch.LongTensor | None = None,
+        M_c: torch.Tensor | None = None,
+        m_t: torch.Tensor | None = None,
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> CausalLMOutputWithPast:
         """
         Args:
-            memory_state: optional (B, K, d) compressed memory.
-            collect_alpha_trace: when True, expose ``alpha_trace`` on output.
+            history_ids: (B, N) past-session token ids -> compressed to memory.
+            M_c: (B, K, d) pre-computed memory matrix.
+            m_t: (B, d) pre-computed readout vector.
+            collect_alpha_trace: expose per-layer memory routing mass.
         """
         outputs: BaseModelOutputWithPast = self.model(
             input_ids=input_ids,
@@ -509,7 +629,9 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             cache_position=cache_position,
-            memory_state=memory_state,
+            history_ids=history_ids,
+            M_c=M_c,
+            m_t=m_t,
             collect_alpha_trace=collect_alpha_trace,
             **kwargs,
         )

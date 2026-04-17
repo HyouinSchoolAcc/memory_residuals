@@ -2,7 +2,7 @@
 Evaluate Memory Residuals on held-out (history, current) pairs.
 
 Reports mean next-token cross-entropy on the `current` session:
-  - with_memory:  model conditioned on compress_history(history_ids)
+  - with_memory:  model conditioned on compress+readout(history_ids)
   - no_memory:    model run on current_ids alone
   - delta:        no_memory - with_memory  (positive => memory helps)
 
@@ -55,15 +55,16 @@ class MemoryEvaluator:
         )
 
     @torch.no_grad()
-    def lm_loss(self, input_ids, labels, memory_state=None) -> float:
+    def lm_loss(self, input_ids, labels, m_t=None) -> float:
         return self.model(
-            input_ids=input_ids, labels=labels, memory_state=memory_state
+            input_ids=input_ids, labels=labels, m_t=m_t
         ).loss.item()
 
     @torch.no_grad()
     def compress(self, history_ids: torch.Tensor) -> torch.Tensor:
-        h_hidden = self.model.model(input_ids=history_ids).last_hidden_state
-        return self.model.model.compress_history(h_hidden)
+        """Embed history, two-stage compress, readout -> m_t."""
+        _, m_t = self.model.model.compute_memory(history_ids)
+        return m_t
 
     def run(self, samples):
         losses_mem, losses_nomem = [], []
@@ -80,9 +81,9 @@ class MemoryEvaluator:
             input_ids = c_ids[:, :-1]
             labels = input_ids.clone()
 
-            m_c = self.compress(h_ids)
-            losses_mem.append(self.lm_loss(input_ids, labels, memory_state=m_c))
-            losses_nomem.append(self.lm_loss(input_ids, labels, memory_state=None))
+            m_t = self.compress(h_ids)
+            losses_mem.append(self.lm_loss(input_ids, labels, m_t=m_t))
+            losses_nomem.append(self.lm_loss(input_ids, labels, m_t=None))
         return losses_mem, losses_nomem
 
 

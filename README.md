@@ -1,9 +1,21 @@
 # Memory Residuals
 
-A Qwen3 variant that keeps a fixed-size compressed memory of past sessions and
-lets every layer softmax-route attention over `[local hidden states || memory]`.
-When the next token is generic filler, the routing collapses to local tokens.
-When it's a callback to history, mass flows to the memory block.
+A Qwen3 variant implementing the Memory Residuals architecture from the paper:
+end-to-end differentiable lifelong memory via two key advances.
+
+**Advance 1 — Two-Stage QKV Competition (Section 2.1):**
+A recurrent memory block that compresses each session into a candidate via
+learnable extraction queries, then forces old memory and new candidate into
+zero-sum softmax competition via judging queries.  Mundane filler sessions
+pass old memory through untouched; critical state-changes overwrite.
+
+**Advance 2 — Depth-Wise Residual Stream Injection (Section 2.2):**
+The memory matrix is compressed into a single vector `m^t` via a learned
+readout query, then registered as `v_0` in a depth-wise attention pool.
+Each layer's input is a softmax-weighted mix of all preceding layer outputs
+plus this memory source, using `phi(q, k) = exp(q^T RMSNorm(k))` with a
+learned per-layer pseudo-query `w_l`.  During filler turns, local layer
+outputs dominate the softmax; during callbacks, mass shifts onto `v_0`.
 
 > **Paper:** see [`memory_residuals.pdf`](memory_residuals.pdf) in this repo for
 > the full theoretical framework and the call for collaboration.
@@ -20,35 +32,21 @@ reference and is not imported by the current pipeline.
 
 ---
 
-## Roadmap / next steps
+## Paper-to-Code Map
 
-Short list of things that would make this repo easier to pick up and extend.
-Contributions welcome — the paper is explicitly a call for collaboration.
-
-- [ ] **Report baseline numbers.** Publish a results table (loss with/without
-      memory, callback-vs-filler α Δ) for at least one from-scratch config and
-      the `Qwen/Qwen3-0.6B` attached config, so reviewers don't have to train
-      before they can evaluate the claim.
-- [ ] **Release a small checkpoint.** Upload a ~20–80M from-scratch MemRes
-      checkpoint to HF so `eval_memres.py` / `probe_memres.py` /
-      `visualize_memres.py` run out of the box without a GPU training budget.
-- [ ] **Paper → code map.** Add a short section (or `ARCHITECTURE.md`) showing
-      which equation in the paper maps to which module in `modeling_memres.py`
-      (memory block cross-attention, gated residual, routing α).
-- [ ] **Architecture diagram.** Drop in a figure of a Qwen3 decoder block with
-      the MemRes routing sites marked (`attn`, `mlp`, `both`).
-- [ ] **Document the JSONL data format.** Include a 2–3 line sample of
-      `{"history": ..., "current": ...}` in the README, plus a pointer to
-      `data/friends_scripts.jsonl` for a real example.
-- [ ] **Minimal smoke test.** A `python -m pytest` or single-command script
-      that trains for 5 steps on a tiny slice and confirms the loss decreases
-      and α is non-degenerate, so newcomers can verify their environment.
-- [ ] **Decide on `modeling_memory_residuals.py`.** Either fold the useful
-      parts into `modeling_memres.py` or delete the orphan to avoid confusion.
-- [ ] **BibTeX entry.** Add a citation block to the README so others can cite
-      the work consistently.
-- [ ] **CONTRIBUTING.md.** Echo the paper's call for collaboration with
-      concrete ways to help (compute, datasets, evals, baselines).
+| Paper Section / Equation | Module in `modeling_memres.py` |
+|---|---|
+| Section 2.1, Eq. 1 — Extraction | `MemoryBlock.extract()` via `CrossAttention` |
+| Section 2.1, Eq. 2 — Judging | `MemoryBlock.judge()` via `CrossAttention` |
+| Section 2.1.1, Eq. 3-5 — Multi-layer judging | `MemoryBlock.judging_layers` + `readout` |
+| M_in (extraction queries) | `MemoryBlock.M_in` |
+| M_judge (judging queries) | `MemoryBlock.M_judge` |
+| Section 2.2, Eq. 6 — Readout | `MemoryReadout.forward()` |
+| Section 2.2, Eq. 7 — v_0 := m^t | `Qwen3MemResModel.forward()` (v_0 broadcast) |
+| Section 2.2, Eq. 8 — Depth-wise routing | `DepthWiseRouter.route()` |
+| phi(q,k) = exp(q^T RMSNorm(k)) | `DepthWiseRouter.route()` (scores computation) |
+| w_l (per-layer pseudo-query) | `DepthWiseRouter.w` |
+| r (readout query) | `MemoryReadout.r` |
 
 ---
 
@@ -61,7 +59,7 @@ torchrun --nproc_per_node=1 train_memres.py \
     --data_path data/friends_scripts.jsonl \
     --hidden_size 128 --num_layers 4 --num_heads 4 --num_kv_heads 2 \
     --intermediate_size 256 --head_dim 32 \
-    --memres_num_memory_vectors 32 --memres_num_memory_heads 4 \
+    --memres_num_vectors 32 \
     --history_len 256 --current_len 128 \
     --steps 200 --batch_size 2 --out_dir output/test_memres
 ```
@@ -73,7 +71,7 @@ torchrun --nproc_per_node=1 train_memres.py \
     --data_path data/friends_scripts.jsonl \
     --hidden_size 512 --num_layers 12 --num_heads 8 --num_kv_heads 4 \
     --intermediate_size 1536 \
-    --memres_num_memory_vectors 128 --memres_num_memory_heads 8 \
+    --memres_num_vectors 128 --memres_judging_depth 1 \
     --history_len 512 --current_len 256 \
     --steps 3000 --batch_size 2 --grad_accum 2 \
     --out_dir output/bigger_memres
@@ -81,21 +79,18 @@ torchrun --nproc_per_node=1 train_memres.py \
 
 ## Attach MemRes on top of a pretrained Qwen3
 
-The base weights load from the HF checkpoint; MemRes projections and the
-memory block stay randomly initialized and learn from scratch. The gate
-(below) keeps the random MemRes from corrupting the pretrained residual
-stream at step 0.
+The base weights load from the HF checkpoint; MemRes params (memory block,
+readout, depth-wise router) stay randomly initialized and learn from scratch.
 
 ```bash
 torchrun --nproc_per_node=1 train_memres.py \
     --pretrained Qwen/Qwen3-0.6B \
     --data_path data/friends_scripts.jsonl \
-    --memres_num_memory_vectors 128 --memres_num_memory_heads 8 \
-    --memres_use_gate --memres_gate_init -2.0 \
+    --memres_num_vectors 128 --memres_judging_depth 1 \
     --history_len 512 --current_len 256 \
     --steps 2000 --batch_size 1 --grad_accum 4 \
     --lr 2e-5 --warmup 100 \
-    --out_dir output/qwen3_0p6b_memres_gated
+    --out_dir output/qwen3_0p6b_memres
 ```
 
 ---
@@ -105,8 +100,7 @@ torchrun --nproc_per_node=1 train_memres.py \
 ### Data
 
 - `--data_path` — JSONL file with `{"history": "...", "current": "..."}` per
-  line. `history` is compressed into `M_c`; `current` is the target sequence
-  the model is scored on.
+  line. `history` is compressed into memory; `current` is the target sequence.
 - `--simulate_sessions` — alternative to `--data_path`. Streams raw text and
   splits each document in half (first half = history, second half = current).
 - `--dataset`, `--dataset_name` — HuggingFace dataset id when using
@@ -121,32 +115,14 @@ torchrun --nproc_per_node=1 train_memres.py \
 - `--intermediate_size` — MLP hidden dim.
 - `--head_dim` — overrides `hidden_size / num_heads` if set.
 
-### Pretrained base
-
-- `--pretrained Qwen/Qwen3-0.6B` — load base weights from HF. Size flags above
-  are ignored. Only MemRes params (memory block + per-layer projections) are
-  randomly initialized.
-
 ### Memory Residual knobs
 
-- `--memres_num_memory_vectors K` — number of latent memory slots. Fixed,
-  independent of history length. Common values: 32 (small), 128 (default),
-  256 (big).
-- `--memres_num_memory_heads` — multi-head count inside the memory block's
-  cross-attention. Must divide `hidden_size`.
-- `--memres_apply_at {attn, mlp, both}` — where to insert the MemRes routing
-  site in each decoder layer:
-  - `attn` — once, before self-attention.
-  - `mlp` — once, before the MLP.
-  - `both` — two sites per layer (default; more routing capacity).
-- `--memres_use_gate` — add a learned per-token sigmoid gate that mixes the
-  memory-routed output with the untouched hidden states:
-  `h = (1 - σ(W·h)) · h + σ(W·h) · h_tilde`. Needed when attaching MemRes on
-  top of a pretrained base so random-init projections don't corrupt the
-  pretrained residual stream at step 0.
-- `--memres_gate_init` — bias initialization for the gate (default `-2.0`).
-  `σ(-2) ≈ 0.12`, so at step 0 the layer is ~88% original, ~12% memory-routed.
-  The gate is free to open to 1.0 or close to 0.0 through training.
+- `--memres_num_vectors K` — number of latent memory slots (K in the paper).
+  Fixed, independent of history length. Common values: 32 (small), 128
+  (default), 256 (big).
+- `--memres_judging_depth L_J` — number of judging refinement layers
+  (Section 2.1.1). Default 1 (single-pass judging). Higher values (2-8) add
+  non-linear refinement capacity for complex multi-hop callbacks.
 
 ### Sequence lengths
 
@@ -157,22 +133,14 @@ torchrun --nproc_per_node=1 train_memres.py \
 
 - `--steps` — optimizer steps (after gradient accumulation).
 - `--batch_size` — per-step micro-batch.
-- `--grad_accum` — micro-batches accumulated per optimizer step. Effective
-  batch = `batch_size * grad_accum * world_size`.
-- `--lr`, `--lr_min` — cosine schedule endpoints. Use `6e-4 → 6e-5` from
-  scratch, `2e-5 → 2e-6` when attaching to pretrained weights.
+- `--grad_accum` — micro-batches per optimizer step.
+- `--lr`, `--lr_min` — cosine schedule endpoints.
 - `--warmup` — linear warmup steps.
 - `--max_norm` — gradient clipping.
 - `--save_every`, `--log_every` — checkpoint and log cadence.
 - `--out_dir` — where to save.
 - `--wandb_project`, `--wandb_entity`, `--run_name` — optional W&B logging.
 - `--seed` — RNG seed.
-
-### Tokenizer
-
-The Qwen3 tokenizer is always used (`Qwen/Qwen3-0.6B`), regardless of model
-size, so from-scratch and pretrained runs are interchangeable on the same
-data.
 
 ---
 
@@ -183,23 +151,10 @@ without. Reports mean cross-entropy and the delta.
 
 ```bash
 python eval_memres.py \
-    --model_path output/qwen3_0p6b_memres_gated/final \
+    --model_path output/qwen3_0p6b_memres/final \
     --data_path data/friends_scripts.jsonl \
     --history_len 512 --current_len 256 --num_eval 32
 ```
-
-Args:
-- `--model_path` — checkpoint dir (contains `config.json`, weights).
-- `--data_path` — same JSONL as training.
-- `--tokenizer` — default `Qwen/Qwen3-0.6B`.
-- `--history_len`, `--current_len` — must match what was used at train time
-  (sequence length the model saw).
-- `--num_eval` — number of held-out samples.
-- `--eval_start` — index where the held-out split starts. Training uses
-  the first `eval_start` lines (default 200).
-
-Output: `delta = loss_without_memory - loss_with_memory`. Positive means
-memory reduces loss.
 
 ---
 
@@ -209,39 +164,28 @@ Compresses a history once, then feeds two paired continuations:
 - a **callback** ("Remember what we just talked about? ...")
 - a **filler** ("The quick brown fox ...")
 
-Measures α mass routed to `M_c` in each case. Positive `callback - filler`
-Δ means the model opens memory more on callbacks than filler.
+Measures `alpha_{0->l}` (attention mass routed to `v_0 = m^t`) at each
+depth-wise routing layer. Positive `callback - filler` delta means the model
+opens memory more on callbacks than filler.
 
 ```bash
 python probe_memres.py \
-    --model_path output/qwen3_0p6b_memres_gated/final \
+    --model_path output/qwen3_0p6b_memres/final \
     --data_path data/friends_scripts.jsonl \
     --num_samples 16
 ```
-
-Args:
-- `--model_path`, `--data_path`, `--tokenizer`, `--eval_start`, `--device`
-  — same as eval.
-- `--history_len` — how much history to compress (default 512).
-- `--probe_len` — token length of the suffix continuation to score routing
-  on (default 32).
-- `--num_samples` — number of held-out histories to probe.
-
-Output per MemRes site: mean α on memory for callback vs filler, and Δ.
 
 ---
 
 ## Visualize
 
-Same measurement as the probe, plotted as (a) per-site bar chart and
-(b) per-sample × per-site Δα heatmap.
+Same measurement as the probe, plotted as (a) per-layer bar chart and
+(b) per-sample x per-layer delta-alpha heatmap.
 
 ```bash
 python visualize_memres.py \
-    --model_path output/qwen3_0p6b_memres_gated/final \
+    --model_path output/qwen3_0p6b_memres/final \
     --data_path data/friends_scripts.jsonl \
     --num_samples 16 \
     --output memres_routing.png
 ```
-
-Args: same as the probe, plus `--output` for the PNG path.

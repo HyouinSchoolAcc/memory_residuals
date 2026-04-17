@@ -50,11 +50,8 @@ def parse_args():
     p.add_argument("--intermediate_size", type=int, default=1536)
     p.add_argument("--head_dim", type=int, default=None)
 
-    p.add_argument("--memres_num_memory_vectors", type=int, default=128)
-    p.add_argument("--memres_num_memory_heads", type=int, default=8)
-    p.add_argument("--memres_apply_at", default="both", choices=["attn", "mlp", "both"])
-    p.add_argument("--memres_use_gate", action="store_true")
-    p.add_argument("--memres_gate_init", type=float, default=-2.0)
+    p.add_argument("--memres_num_vectors", type=int, default=128)
+    p.add_argument("--memres_judging_depth", type=int, default=1)
 
     p.add_argument("--history_len", type=int, default=1024)
     p.add_argument("--current_len", type=int, default=1024)
@@ -199,7 +196,7 @@ class Trainer:
         if a.run_name is None:
             a.run_name = (
                 f"memres-d{a.hidden_size}-L{a.num_layers}"
-                f"-K{a.memres_num_memory_vectors}-{a.steps // 1000}k"
+                f"-K{a.memres_num_vectors}-{a.steps // 1000}k"
             )
         if a.out_dir is None:
             a.out_dir = f"./output/{a.run_name}"
@@ -224,11 +221,8 @@ class Trainer:
     def _build_model(self):
         a = self.args
         memres_kwargs = dict(
-            memres_num_memory_vectors=a.memres_num_memory_vectors,
-            memres_num_memory_heads=a.memres_num_memory_heads,
-            memres_apply_at=a.memres_apply_at,
-            memres_use_gate=a.memres_use_gate,
-            memres_gate_init=a.memres_gate_init,
+            memres_num_vectors=a.memres_num_vectors,
+            memres_judging_depth=a.memres_judging_depth,
         )
 
         if a.pretrained:
@@ -269,12 +263,12 @@ class Trainer:
         n_memres = sum(
             p.numel()
             for n, p in self.model.named_parameters()
-            if "memory_block" in n or "memres_attn" in n or "memres_mlp" in n
+            if "memory_block" in n or "memory_readout" in n or "depth_router" in n
         )
         print(f"Model: {n_total:.1f}M total | MemRes: {n_memres / 1e3:.1f}K")
         print(
-            f"K={a.memres_num_memory_vectors} | history_len={a.history_len} | "
-            f"current_len={a.current_len}"
+            f"K={a.memres_num_vectors} | L_J={a.memres_judging_depth} | "
+            f"history_len={a.history_len} | current_len={a.current_len}"
         )
 
     def _build_optimizer(self):
@@ -309,18 +303,24 @@ class Trainer:
             return iter(SimulatedSessionStream(a.dataset, a.dataset_name, **common))
         raise ValueError("Provide --data_path or --simulate_sessions")
 
-    def _compute_memory_state(self, history_ids):
-        # History encoder runs without grad; compress_history keeps grad
-        # on the MemoryBlock so it learns end-to-end.
-        with torch.no_grad():
-            h_out = self.ddp.module.model(input_ids=history_ids)
-        return self.ddp.module.model.compress_history(h_out.last_hidden_state.detach())
+    def _compute_memory(self, history_ids):
+        """Embed history (detached), then compress + readout.
+
+        Detaching the embeddings keeps the shared embedding table out of the
+        memory-path gradient graph (cheaper), while the MemoryBlock and
+        MemoryReadout params still receive gradients via the downstream LM
+        loss.
+        """
+        C = self.ddp.module.model.embed_tokens(history_ids).detach()
+        M_c = self.ddp.module.model.compress_session(C)
+        m_t = self.ddp.module.model.readout_memory(M_c)
+        return m_t
 
     def _train_step(self, history_ids, current_ids):
         input_ids = current_ids[:, :-1]
         labels = input_ids
-        memory_state = self._compute_memory_state(history_ids)
-        out = self.ddp(input_ids=input_ids, labels=labels, memory_state=memory_state)
+        m_t = self._compute_memory(history_ids)
+        out = self.ddp(input_ids=input_ids, labels=labels, m_t=m_t)
         loss = out.loss / self.args.grad_accum
         loss.backward()
         return loss.item()

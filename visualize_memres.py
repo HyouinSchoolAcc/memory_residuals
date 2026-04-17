@@ -51,8 +51,8 @@ class MemResVisualizer:
         width = 0.4
         ax_bar.bar(x - width / 2, cb_mean, width, label="callback", color="#4CAF50")
         ax_bar.bar(x + width / 2, fl_mean, width, label="filler", color="#FF9800")
-        ax_bar.set_xlabel("MemRes site (layer index)")
-        ax_bar.set_ylabel(r"mean $\alpha \rightarrow M_c$")
+        ax_bar.set_xlabel("Routing layer (depth-wise)")
+        ax_bar.set_ylabel(r"mean $\alpha_{0 \to l}$ (memory mass)")
         ax_bar.set_title("Routing mass per site")
         ax_bar.set_xticks(x)
         ax_bar.legend()
@@ -67,7 +67,7 @@ class MemResVisualizer:
             vmax=vmax,
             interpolation="nearest",
         )
-        ax_heat.set_xlabel("MemRes site (layer index)")
+        ax_heat.set_xlabel("Routing layer (depth-wise)")
         ax_heat.set_ylabel("sample index")
         ax_heat.set_title(r"$\Delta\alpha$ = callback - filler")
         ax_heat.set_xticks(x)
@@ -75,8 +75,8 @@ class MemResVisualizer:
         cbar.set_label(r"$\Delta\alpha$")
 
         fig.suptitle(
-            f"Memory Residuals routing — {model_name}  "
-            f"(n={n_samples}, sites={n_sites})",
+            f"Memory Residuals depth-wise routing — {model_name}  "
+            f"(n={n_samples}, layers={n_sites})",
             fontsize=12,
             fontweight="bold",
         )
