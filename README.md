@@ -4,9 +4,11 @@ A Qwen3 variant implementing the Memory Residuals architecture from the paper:
 end-to-end differentiable lifelong memory via two key advances.
 
 **Advance 1 — Two-Stage QKV Competition (Section 2.1):**
-A recurrent memory block that compresses each session into a candidate via
-learnable extraction queries, then forces old memory and new candidate into
-zero-sum softmax competition via judging queries.  Mundane filler sessions
+A recurrent memory block that distills each session into a `(K, d)`
+candidate `M_new` via a stack of `1 + L_E` cross-attention layers
+(initial `M_in` compression followed by Perceiver-style refinement),
+then forces old memory and new candidate into zero-sum softmax
+competition via judging queries `M_judge`.  Mundane filler sessions
 pass old memory through untouched; critical state-changes overwrite.
 
 **Advance 2 — Depth-Wise Residual Stream Injection (Section 2.2):**
@@ -38,9 +40,9 @@ reference and is not imported by the current pipeline.
 
 | Paper Section / Equation | Module in `modeling_memres.py` |
 |---|---|
-| Section 2.1, Eq. 1 — Extraction | `MemoryBlock.extract()` via `CrossAttention` |
-| Section 2.1, Eq. 2 — Judging | `MemoryBlock.judge()` via `CrossAttention` |
-| Section 2.1.1, Eq. 3-5 — Multi-layer judging | `MemoryBlock.judging_layers` + `readout` |
+| Section 2.1, Eq. 1 — Initial extraction | `MemoryBlock.extraction_layers[0]` |
+| Section 2.1.1, Eqs. 3-4 — Refinement (L_E layers) | `MemoryBlock.extraction_layers[1:]` (residual) |
+| Section 2.1, Eq. 2 / 2.1.1 Eq. 5 — Judging | `MemoryBlock.judge()` via `CrossAttention` |
 | M_in (extraction queries) | `MemoryBlock.M_in` |
 | M_judge (judging queries) | `MemoryBlock.M_judge` |
 | Section 2.2, Eq. 6 — Per-position readout | `MemoryReadout.forward()` (cross-attn, queries = `inputs_embeds`) |
@@ -73,7 +75,7 @@ torchrun --nproc_per_node=1 train_memres.py \
     --data_path data/friends_scripts.jsonl \
     --hidden_size 512 --num_layers 12 --num_heads 8 --num_kv_heads 4 \
     --intermediate_size 1536 \
-    --memres_num_vectors 128 --memres_judging_depth 1 \
+    --memres_num_vectors 128 --memres_extraction_depth 0 \
     --history_len 512 --current_len 256 \
     --steps 3000 --batch_size 2 --grad_accum 2 \
     --out_dir output/bigger_memres
@@ -88,7 +90,7 @@ readout, depth-wise router) stay randomly initialized and learn from scratch.
 torchrun --nproc_per_node=1 train_memres.py \
     --pretrained Qwen/Qwen3-0.6B \
     --data_path data/friends_scripts.jsonl \
-    --memres_num_vectors 128 --memres_judging_depth 1 \
+    --memres_num_vectors 128 --memres_extraction_depth 0 \
     --history_len 512 --current_len 256 \
     --steps 2000 --batch_size 1 --grad_accum 4 \
     --lr 2e-5 --warmup 100 \
@@ -122,9 +124,11 @@ torchrun --nproc_per_node=1 train_memres.py \
 - `--memres_num_vectors K` — number of latent memory slots (K in the paper).
   Fixed, independent of history length. Common values: 32 (small), 128
   (default), 256 (big).
-- `--memres_judging_depth L_J` — number of judging refinement layers
-  (Section 2.1.1). Default 1 (single-pass judging). Higher values (2-8) add
-  non-linear refinement capacity for complex multi-hop callbacks.
+- `--memres_extraction_depth L_E` — number of Perceiver-style refinement
+  layers stacked on top of the initial `M_in` cross-attention
+  (Section 2.1.1, Eqs. 3-4). Default 0 (single-layer extraction, i.e. Eq. 1).
+  Higher values (2-8) add non-linear distillation capacity for extracting
+  multi-hop semantic content from long raw sessions.
 
 ### Sequence lengths
 

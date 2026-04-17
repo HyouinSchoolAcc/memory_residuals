@@ -51,7 +51,13 @@ def parse_args():
     p.add_argument("--head_dim", type=int, default=None)
 
     p.add_argument("--memres_num_vectors", type=int, default=128)
-    p.add_argument("--memres_judging_depth", type=int, default=1)
+    p.add_argument(
+        "--memres_extraction_depth",
+        type=int,
+        default=0,
+        help="L_E: Perceiver-style refinement layers on top of Eq. 1 "
+        "(default 0 -> single-layer extraction).",
+    )
 
     p.add_argument("--history_len", type=int, default=1024)
     p.add_argument("--current_len", type=int, default=1024)
@@ -222,7 +228,7 @@ class Trainer:
         a = self.args
         memres_kwargs = dict(
             memres_num_vectors=a.memres_num_vectors,
-            memres_judging_depth=a.memres_judging_depth,
+            memres_extraction_depth=a.memres_extraction_depth,
         )
 
         if a.pretrained:
@@ -267,7 +273,7 @@ class Trainer:
         )
         print(f"Model: {n_total:.1f}M total | MemRes: {n_memres / 1e3:.1f}K")
         print(
-            f"K={a.memres_num_vectors} | L_J={a.memres_judging_depth} | "
+            f"K={a.memres_num_vectors} | L_E={a.memres_extraction_depth} | "
             f"history_len={a.history_len} | current_len={a.current_len}"
         )
 

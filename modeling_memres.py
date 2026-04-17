@@ -5,17 +5,19 @@ Two key architectural advances over standard Qwen3:
 
 1. MemoryBlock — Two-Stage QKV Competition (Section 2.1):
 
-   Stage 1 (Extraction, Eq. 1):
-       E_t = Softmax(M_in W_Q^ext (C_t W_K^ext)^T / sqrt(d)) C_t W_V^ext
+   Stage 1 (Extraction, Eq. 1 baseline; Eqs. 3-4 with L_E > 0):
+       E^(0) = CrossAttn(M_in, C_t)                                  # (K, d)
+       E^(ℓ) = E^(ℓ-1) + CrossAttn^(ℓ)(E^(ℓ-1), C_t)  for ℓ = 1..L_E # (K, d)
+       M_new = E^(L_E)
 
-   Stage 2 (Judging, Eq. 2):
-       P_judge = [M_c^{t-1} || E_t]
+   Stage 2 (Judging, Eqs. 2/5):
+       P_judge = [M_c^{t-1} || M_new]                                 # (2K, d)
        M_c^t   = Softmax(M_judge W_Q^judge (P_judge W_K^judge)^T / sqrt(d)) P_judge W_V^judge
 
-   The softmax across the 2K dimension creates zero-sum competition between
-   old memory and new extraction (the Forgetting Defense).
-
-   Optional multi-layer judging depth L_J (Section 2.1.1, Eq. 3-5).
+   The softmax across the 2K dimension creates zero-sum competition
+   between old memory and new candidate (the Forgetting Defense).  Every
+   intermediate state in the extraction lives in R^{K x d}, so the
+   residual refinement is well-typed and L_E = 0 recovers Eq. 1.
 
 2. Depth-Wise Residual Stream Injection (Section 2.2):
 
@@ -82,12 +84,14 @@ class Qwen3MemResConfig(Qwen3Config):
     def __init__(
         self,
         memres_num_vectors: int = 128,
-        memres_judging_depth: int = 1,
+        memres_extraction_depth: int = 0,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.memres_num_vectors = memres_num_vectors
-        self.memres_judging_depth = memres_judging_depth
+        # L_E: number of Perceiver-style refinement layers stacked on top of
+        # the initial M_in cross-attention (Eq. 4).  L_E = 0 recovers Eq. 1.
+        self.memres_extraction_depth = memres_extraction_depth
 
 
 # ---------------------------------------------------------------------------
@@ -122,63 +126,70 @@ class MemoryBlock(nn.Module):
     """
     Two-Stage QKV Competition (Section 2.1).
 
-    Stage 1 — Extraction (Eq. 1):
-        Compress raw session C_t into a candidate E_t via learnable
-        extraction queries M_in.
+    Stage 1 — Extraction (Eq. 1 baseline; Eqs. 3-4 with L_E > 0):
+        The raw session C_t (shape (B, N, d)) is compressed into a
+        K-slot candidate M_new via a Perceiver-style refinement stack.
+        The initial cross-attention uses fixed learnable queries M_in;
+        each refinement layer lets the evolving latent state re-query
+        the raw session.  All intermediate states live in R^{K x d},
+        so the residual refinement is well-typed.
 
-    Stage 2 — Judging (Eq. 2):
-        Concatenate old memory and new candidate into a judgment pool
-        P_judge = [M_c^{t-1} || E_t].  Learnable judging queries M_judge
-        attend over P_judge so old and new compete in a zero-sum softmax.
+            E^(0) = CrossAttn(M_in, C_t)
+            E^(ℓ) = E^(ℓ-1) + CrossAttn^(ℓ)(E^(ℓ-1), C_t), ℓ = 1..L_E
+            M_new = E^(L_E)
 
-    Optional multi-layer judging (Eq. 3-5) with depth L_J.
+    Stage 2 — Judging (Eqs. 2/5):
+        P_judge = [M_c^{t-1} || M_new] in R^{2K x d}.  Learnable judging
+        queries M_judge (K x d) attend over P_judge so old and new
+        compete in a zero-sum softmax.  Single round — the heavy lifting
+        has already happened in the extraction stack.
     """
 
-    def __init__(self, hidden_size: int, num_vectors: int, judging_depth: int = 1):
+    def __init__(
+        self,
+        hidden_size: int,
+        num_vectors: int,
+        extraction_depth: int = 0,
+    ):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_vectors = num_vectors
-        self.judging_depth = judging_depth
+        self.extraction_depth = extraction_depth
 
         # Stage 1: learnable extraction queries M_in  (K x d)
         self.M_in = nn.Parameter(torch.empty(num_vectors, hidden_size))
         nn.init.normal_(self.M_in, std=hidden_size**-0.5)
-        self.extraction = CrossAttention(hidden_size)
+        # Initial compression + L_E refinement layers (Eq. 3-4).
+        # All share the same (K, d) -> (K, d) latent shape.
+        self.extraction_layers = nn.ModuleList(
+            [CrossAttention(hidden_size) for _ in range(1 + extraction_depth)]
+        )
 
         # Stage 2: learnable judging queries M_judge  (K x d)
         self.M_judge = nn.Parameter(torch.empty(num_vectors, hidden_size))
         nn.init.normal_(self.M_judge, std=hidden_size**-0.5)
-
-        if judging_depth <= 1:
-            # Single-layer judging (Eq. 2)
-            self.judging = CrossAttention(hidden_size)
-        else:
-            # Multi-layer refinement (Eq. 3-4) + final readout (Eq. 5)
-            self.judging_layers = nn.ModuleList(
-                [CrossAttention(hidden_size) for _ in range(judging_depth)]
-            )
-            self.readout = CrossAttention(hidden_size)
+        self.judging = CrossAttention(hidden_size)
 
     def extract(self, C: torch.Tensor) -> torch.Tensor:
-        """Stage 1: E_t = CrossAttn(M_in, C_t) — Eq. 1."""
+        """Stage 1: refine M_in queries over C_t for 1 + L_E layers.
+
+        Initial layer compresses N -> K via M_in queries (Eq. 1 / 3).
+        Subsequent layers refine the (K, d) state by letting it re-query
+        C_t with a residual connection (Eq. 4).
+        """
         B = C.size(0)
         M_in = self.M_in.unsqueeze(0).expand(B, -1, -1)
-        return self.extraction(M_in, C)
+        E = self.extraction_layers[0](M_in, C)  # (B, K, d)
+        for layer in self.extraction_layers[1:]:
+            E = E + layer(E, C)
+        return E
 
-    def judge(self, M_c_prev: torch.Tensor, E_t: torch.Tensor) -> torch.Tensor:
-        """Stage 2: compete old vs new over P_judge — Eq. 2 or Eq. 3-5."""
-        B = E_t.size(0)
-        P_judge = torch.cat([M_c_prev, E_t], dim=1)  # (B, 2K, d)
+    def judge(self, M_c_prev: torch.Tensor, M_new: torch.Tensor) -> torch.Tensor:
+        """Stage 2: single-round competition over [M_c^{t-1} || M_new]."""
+        B = M_new.size(0)
+        P_judge = torch.cat([M_c_prev, M_new], dim=1)  # (B, 2K, d)
         M_judge = self.M_judge.unsqueeze(0).expand(B, -1, -1)
-
-        if self.judging_depth <= 1:
-            return self.judging(M_judge, P_judge)
-
-        # Multi-layer refinement (Eq. 3-4)
-        for layer in self.judging_layers:
-            P_judge = P_judge + layer(M_judge, P_judge)
-        # Final readout (Eq. 5)
-        return self.readout(M_judge, P_judge)
+        return self.judging(M_judge, P_judge)
 
     def forward(
         self,
@@ -194,10 +205,10 @@ class MemoryBlock(nn.Module):
         Returns:
             M_c: (B, K, d) — updated memory state.
         """
-        E_t = self.extract(C)
+        M_new = self.extract(C)
         if M_c_prev is None:
-            M_c_prev = torch.zeros_like(E_t)
-        return self.judge(M_c_prev, E_t)
+            M_c_prev = torch.zeros_like(M_new)
+        return self.judge(M_c_prev, M_new)
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +393,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         self.memory_block = MemoryBlock(
             config.hidden_size,
             config.memres_num_vectors,
-            config.memres_judging_depth,
+            config.memres_extraction_depth,
         )
         self.memory_readout = MemoryReadout(config.hidden_size)
         self.depth_router = DepthWiseRouter(

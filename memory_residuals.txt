@@ -75,26 +75,26 @@ To update the memory, we employ a second cross-attention block governed by a dis
 
 \textit{The Forgetting Defense Insight:} Because the Softmax is computed across the $2K$ dimension, the old memory and the new candidate memory are forced into a zero-sum semantic competition. If the new session $C_t$ contains only mundane conversational filler, $E_t$ will lack predictive semantic value. The Judging Queries will recognize this and shift their attention distribution heavily onto the keys of $M_{\text{c}}^{t-1}$, effectively routing the old memory untouched into the next state. Conversely, if $E_t$ contains a critical state-change, the queries will strongly attend to the new representation, implicitly overwriting outdated information.
 
-\subsubsection{On Judging Depth: Multi-Layer Competition as an Ablation Axis}
-\label{sec:judging_depth}
+\subsubsection{On Extraction Depth: Multi-Layer Distillation as an Ablation Axis}
+\label{sec:extraction_depth}
 
-The single-layer formulation above assumes that a lone cross-attention pass over $P_{\text{judge}}$ is sufficient to determine what knowledge to retain and what to discard. In practice, deciding \textit{what matters} is a highly non-linear judgment. A user mentioning "my sister" in Session 12 is mundane in isolation, but becomes critical if Session 3 established a family conflict.
+Equation~1 assumes that a single cross-attention pass over $C_t$ is sufficient to distill the session's salient semantic content into a $K$-slot candidate. In practice, deciding \textit{what to extract} from a raw conversation of hundreds of tokens is a highly non-linear task: a throwaway mention of "my sister" early in the session may only surface as meaningful after composing it with later turns of the same session. The judging step that follows operates on a $2K$-slot pool and is therefore already a low-bandwidth decision; the capacity we want is in the distillation that \emph{feeds} that decision.
 
-We therefore identify \textbf{judging depth} $L_J$ as a primary ablation axis for empirical study. We generalize to a deeper judging stack by iteratively refining the judgment:
+We therefore identify \textbf{extraction depth} $L_E$ as a primary ablation axis, replacing Eq.~1 with a Perceiver-style refinement stack in which the latent state iteratively re-queries the raw session:
 
 \begin{equation}
-    P_{\text{judge}}^{(0)} =[M_{\text{c}}^{t-1} \parallel E_t]
+    E^{(0)} = \text{CrossAttn}^{(0)}\!\left(M_{\text{in}},\; C_t\right) \in \mathbb{R}^{K \times d}
 \end{equation}
 \begin{equation}
-    P_{\text{judge}}^{(\ell)} = P_{\text{judge}}^{(\ell-1)} + \text{CrossAttn}^{(\ell)}\!\left(M_{\text{judge}},\; P_{\text{judge}}^{(\ell-1)}\right), \quad \ell = 1, \dots, L_J
+    E^{(\ell)} = E^{(\ell-1)} + \text{CrossAttn}^{(\ell)}\!\left(E^{(\ell-1)},\; C_t\right) \in \mathbb{R}^{K \times d}, \quad \ell = 1, \dots, L_E
 \end{equation}
 
-The final memory state is then read out from the refined pool:
+The final candidate $M_{\text{new}} := E^{(L_E)}$ replaces $E_t$ in the judging step of Eq.~2, which remains a single zero-sum competition:
 \begin{equation}
-    M_{\text{c}}^{t} = \text{Softmax}\left(\frac{M_{\text{judge}} W_Q^{\text{read}} (P_{\text{judge}}^{(L_J)} W_K^{\text{read}})^\top}{\sqrt{d}}\right) P_{\text{judge}}^{(L_J)} W_V^{\text{read}}
+    M_{\text{c}}^{t} = \text{Softmax}\!\left(\frac{M_{\text{judge}} W_Q^{\text{judge}} \left(P_{\text{judge}} W_K^{\text{judge}}\right)^\top}{\sqrt{d}}\right) P_{\text{judge}} W_V^{\text{judge}}, \quad P_{\text{judge}} = \left[M_{\text{c}}^{t-1} \parallel M_{\text{new}}\right]
 \end{equation}
 
-We deliberately present $L_J = 1$ as the baseline architecture. Deeper stacks ($L_J = 2\text{--}8$) provide non-linear refinement capacity for complex, multi-hop callbacks, but must be empirically justified against the risk of overfitting to training-distribution dialogue patterns.
+Because every intermediate state in the refinement lives in $\mathbb{R}^{K \times d}$, the residual in Eq.~4 is well-typed and $L_E = 0$ trivially recovers the single-layer baseline. Deeper stacks ($L_E = 2\text{--}8$) provide non-linear refinement capacity for multi-hop extraction, but must be empirically justified against the risk of overfitting to training-distribution dialogue patterns.
 
 \subsection{Key Advance 2: Implicit Retrieval via the Depth-Wise Residual Stream}
 
