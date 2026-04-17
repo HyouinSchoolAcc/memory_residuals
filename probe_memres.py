@@ -5,7 +5,7 @@ Builds paired prompts from a history:
   - "callback":  explicit callback to the history ("Remember when we...")
   - "filler":    generic non-callback continuation ("The quick brown fox...")
 
-Both share the same m_t = readout(compress(history)).  We run the model with
+Both share the same M_c = compress(history).  We run the model with
 collect_alpha_trace=True and report mean alpha_{0->l} (per routing layer)
 for each prompt type.  Positive callback-vs-filler delta means the model
 routes more mass to memory when the prompt calls back to the history.
@@ -65,11 +65,10 @@ class RoutingProbe:
         ids_t = torch.tensor(
             ids[: self.history_len], dtype=torch.long, device=self.device
         ).unsqueeze(0)
-        _, m_t = self.model.model.compute_memory(ids_t)
-        return m_t
+        return self.model.model.compute_memory(ids_t)
 
     @torch.no_grad()
-    def alpha_mass_for_suffix(self, suffix_text: str, m_t: torch.Tensor):
+    def alpha_mass_for_suffix(self, suffix_text: str, M_c: torch.Tensor):
         ids = self.tokenizer.encode(suffix_text, add_special_tokens=False)[
             : self.probe_len
         ]
@@ -77,7 +76,7 @@ class RoutingProbe:
             return None
         ids_t = torch.tensor(ids, dtype=torch.long, device=self.device).unsqueeze(0)
         out = self.model(
-            input_ids=ids_t, m_t=m_t, collect_alpha_trace=True
+            input_ids=ids_t, M_c=M_c, collect_alpha_trace=True
         )
         # alpha_trace: list of (B, S) tensors, one per routing layer
         return [a.squeeze(0).mean().item() for a in out.alpha_trace]
@@ -87,15 +86,15 @@ class RoutingProbe:
         for i, sample in enumerate(samples):
             if not sample.get("history"):
                 continue
-            m_t = self.compress(sample["history"])
-            if m_t is None:
+            M_c = self.compress(sample["history"])
+            if M_c is None:
                 continue
 
             cb_suffix = self.CALLBACK_SUFFIXES[i % len(self.CALLBACK_SUFFIXES)]
             fl_suffix = self.FILLER_SUFFIXES[i % len(self.FILLER_SUFFIXES)]
 
-            cb = self.alpha_mass_for_suffix(cb_suffix, m_t)
-            fl = self.alpha_mass_for_suffix(fl_suffix, m_t)
+            cb = self.alpha_mass_for_suffix(cb_suffix, M_c)
+            fl = self.alpha_mass_for_suffix(fl_suffix, M_c)
             if cb is None or fl is None:
                 continue
             callback_traces.append(cb)

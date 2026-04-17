@@ -55,16 +55,15 @@ class MemoryEvaluator:
         )
 
     @torch.no_grad()
-    def lm_loss(self, input_ids, labels, m_t=None) -> float:
+    def lm_loss(self, input_ids, labels, M_c=None) -> float:
         return self.model(
-            input_ids=input_ids, labels=labels, m_t=m_t
+            input_ids=input_ids, labels=labels, M_c=M_c
         ).loss.item()
 
     @torch.no_grad()
     def compress(self, history_ids: torch.Tensor) -> torch.Tensor:
-        """Embed history, two-stage compress, readout -> m_t."""
-        _, m_t = self.model.model.compute_memory(history_ids)
-        return m_t
+        """Embed history and two-stage compress to M_c."""
+        return self.model.model.compute_memory(history_ids)
 
     def run(self, samples):
         losses_mem, losses_nomem = [], []
@@ -81,9 +80,9 @@ class MemoryEvaluator:
             input_ids = c_ids[:, :-1]
             labels = input_ids.clone()
 
-            m_t = self.compress(h_ids)
-            losses_mem.append(self.lm_loss(input_ids, labels, m_t=m_t))
-            losses_nomem.append(self.lm_loss(input_ids, labels, m_t=None))
+            M_c = self.compress(h_ids)
+            losses_mem.append(self.lm_loss(input_ids, labels, M_c=M_c))
+            losses_nomem.append(self.lm_loss(input_ids, labels, M_c=None))
         return losses_mem, losses_nomem
 
 

@@ -100,20 +100,20 @@ We deliberately present $L_J = 1$ as the baseline architecture. Deeper stacks ($
 
 Our second advance defines how the active model queries the persistent state $M_{\text{c}}^t$ during a live conversation. Treating memory retrieval as a standard token-level attention operation over a concatenated pool would reintroduce an $O((N+K)^2)$ bottleneck. To avoid sequence-length bloat, we register the episodic memory block directly into the model's \emph{depth-wise} residual stream, utilizing the principles of Attention Residuals \cite{du2026attention}.
 
-\paragraph{Compressing Memory into a Source Vector.}
-Depth-wise routing frameworks expect inputs as single $d$-dimensional vectors per layer. To interface seamlessly with this structure, we compress the $K$-row memory matrix $M_{\text{c}}^t$ into a unified episodic vector via a learned, session-invariant readout query $r \in \mathbb{R}^d$:
+\paragraph{Reading Memory as a Source Stream.}
+Depth-wise routing frameworks treat each layer's output as a source tensor of shape $S \times d$: one $d$-dimensional vector per token position in the current session. To interface seamlessly with this structure---and to let each position in the current session retrieve the memory slot most relevant to its local context---we read out from the $K$-row memory matrix $M_{\text{c}}^t$ via a cross-attention whose queries are the current session's token embeddings $X \in \mathbb{R}^{S \times d}$:
 
 \begin{equation}
-    m^t = \text{Softmax}\!\left(\frac{r^\top (M_{\text{c}}^t)^\top}{\sqrt{d}}\right) M_{\text{c}}^t \in \mathbb{R}^d
+    m^t = \text{Softmax}\!\left(\frac{X W_Q^{\text{read}} (M_{\text{c}}^t W_K^{\text{read}})^\top}{\sqrt{d}}\right) M_{\text{c}}^t W_V^{\text{read}} \in \mathbb{R}^{S \times d}
 \end{equation}
 
-This readout produces a single dense vector $m^t$ that acts as the model's holistic "feeling" of the past. Because $r$ is a learned parameter rather than derived from the current conversational input, it ensures memory retrieval remains structurally decoupled from local token generation.
+Each position $s$ attends over the $K$ memory slots independently, so the readout is inherently query-dependent: tokens discussing a family conflict route mass onto slots encoding family context, while tokens about dinner plans attend elsewhere. Because $m^t$ has exactly the shape of a standard attention layer's output, it drops directly into the depth-wise routing pool described below without any special-casing.
 
 \paragraph{Registering Memory as the Foundational Layer.}
-Let a model have $L$ layers. In a depth-wise attention system, layer outputs act as source vectors $v_1, \ldots, v_{L-1}$ that can be queried by subsequent layers. We introduce our compressed memory as the foundational source at index 0:
+Let a model have $L$ layers. In a depth-wise attention system, layer outputs act as source tensors $v_1, \ldots, v_{L-1}$ (each of shape $S \times d$) that can be queried by subsequent layers. We introduce the per-position memory readout as the foundational source at index 0:
 
 \begin{equation}
-    v_0 := m^t
+    v_0 := m^t \quad \in \mathbb{R}^{S \times d}
 \end{equation}
 
 The input to any downstream layer $l$ is computed as a depth-wise softmax attention over all preceding sources, \textit{including} the episodic memory:
@@ -142,7 +142,7 @@ By integrating memory directly into the layer-to-layer residual stream, the mode
 While our approach shares philosophical DNA with several recent works, it uniquely resolves the limitations of modern agentic workflows:
 \begin{itemize}
     \item \textbf{Versus Standard RAG and MemGPT:} Memory Residuals are entirely end-to-end differentiable. The model learns \textit{how} to encode implicit user preferences based on backpropagated loss, eliminating the need for rigid vector databases and lossy text-summarization prompts.
-    \item \textbf{Versus Attention Residuals \cite{du2026attention}:} While recent work replaces uniform depth-wise addition with a softmax attention mechanism over \textit{internal} layer outputs, Memory Residuals expand this paradigm to the \textit{external} temporal domain. By injecting the cross-session episodic vector $m^t$ as the foundational source token ($v_0$), we bridge the gap between intra-session depth routing and lifelong memory retrieval.
+    \item \textbf{Versus Attention Residuals \cite{du2026attention}:} While recent work replaces uniform depth-wise addition with a softmax attention mechanism over \textit{internal} layer outputs, Memory Residuals expand this paradigm to the \textit{external} temporal domain. By injecting a per-position cross-session readout $m^t$ as the foundational source ($v_0$), we bridge the gap between intra-session depth routing and lifelong memory retrieval while preserving the query-dependent selectivity of standard attention.
     \item \textbf{Versus Perceiver IO \cite{jaegle2021perceiver}:} While Perceiver uses cross-attention bottlenecks to handle large inputs, Memory Residuals embed this bottleneck specifically as a \textit{softmax-weighted depth source}, allowing context-dependent querying on a turn-by-turn basis.
     \item \textbf{Versus Recurrent Memory Transformer (RMT) \cite{bulatov2022recurrent}:} Models like RMT prepend memory embeddings directly to the context window. Memory Residuals remove memory from the standard $O(N^2)$ sequence entirely, isolating it in the orthogonal depth-wise routing pool.
 \end{itemize}

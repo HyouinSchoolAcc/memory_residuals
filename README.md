@@ -10,9 +10,11 @@ zero-sum softmax competition via judging queries.  Mundane filler sessions
 pass old memory through untouched; critical state-changes overwrite.
 
 **Advance 2 — Depth-Wise Residual Stream Injection (Section 2.2):**
-The memory matrix is compressed into a single vector `m^t` via a learned
-readout query, then registered as `v_0` in a depth-wise attention pool.
-Each layer's input is a softmax-weighted mix of all preceding layer outputs
+Each position in the current session queries the memory matrix `M_c`
+via cross-attention, yielding a per-position readout `m^t` of shape
+`(B, S, d)` — indistinguishable from any attention layer's output.
+This readout is registered as `v_0` in a depth-wise attention pool; each
+layer's input is a softmax-weighted mix of all preceding layer outputs
 plus this memory source, using `phi(q, k) = exp(q^T RMSNorm(k))` with a
 learned per-layer pseudo-query `w_l`.  During filler turns, local layer
 outputs dominate the softmax; during callbacks, mass shifts onto `v_0`.
@@ -41,12 +43,12 @@ reference and is not imported by the current pipeline.
 | Section 2.1.1, Eq. 3-5 — Multi-layer judging | `MemoryBlock.judging_layers` + `readout` |
 | M_in (extraction queries) | `MemoryBlock.M_in` |
 | M_judge (judging queries) | `MemoryBlock.M_judge` |
-| Section 2.2, Eq. 6 — Readout | `MemoryReadout.forward()` |
-| Section 2.2, Eq. 7 — v_0 := m^t | `Qwen3MemResModel.forward()` (v_0 broadcast) |
+| Section 2.2, Eq. 6 — Per-position readout | `MemoryReadout.forward()` (cross-attn, queries = `inputs_embeds`) |
+| Section 2.2, Eq. 7 — v_0 := m^t  (shape `(B,S,d)`) | `Qwen3MemResModel.forward()` (`sources = [m_t]`) |
 | Section 2.2, Eq. 8 — Depth-wise routing | `DepthWiseRouter.route()` |
 | phi(q,k) = exp(q^T RMSNorm(k)) | `DepthWiseRouter.route()` (scores computation) |
 | w_l (per-layer pseudo-query) | `DepthWiseRouter.w` |
-| r (readout query) | `MemoryReadout.r` |
+| W_Q/W_K/W_V (readout projections) | `MemoryReadout.W_Q/W_K/W_V` |
 
 ---
 

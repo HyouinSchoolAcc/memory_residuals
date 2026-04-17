@@ -19,11 +19,13 @@ Two key architectural advances over standard Qwen3:
 
 2. Depth-Wise Residual Stream Injection (Section 2.2):
 
-   Readout (Eq. 6):
-       m^t = Softmax(r^T (M_c^t)^T / sqrt(d)) M_c^t   in R^d
+   Readout (Eq. 6) — per-position cross-attention over M_c with the
+   current session's token embeddings as queries:
+       m^t = Softmax(X W_Q^read (M_c^t W_K^read)^T / sqrt(d)) M_c^t W_V^read
+       m^t in R^{S x d}  — matches the shape of any attention layer output.
 
    Register as foundational source (Eq. 7):
-       v_0 := m^t
+       v_0 := m^t  in R^{S x d}
 
    Depth-wise attention (Eq. 8):
        h_l = sum_{i=0}^{l-1} alpha_{i->l} * v_i
@@ -204,22 +206,30 @@ class MemoryBlock(nn.Module):
 
 
 class MemoryReadout(nn.Module):
-    """Compress M_c in R^{K x d} -> m^t in R^d via learned readout query r.
+    """Per-position cross-attention readout over M_c (Eq. 6).
 
-    m^t = Softmax(r^T (M_c)^T / sqrt(d)) M_c
+    Each position in the current session queries the K memory slots
+    independently, producing m^t of shape (B, S, d) — identical to the
+    shape of any standard attention layer output, so it drops directly
+    into the depth-wise routing pool at v_0 without broadcasting.
+
+        m^t = Softmax(X W_Q (M_c W_K)^T / sqrt(d)) M_c W_V
     """
 
     def __init__(self, hidden_size: int):
         super().__init__()
         self.scale = hidden_size**-0.5
-        self.r = nn.Parameter(torch.empty(hidden_size))
-        nn.init.normal_(self.r, std=hidden_size**-0.5)
+        self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
 
-    def forward(self, M_c: torch.Tensor) -> torch.Tensor:
-        """(B, K, d) -> (B, d)"""
-        scores = torch.einsum("d,bkd->bk", self.r, M_c) * self.scale
-        attn = F.softmax(scores, dim=-1)
-        return torch.einsum("bk,bkd->bd", attn, M_c)
+    def forward(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
+        """X: (B, S, d) queries;  M_c: (B, K, d) memory slots  ->  (B, S, d)"""
+        Q = self.W_Q(X)
+        K = self.W_K(M_c)
+        V = self.W_V(M_c)
+        attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
+        return attn @ V
 
 
 # ---------------------------------------------------------------------------
@@ -396,17 +406,23 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         """Two-stage compression: extract + judge. Returns M_c (B, K, d)."""
         return self.memory_block(C, M_c_prev)
 
-    def readout_memory(self, M_c: torch.Tensor) -> torch.Tensor:
-        """M_c (B, K, d) -> m^t (B, d)."""
-        return self.memory_readout(M_c)
+    def readout_memory(
+        self, X: torch.Tensor, M_c: torch.Tensor
+    ) -> torch.Tensor:
+        """Per-position readout: X (B, S, d) queries M_c (B, K, d) -> (B, S, d)."""
+        return self.memory_readout(X, M_c)
 
     def compute_memory(
         self,
         history_ids: torch.Tensor,
         M_c_prev: torch.Tensor | None = None,
         detach_embeddings: bool = True,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """history_ids (B, N) -> (M_c, m_t).
+    ) -> torch.Tensor:
+        """history_ids (B, N) -> M_c (B, K, d).
+
+        Returns only the persistent memory matrix M_c.  The per-position
+        readout m^t depends on the *current* session and is therefore
+        computed inside ``forward`` from ``M_c`` and ``inputs_embeds``.
 
         When detach_embeddings is True the embedding lookup is detached so
         gradients flow through the memory block but not through the shared
@@ -415,9 +431,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         C = self.embed_tokens(history_ids)
         if detach_embeddings:
             C = C.detach()
-        M_c = self.compress_session(C, M_c_prev)
-        m_t = self.readout_memory(M_c)
-        return M_c, m_t
+        return self.compress_session(C, M_c_prev)
 
     # -- forward ------------------------------------------------------------
 
@@ -435,20 +449,18 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         cache_position: torch.LongTensor | None = None,
         history_ids: torch.LongTensor | None = None,
         M_c: torch.Tensor | None = None,
-        m_t: torch.Tensor | None = None,
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> BaseModelOutputWithPast:
         """
         Args:
             history_ids: (B, N) token ids of past session(s).  Embedded and
-                compressed into M_c / m_t by the MemoryBlock + Readout.
-                Ignored when M_c or m_t is passed directly.
+                compressed into M_c by the MemoryBlock.  Ignored when M_c
+                is passed directly.
             M_c: (B, K, d) pre-computed memory matrix.  Takes precedence
-                over history_ids.  Readout is still computed.
-            m_t: (B, d) pre-computed readout vector.  Takes precedence over
-                both M_c and history_ids — used for efficient multi-turn
-                generation where you pre-compute once.
+                over history_ids.  The per-position readout m^t is
+                recomputed each forward from (inputs_embeds, M_c) because
+                it is query-dependent on the current session.
             collect_alpha_trace: when True, attach ``alpha_trace`` (list of
                 (B, S) tensors, one per routing layer) to the output.
         """
@@ -458,13 +470,15 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        # ── Resolve memory: history_ids -> M_c -> m_t ──
-        if m_t is None:
-            if M_c is None and history_ids is not None:
-                C = self.embed_tokens(history_ids)
-                M_c = self.compress_session(C)
-            if M_c is not None:
-                m_t = self.readout_memory(M_c)
+        # ── Resolve memory: history_ids -> M_c ──
+        if M_c is None and history_ids is not None:
+            C = self.embed_tokens(history_ids)
+            M_c = self.compress_session(C)
+
+        # Per-position readout (Eq. 6): m^t = CrossAttn(inputs_embeds, M_c)
+        m_t = (
+            self.readout_memory(inputs_embeds, M_c) if M_c is not None else None
+        )
 
         # ── Standard cache / position setup ──
         if use_cache and past_key_values is None:
@@ -502,14 +516,12 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         position_embeddings = self.rotary_emb(inputs_embeds, position_ids)
 
         # ── Forward through layers with depth-wise routing ──
-        B, S, d = inputs_embeds.shape
         use_routing = m_t is not None
         alpha_trace: list | None = [] if collect_alpha_trace else None
 
         if use_routing:
-            # v_0 = m^t broadcast to (B, S, d) — Eq. 7
-            v_0 = m_t.unsqueeze(1).expand(B, S, d)
-            sources: list[torch.Tensor] = [v_0]
+            # v_0 := m^t is already (B, S, d) — Eq. 7, no broadcasting needed.
+            sources: list[torch.Tensor] = [m_t]
 
         # Layer 0 always receives embeddings directly
         hidden_states = inputs_embeds
@@ -572,17 +584,19 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
 
     Quick-start::
 
-        # Training (history_ids automatically compressed)
+        # Training (history_ids automatically compressed to M_c)
         out = model(input_ids=current, labels=current, history_ids=prev_session)
 
-        # Efficient multi-turn generation (pre-compute m_t once)
-        M_c, m_t = model.model.compute_memory(history_ids)
-        tokens = model.generate(input_ids=prompt, m_t=m_t, max_new_tokens=200)
+        # Efficient multi-turn generation: pre-compute M_c once; the
+        # per-position readout m^t is recomputed each forward from M_c
+        # and the current session's embeddings.
+        M_c = model.model.compute_memory(history_ids)
+        tokens = model.generate(input_ids=prompt, M_c=M_c, max_new_tokens=200)
 
         # Recurrent multi-session update
-        M_c_1, _ = model.model.compute_memory(session_1_ids)
-        M_c_2, m_t = model.model.compute_memory(session_2_ids, M_c_prev=M_c_1)
-        tokens = model.generate(input_ids=prompt, m_t=m_t, max_new_tokens=200)
+        M_c_1 = model.model.compute_memory(session_1_ids)
+        M_c_2 = model.model.compute_memory(session_2_ids, M_c_prev=M_c_1)
+        tokens = model.generate(input_ids=prompt, M_c=M_c_2, max_new_tokens=200)
     """
 
     config_class = Qwen3MemResConfig
@@ -610,15 +624,14 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         logits_to_keep: int | torch.Tensor = 0,
         history_ids: torch.LongTensor | None = None,
         M_c: torch.Tensor | None = None,
-        m_t: torch.Tensor | None = None,
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> CausalLMOutputWithPast:
         """
         Args:
             history_ids: (B, N) past-session token ids -> compressed to memory.
-            M_c: (B, K, d) pre-computed memory matrix.
-            m_t: (B, d) pre-computed readout vector.
+            M_c: (B, K, d) pre-computed memory matrix.  The per-position
+                readout m^t is computed inside the backbone forward.
             collect_alpha_trace: expose per-layer memory routing mass.
         """
         outputs: BaseModelOutputWithPast = self.model(
@@ -631,7 +644,6 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
             cache_position=cache_position,
             history_ids=history_ids,
             M_c=M_c,
-            m_t=m_t,
             collect_alpha_trace=collect_alpha_trace,
             **kwargs,
         )

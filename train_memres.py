@@ -304,23 +304,22 @@ class Trainer:
         raise ValueError("Provide --data_path or --simulate_sessions")
 
     def _compute_memory(self, history_ids):
-        """Embed history (detached), then compress + readout.
+        """Embed history (detached) and compress to M_c.
 
         Detaching the embeddings keeps the shared embedding table out of the
-        memory-path gradient graph (cheaper), while the MemoryBlock and
-        MemoryReadout params still receive gradients via the downstream LM
-        loss.
+        memory-path gradient graph (cheaper), while the MemoryBlock params
+        still receive gradients via the downstream LM loss.  The per-position
+        readout m^t is recomputed inside ``forward`` from M_c and the current
+        session's embeddings.
         """
         C = self.ddp.module.model.embed_tokens(history_ids).detach()
-        M_c = self.ddp.module.model.compress_session(C)
-        m_t = self.ddp.module.model.readout_memory(M_c)
-        return m_t
+        return self.ddp.module.model.compress_session(C)
 
     def _train_step(self, history_ids, current_ids):
         input_ids = current_ids[:, :-1]
         labels = input_ids
-        m_t = self._compute_memory(history_ids)
-        out = self.ddp(input_ids=input_ids, labels=labels, m_t=m_t)
+        M_c = self._compute_memory(history_ids)
+        out = self.ddp(input_ids=input_ids, labels=labels, M_c=M_c)
         loss = out.loss / self.args.grad_accum
         loss.backward()
         return loss.item()
