@@ -5,11 +5,50 @@ lets every layer softmax-route attention over `[local hidden states || memory]`.
 When the next token is generic filler, the routing collapses to local tokens.
 When it's a callback to history, mass flows to the memory block.
 
+> **Paper:** see [`memory_residuals.pdf`](memory_residuals.pdf) in this repo for
+> the full theoretical framework and the call for collaboration.
+
 Four scripts:
 - `train_memres.py` — train (from scratch or attached to pretrained Qwen3)
 - `eval_memres.py` — measure loss gain from having memory vs not
 - `probe_memres.py` — measure whether routing is semantic (callback > filler)
 - `visualize_memres.py` — plot per-layer routing mass
+
+The canonical implementation lives in `modeling_memres.py` (all four scripts
+import from it). `modeling_memory_residuals.py` is an earlier variant kept for
+reference and is not imported by the current pipeline.
+
+---
+
+## Roadmap / next steps
+
+Short list of things that would make this repo easier to pick up and extend.
+Contributions welcome — the paper is explicitly a call for collaboration.
+
+- [ ] **Report baseline numbers.** Publish a results table (loss with/without
+      memory, callback-vs-filler α Δ) for at least one from-scratch config and
+      the `Qwen/Qwen3-0.6B` attached config, so reviewers don't have to train
+      before they can evaluate the claim.
+- [ ] **Release a small checkpoint.** Upload a ~20–80M from-scratch MemRes
+      checkpoint to HF so `eval_memres.py` / `probe_memres.py` /
+      `visualize_memres.py` run out of the box without a GPU training budget.
+- [ ] **Paper → code map.** Add a short section (or `ARCHITECTURE.md`) showing
+      which equation in the paper maps to which module in `modeling_memres.py`
+      (memory block cross-attention, gated residual, routing α).
+- [ ] **Architecture diagram.** Drop in a figure of a Qwen3 decoder block with
+      the MemRes routing sites marked (`attn`, `mlp`, `both`).
+- [ ] **Document the JSONL data format.** Include a 2–3 line sample of
+      `{"history": ..., "current": ...}` in the README, plus a pointer to
+      `data/friends_scripts.jsonl` for a real example.
+- [ ] **Minimal smoke test.** A `python -m pytest` or single-command script
+      that trains for 5 steps on a tiny slice and confirms the loss decreases
+      and α is non-degenerate, so newcomers can verify their environment.
+- [ ] **Decide on `modeling_memory_residuals.py`.** Either fold the useful
+      parts into `modeling_memres.py` or delete the orphan to avoid confusion.
+- [ ] **BibTeX entry.** Add a citation block to the README so others can cite
+      the work consistently.
+- [ ] **CONTRIBUTING.md.** Echo the paper's call for collaboration with
+      concrete ways to help (compute, datasets, evals, baselines).
 
 ---
 
