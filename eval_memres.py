@@ -65,15 +65,20 @@ class MemoryEvaluator:
         """Embed history and two-stage compress to M_c."""
         return self.model.model.compute_memory(history_ids)
 
-    def run(self, samples):
-        losses_mem, losses_nomem = [], []
+    def run(self, samples, shuffle_history: bool = False):
+        encoded = []
         for sample in samples:
             if not sample.get("history") or not sample.get("current"):
                 continue
             enc = self.encode_pair(sample)
-            if enc is None:
-                continue
-            h_ids, c_ids = enc
+            if enc is not None:
+                encoded.append(enc)
+
+        losses_mem, losses_nomem = [], []
+        n = len(encoded)
+        for i, (h_ids, c_ids) in enumerate(encoded):
+            if shuffle_history:
+                h_ids, _ = encoded[(i + 1) % n]
             h_ids = h_ids.unsqueeze(0).to(self.device)
             c_ids = c_ids.unsqueeze(0).to(self.device)
 
@@ -101,6 +106,11 @@ def parse_args():
         help="index where eval split begins (train uses [0:eval_start))",
     )
     p.add_argument("--device", default="cuda")
+    p.add_argument(
+        "--shuffle_history",
+        action="store_true",
+        help="pair each current with a different sample's history (control)",
+    )
     return p.parse_args()
 
 
@@ -122,7 +132,9 @@ def main():
         for line in lines[args.eval_start : args.eval_start + args.num_eval]
     ]
 
-    losses_mem, losses_nomem = evaluator.run(held_out)
+    losses_mem, losses_nomem = evaluator.run(
+        held_out, shuffle_history=args.shuffle_history
+    )
 
     if not losses_mem:
         print("No valid eval samples.")
@@ -130,7 +142,8 @@ def main():
 
     mean_mem = sum(losses_mem) / len(losses_mem)
     mean_nomem = sum(losses_nomem) / len(losses_nomem)
-    print(f"n = {len(losses_mem)}")
+    tag = " (SHUFFLED history control)" if args.shuffle_history else ""
+    print(f"n = {len(losses_mem)}{tag}")
     print(f"mean CE with_memory : {mean_mem:.4f}")
     print(f"mean CE no_memory   : {mean_nomem:.4f}")
     print(
