@@ -108,6 +108,27 @@ class Qwen3MemResConfig(Qwen3Config):
 
 
 # ---------------------------------------------------------------------------
+# Weight init helper
+# ---------------------------------------------------------------------------
+
+
+def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
+    """Initialize raw nn.Parameter attributes on MemRes modules.
+
+    HF's `_init_weights` only touches Linear/Embedding/Norms, so our custom
+    Parameters (M_in, M_judge, depth_router.w[...]) stay uninitialized (NaN
+    garbage) after `from_pretrained` unless we init them explicitly.
+    """
+    std = hidden_size**-0.5
+    if isinstance(module, MemoryBlock):
+        nn.init.normal_(module.M_in, std=std)
+        nn.init.normal_(module.M_judge, std=std)
+    elif isinstance(module, DepthWiseRouter):
+        for w in module.w:
+            nn.init.normal_(w, std=0.01)
+
+
+# ---------------------------------------------------------------------------
 # Cross-attention primitive
 # ---------------------------------------------------------------------------
 
@@ -418,6 +439,10 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
 
         self.post_init()
 
+    def _init_weights(self, module):
+        super()._init_weights(module)
+        _init_memres_params(module, self.config.hidden_size)
+
     # -- convenience helpers ------------------------------------------------
 
     def compress_session(
@@ -634,6 +659,10 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
+
+    def _init_weights(self, module):
+        super()._init_weights(module)
+        _init_memres_params(module, self.config.hidden_size)
 
     @can_return_tuple
     @auto_docstring(

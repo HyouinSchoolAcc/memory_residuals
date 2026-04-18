@@ -8,3 +8,4 @@ build/
 .eggs/
 *.safetensors
 data_pipeline/
+tea_debug.log
