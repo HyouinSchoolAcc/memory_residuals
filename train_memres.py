@@ -286,6 +286,11 @@ class Trainer:
             weight_decay=0.1,
             eps=1e-8,
         )
+        if a.lr_min > a.lr:
+            raise ValueError(
+                f"--lr_min ({a.lr_min}) must be <= --lr ({a.lr}); "
+                "the cosine schedule decays from lr down to lr_min"
+            )
         lr_min_ratio = a.lr_min / a.lr
         scheduler = LambdaLR(
             optimizer,
