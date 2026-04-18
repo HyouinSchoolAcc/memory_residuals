@@ -67,8 +67,21 @@ from transformers.models.qwen3.modeling_qwen3 import (
     Qwen3RotaryEmbedding,
 )
 from transformers.utils import auto_docstring, can_return_tuple
-from transformers.utils.generic import merge_with_config_defaults
-from transformers.utils.output_capturing import capture_outputs
+
+try:
+    from transformers.utils.generic import merge_with_config_defaults
+except ImportError:
+
+    def merge_with_config_defaults(fn):
+        return fn
+
+
+try:
+    from transformers.utils.output_capturing import capture_outputs
+except ImportError:
+
+    def capture_outputs(fn):
+        return fn
 
 
 # ---------------------------------------------------------------------------
@@ -324,9 +337,7 @@ class Qwen3MemResDecoderLayer(GradientCheckpointingLayer):
 
         self.self_attn = Qwen3Attention(config=config, layer_idx=layer_idx)
         self.mlp = Qwen3MLP(config)
-        self.input_layernorm = Qwen3RMSNorm(
-            config.hidden_size, eps=config.rms_norm_eps
-        )
+        self.input_layernorm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen3RMSNorm(
             config.hidden_size, eps=config.rms_norm_eps
         )
@@ -417,9 +428,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         """Two-stage compression: extract + judge. Returns M_c (B, K, d)."""
         return self.memory_block(C, M_c_prev)
 
-    def readout_memory(
-        self, X: torch.Tensor, M_c: torch.Tensor
-    ) -> torch.Tensor:
+    def readout_memory(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
         """Per-position readout: X (B, S, d) queries M_c (B, K, d) -> (B, S, d)."""
         return self.memory_readout(X, M_c)
 
@@ -448,7 +457,20 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
 
     @merge_with_config_defaults
     @capture_outputs
-    @auto_docstring
+    @auto_docstring(
+        custom_args="""
+        history_ids (`torch.LongTensor` of shape `(batch_size, history_length)`, *optional*):
+            Token ids of past session(s). Embedded and compressed into `M_c` by the MemoryBlock.
+            Ignored when `M_c` is passed directly.
+        M_c (`torch.Tensor` of shape `(batch_size, num_vectors, hidden_size)`, *optional*):
+            Pre-computed memory matrix. Takes precedence over `history_ids`. The per-position
+            readout m^t is recomputed each forward from (`inputs_embeds`, `M_c`) because it is
+            query-dependent on the current session.
+        collect_alpha_trace (`bool`, *optional*, defaults to `False`):
+            When True, attach `alpha_trace` (list of `(B, S)` tensors, one per routing layer)
+            to the output.
+        """
+    )
     def forward(
         self,
         input_ids: torch.LongTensor | None = None,
@@ -463,18 +485,6 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> BaseModelOutputWithPast:
-        """
-        Args:
-            history_ids: (B, N) token ids of past session(s).  Embedded and
-                compressed into M_c by the MemoryBlock.  Ignored when M_c
-                is passed directly.
-            M_c: (B, K, d) pre-computed memory matrix.  Takes precedence
-                over history_ids.  The per-position readout m^t is
-                recomputed each forward from (inputs_embeds, M_c) because
-                it is query-dependent on the current session.
-            collect_alpha_trace: when True, attach ``alpha_trace`` (list of
-                (B, S) tensors, one per routing layer) to the output.
-        """
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("Specify exactly one of input_ids or inputs_embeds")
 
@@ -487,9 +497,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             M_c = self.compress_session(C)
 
         # Per-position readout (Eq. 6): m^t = CrossAttn(inputs_embeds, M_c)
-        m_t = (
-            self.readout_memory(inputs_embeds, M_c) if M_c is not None else None
-        )
+        m_t = self.readout_memory(inputs_embeds, M_c) if M_c is not None else None
 
         # ── Standard cache / position setup ──
         if use_cache and past_key_values is None:
@@ -510,14 +518,21 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
 
         # ── Causal mask ──
         if not isinstance(causal_mask_mapping := attention_mask, dict):
-            mask_kwargs = dict(
-                config=self.config,
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                cache_position=cache_position,
-                past_key_values=past_key_values,
-                position_ids=position_ids,
+            import inspect as _inspect
+
+            _embed_kw = (
+                "input_embeds"
+                if "input_embeds" in _inspect.signature(create_causal_mask).parameters
+                else "inputs_embeds"
             )
+            mask_kwargs = {
+                "config": self.config,
+                _embed_kw: inputs_embeds,
+                "attention_mask": attention_mask,
+                "cache_position": cache_position,
+                "past_key_values": past_key_values,
+                "position_ids": position_ids,
+            }
             causal_mask_mapping = {"full_attention": create_causal_mask(**mask_kwargs)}
             if self.has_sliding_layers:
                 causal_mask_mapping["sliding_attention"] = (
@@ -621,7 +636,17 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         self.post_init()
 
     @can_return_tuple
-    @auto_docstring
+    @auto_docstring(
+        custom_args="""
+        history_ids (`torch.LongTensor` of shape `(batch_size, history_length)`, *optional*):
+            Past-session token ids, compressed to memory via the backbone's MemoryBlock.
+        M_c (`torch.Tensor` of shape `(batch_size, num_vectors, hidden_size)`, *optional*):
+            Pre-computed memory matrix. The per-position readout m^t is computed inside
+            the backbone forward.
+        collect_alpha_trace (`bool`, *optional*, defaults to `False`):
+            Expose per-layer memory routing mass as `alpha_trace` on the output.
+        """
+    )
     def forward(
         self,
         input_ids: torch.LongTensor | None = None,
@@ -638,13 +663,6 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         collect_alpha_trace: bool = False,
         **kwargs,
     ) -> CausalLMOutputWithPast:
-        """
-        Args:
-            history_ids: (B, N) past-session token ids -> compressed to memory.
-            M_c: (B, K, d) pre-computed memory matrix.  The per-position
-                readout m^t is computed inside the backbone forward.
-            collect_alpha_trace: expose per-layer memory routing mass.
-        """
         outputs: BaseModelOutputWithPast = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,

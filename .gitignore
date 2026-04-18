@@ -7,3 +7,4 @@ dist/
 build/
 .eggs/
 *.safetensors
+data_pipeline/
