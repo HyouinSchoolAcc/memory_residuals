@@ -1,0 +1,82 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{liu2024lost}
+\citation{lewis2020retrieval}
+\citation{packer2023memgpt}
+\citation{dai2019transformerxl}
+\citation{rae2020compressive}
+\citation{bulatov2022recurrent}
+\citation{wu2022memorizing}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\citation{bulatov2022recurrent}
+\citation{jaegle2021perceiver}
+\citation{du2026attention}
+\citation{bulatov2022recurrent}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Method}{2}{section.2}\protected@file@percent }
+\newlabel{sec:method}{{2}{2}{Method}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Memory update: two-stage cross-attention}{2}{subsection.2.1}\protected@file@percent }
+\citation{du2026attention}
+\citation{bachlechner2020rezero}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Per-position readout}{3}{subsection.2.2}\protected@file@percent }
+\newlabel{eq:readout}{{4}{3}{Per-position readout}{equation.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Depth-wise gated injection}{3}{subsection.2.3}\protected@file@percent }
+\newlabel{eq:inject}{{5}{3}{Depth-wise gated injection}{equation.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}End-to-end forward pass}{3}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Initialisation invariant}{3}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Training pipeline}{4}{section.3}\protected@file@percent }
+\newlabel{sec:training}{{3}{4}{Training pipeline}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Data}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Optimisation}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Compute}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{4}{section.4}\protected@file@percent }
+\newlabel{sec:results}{{4}{4}{Results}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Headline cross-entropy on PG-19 validation}{4}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Held-out cross-entropy on 256 PG-19 validation pairs. Lower is better. Bare backbone numbers use the unmodified Qwen3-0.6B weights; MemRes-large numbers use our 8{,}000-step trained checkpoint with extraction depth $L_E{=}4$. Compute-matched RAG uses a single retrieved chunk with prefix length matching the $K{=}128$ memory slot budget. Memory beats every backbone-matched RAG comparison: it is $0.279$ nats better than compute-matched dense retrieval, $0.204$ nats better than top-3 RAG over a 1{,}024-token prefix on the bare backbone, and the shuffled-memory control is now strictly worse than disabling memory entirely.}}{5}{table.1}\protected@file@percent }
+\newlabel{tab:headline}{{1}{5}{Held-out cross-entropy on 256 PG-19 validation pairs. Lower is better. Bare backbone numbers use the unmodified Qwen3-0.6B weights; MemRes-large numbers use our 8{,}000-step trained checkpoint with extraction depth $L_E{=}4$. Compute-matched RAG uses a single retrieved chunk with prefix length matching the $K{=}128$ memory slot budget. Memory beats every backbone-matched RAG comparison: it is $0.279$ nats better than compute-matched dense retrieval, $0.204$ nats better than top-3 RAG over a 1{,}024-token prefix on the bare backbone, and the shuffled-memory control is now strictly worse than disabling memory entirely}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}History specificity (shuffled-memory control)}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Per-callback NLL probe}{5}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:probes}{{4.3}{5}{Per-callback NLL probe}{subsection.4.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Per-position cross-entropy at \emph  {callback} positions (whose underlying word also appears in the history with at least one capitalised occurrence — a proper-noun heuristic) versus \emph  {filler} positions, MemRes-large checkpoint. Memory helps callback tokens $1.77\times $ more than filler tokens, comfortably above the $1.5\times $ threshold the project playbook calls out as the success criterion for semantic memory. Shuffled history hurts callback positions ($+0.058$ nats vs.~true-history) more than it hurts filler positions ($+0.026$ nats), and on filler positions a shuffled memory is statistically indistinguishable from no memory at all — the architecture has learned to encode \emph  {this} sample's history rather than $\langle $any plausible PG-19 history$\rangle $. This is the killer experiment from the diagnostic playbook, which the previous pilot of this architecture had failed.}}{5}{table.2}\protected@file@percent }
+\newlabel{tab:callback}{{2}{5}{Per-position cross-entropy at \emph {callback} positions (whose underlying word also appears in the history with at least one capitalised occurrence — a proper-noun heuristic) versus \emph {filler} positions, MemRes-large checkpoint. Memory helps callback tokens $1.77\times $ more than filler tokens, comfortably above the $1.5\times $ threshold the project playbook calls out as the success criterion for semantic memory. Shuffled history hurts callback positions ($+0.058$ nats vs.~true-history) more than it hurts filler positions ($+0.026$ nats), and on filler positions a shuffled memory is statistically indistinguishable from no memory at all — the architecture has learned to encode \emph {this} sample's history rather than $\langle $any plausible PG-19 history$\rangle $. This is the killer experiment from the diagnostic playbook, which the previous pilot of this architecture had failed}{table.2}{}}
+\citation{du2026attention}
+\citation{bulatov2022recurrent}
+\citation{hutchins2022block}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Per-callback NLL probe by preset. Memory help (left two groups) measures how much disabling memory hurts predictions on callback vs.\ filler positions. Shuffle penalty (right two groups) measures how much substituting another sample's memory hurts vs.~the matched memory. In both groups the deeper-extraction MemRes-large preset shows a stronger ``memory cares about callbacks'' signal. The directional sign across all four bars (positive callback effect $>$ positive filler effect) is the signature of episodic, not stylistic, memory.}}{6}{figure.1}\protected@file@percent }
+\newlabel{fig:callback-bar}{{1}{6}{Per-callback NLL probe by preset. Memory help (left two groups) measures how much disabling memory hurts predictions on callback vs.\ filler positions. Shuffle penalty (right two groups) measures how much substituting another sample's memory hurts vs.~the matched memory. In both groups the deeper-extraction MemRes-large preset shows a stronger ``memory cares about callbacks'' signal. The directional sign across all four bars (positive callback effect $>$ positive filler effect) is the signature of episodic, not stylistic, memory}{figure.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Depth-wise routing pattern}{6}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Ablation: extraction depth}{6}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Training curves}{6}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Architecture decisions and what each one defends against}{6}{section.5}\protected@file@percent }
+\citation{du2026attention}
+\citation{bulatov2023scaling}
+\citation{bulatov2023scaling}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Learned per-sublayer memory gate $g_\ell $ in the MemRes-large checkpoint after 8{,}000 training steps. Even-indexed bars are attention-sublayer gates, odd-indexed bars are MLP-sublayer gates. Two patterns are visible. First, the deepest sublayers (indices $\geq 50$) recruit memory most strongly, peaking at $g_\ell = 0.12$. Second, several mid-depth sublayers learn slightly negative gates, actively suppressing the memory contribution at those depths. This is the depth-wise cognitive routing the architecture was designed to enable: rather than uniformly mixing memory at every layer, the model concentrates the memory contribution at the layers where it pays off and dampens or even reverses it elsewhere.}}{7}{figure.2}\protected@file@percent }
+\newlabel{fig:gate-profile}{{2}{7}{Learned per-sublayer memory gate $g_\ell $ in the MemRes-large checkpoint after 8{,}000 training steps. Even-indexed bars are attention-sublayer gates, odd-indexed bars are MLP-sublayer gates. Two patterns are visible. First, the deepest sublayers (indices $\geq 50$) recruit memory most strongly, peaking at $g_\ell = 0.12$. Second, several mid-depth sublayers learn slightly negative gates, actively suppressing the memory contribution at those depths. This is the depth-wise cognitive routing the architecture was designed to enable: rather than uniformly mixing memory at every layer, the model concentrates the memory contribution at the layers where it pays off and dampens or even reverses it elsewhere}{figure.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Effect of extraction depth $L_E$ on the headline metrics. The $L_E{=}4$ Perceiver-style refinement stack on top of the initial $M_{\mathrm  {in}}$ cross-attention improves all four diagnostics simultaneously. Both presets keep the same number of memory slots ($K{=}128$) and the same number of routing block summaries ($N{=}8$). The MemRes-small run trained for 5{,}000 steps; MemRes-large trained for 8{,}000 steps because its larger memory module needs more updates to converge.}}{7}{table.3}\protected@file@percent }
+\newlabel{tab:ablation-le}{{3}{7}{Effect of extraction depth $L_E$ on the headline metrics. The $L_E{=}4$ Perceiver-style refinement stack on top of the initial $M_{\mathrm {in}}$ cross-attention improves all four diagnostics simultaneously. Both presets keep the same number of memory slots ($K{=}128$) and the same number of routing block summaries ($N{=}8$). The MemRes-small run trained for 5{,}000 steps; MemRes-large trained for 8{,}000 steps because its larger memory module needs more updates to converge}{table.3}{}}
+\citation{gu2023mamba}
+\citation{liu2026pitfalls}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Held-out validation evaluations during the 8{,}000-step MemRes-large training run, $n{=}64$ samples per row. The aggregate memory-help $\Delta _{\text  {nm-m}}$ stabilises within the first $2{,}000$ steps and varies in a narrow band thereafter. The history-specificity gap $\Delta _{\text  {sh-m}}$, which is the load-bearing diagnostic, grows monotonically from $+0.0032$ at step 500 to $+0.0263$ at step 8{,}000. Memory begins as ``something is in there but it does not yet know which history goes with which sample'' and converges to ``memory is reliably more useful with the right history than with another sample's history.'' By step $5{,}000$ the shuffled-history CE is strictly above the no-memory CE, indicating that injecting the wrong memory actively hurts performance.}}{8}{table.4}\protected@file@percent }
+\newlabel{tab:curves}{{4}{8}{Held-out validation evaluations during the 8{,}000-step MemRes-large training run, $n{=}64$ samples per row. The aggregate memory-help $\Delta _{\text {nm-m}}$ stabilises within the first $2{,}000$ steps and varies in a narrow band thereafter. The history-specificity gap $\Delta _{\text {sh-m}}$, which is the load-bearing diagnostic, grows monotonically from $+0.0032$ at step 500 to $+0.0263$ at step 8{,}000. Memory begins as ``something is in there but it does not yet know which history goes with which sample'' and converges to ``memory is reliably more useful with the right history than with another sample's history.'' By step $5{,}000$ the shuffled-history CE is strictly above the no-memory CE, indicating that injecting the wrong memory actively hurts performance}{table.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Limitations and what we are not claiming}{8}{section.6}\protected@file@percent }
+\bibstyle{plain}
+\bibcite{vaswani2017attention}{1}
+\bibcite{liu2024lost}{2}
+\bibcite{lewis2020retrieval}{3}
+\bibcite{packer2023memgpt}{4}
+\bibcite{dai2019transformerxl}{5}
+\bibcite{rae2020compressive}{6}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Reproducibility}{9}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusion}{9}{section.8}\protected@file@percent }
+\bibcite{bulatov2022recurrent}{7}
+\bibcite{wu2022memorizing}{8}
+\bibcite{hutchins2022block}{9}
+\bibcite{bulatov2023scaling}{10}
+\bibcite{jaegle2021perceiver}{11}
+\bibcite{bachlechner2020rezero}{12}
+\bibcite{gu2023mamba}{13}
+\bibcite{du2026attention}{14}
+\bibcite{liu2026pitfalls}{15}
+\gdef \@abspage@last{10}

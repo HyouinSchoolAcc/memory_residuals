@@ -15,11 +15,12 @@ pass old memory through untouched; critical state-changes overwrite.
 Each position in the current session queries the memory matrix `M_c`
 via cross-attention, yielding a per-position readout `m^t` of shape
 `(B, S, d)` — indistinguishable from any attention layer's output.
-This readout is registered as `v_0` in a depth-wise attention pool; each
-layer's input is a softmax-weighted mix of all preceding layer outputs
-plus this memory source, using `phi(q, k) = exp(q^T RMSNorm(k))` with a
-learned per-layer pseudo-query `w_l`.  During filler turns, local layer
-outputs dominate the softmax; during callbacks, mass shifts onto `v_0`.
+This readout is registered as `b_{-1}` in a Block AttnRes pool; each
+attention/MLP sublayer input is a softmax-weighted mix of prior block
+summaries, the running intra-block partial sum, the embedding source `b_0`,
+and this memory source, using `phi(q, k) = exp(q^T RMSNorm(k))` with a
+learned per-sublayer pseudo-query `w_l`.  During filler turns, local layer
+outputs dominate the softmax; during callbacks, mass shifts onto `b_{-1}`.
 
 > **Paper:** see [`memory_residuals.pdf`](memory_residuals.pdf) in this repo for
 > the full theoretical framework and the call for collaboration.
@@ -46,10 +47,10 @@ reference and is not imported by the current pipeline.
 | M_in (extraction queries) | `MemoryBlock.M_in` |
 | M_judge (judging queries) | `MemoryBlock.M_judge` |
 | Section 2.2, Eq. 6 — Per-position readout | `MemoryReadout.forward()` (cross-attn, queries = `inputs_embeds`) |
-| Section 2.2, Eq. 7 — v_0 := m^t  (shape `(B,S,d)`) | `Qwen3MemResModel.forward()` (`sources = [m_t]`) |
-| Section 2.2, Eq. 8 — Depth-wise routing | `DepthWiseRouter.route()` |
-| phi(q,k) = exp(q^T RMSNorm(k)) | `DepthWiseRouter.route()` (scores computation) |
-| w_l (per-layer pseudo-query) | `DepthWiseRouter.w` |
+| Section 2.2, Eq. 8 — `b_{-1} := m^t` (shape `(B,S,d)`) | `Qwen3MemResModel.forward()` (`b_minus_1 = m_t`) |
+| Section 2.2, Eqs. 9-10 — Block depth-wise routing | `BlockAttnResRouter.route()` |
+| phi(q,k) = exp(q^T RMSNorm(k)) | `BlockAttnResRouter.route()` (scores computation) |
+| w_l (per-sublayer pseudo-query) | `BlockAttnResRouter.w` |
 | W_Q/W_K/W_V (readout projections) | `MemoryReadout.W_Q/W_K/W_V` |
 
 ---
@@ -129,6 +130,9 @@ torchrun --nproc_per_node=1 train_memres.py \
   (Section 2.1.1, Eqs. 3-4). Default 0 (single-layer extraction, i.e. Eq. 1).
   Higher values (2-8) add non-linear distillation capacity for extracting
   multi-hop semantic content from long raw sessions.
+- `--memres_num_blocks N` — number of Block AttnRes summaries over the
+  attention/MLP sublayer sequence. `N = 2 * num_layers` recovers Full
+  AttnRes; smaller values keep the routing pool bounded near `N + 2`.
 
 ### Sequence lengths
 
@@ -143,6 +147,9 @@ torchrun --nproc_per_node=1 train_memres.py \
 - `--lr`, `--lr_min` — cosine schedule endpoints.
 - `--warmup` — linear warmup steps.
 - `--max_norm` — gradient clipping.
+- `--detach_history_embeddings` — opt-in memory saver that detaches history
+  token embeddings before memory compression. By default, training is
+  end-to-end through the history embedding lookup.
 - `--save_every`, `--log_every` — checkpoint and log cadence.
 - `--out_dir` — where to save.
 - `--wandb_project`, `--wandb_entity`, `--run_name` — optional W&B logging.
@@ -170,7 +177,7 @@ Compresses a history once, then feeds two paired continuations:
 - a **callback** ("Remember what we just talked about? ...")
 - a **filler** ("The quick brown fox ...")
 
-Measures `alpha_{0->l}` (attention mass routed to `v_0 = m^t`) at each
+Measures `alpha_{b_-1->l}` (attention mass routed to `b_{-1} = m^t`) at each
 depth-wise routing layer. Positive `callback - filler` delta means the model
 opens memory more on callbacks than filler.
 

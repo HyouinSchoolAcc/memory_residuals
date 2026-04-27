@@ -1,0 +1,15 @@
+{
+  "n_callback_tokens": 9260,
+  "n_filler_tokens": 120180,
+  "callback_nll_mem": 3.8428439890779176,
+  "callback_nll_nomem": 3.8843180047478167,
+  "callback_nll_shuffle": 3.901063284313452,
+  "filler_nll_mem": 3.2831493806280148,
+  "filler_nll_nomem": 3.306595500300709,
+  "filler_nll_shuffle": 3.3088426412527236,
+  "delta_callback_nomem_minus_mem": 0.04147401566989917,
+  "delta_filler_nomem_minus_mem": 0.023446119672694277,
+  "ratio_callback_over_filler_help": 1.7689074460453456,
+  "delta_callback_shuffle_minus_mem": 0.058219295235534485,
+  "delta_filler_shuffle_minus_mem": 0.02569326062470889
+}

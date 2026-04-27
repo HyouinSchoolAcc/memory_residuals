@@ -1,0 +1,966 @@
+{
+  "tokenizer": "Qwen/Qwen3-0.6B",
+  "stage1_pg19": {
+    "train": {
+      "books": 500,
+      "sessions": 24627,
+      "chars": 180742266,
+      "qwen_tokens": 44452040,
+      "boundaries": {
+        "synthetic": 18270,
+        "chapter": 6357
+      },
+      "session_tokens": {
+        "count": 24627,
+        "mean": 1805.01,
+        "median": 932,
+        "p90": 3946,
+        "max": 319159
+      },
+      "is_train_subset": true
+    },
+    "validation": {
+      "books": 50,
+      "sessions": 2151,
+      "chars": 14658895,
+      "qwen_tokens": 3586601,
+      "boundaries": {
+        "synthetic": 1660,
+        "chapter": 491
+      },
+      "session_tokens": {
+        "count": 2151,
+        "mean": 1667.41,
+        "median": 919,
+        "p90": 3202,
+        "max": 110069
+      },
+      "is_train_subset": false
+    },
+    "test": {
+      "books": 100,
+      "sessions": 3665,
+      "chars": 35208615,
+      "qwen_tokens": 8708710,
+      "boundaries": {
+        "synthetic": 2049,
+        "chapter": 1616
+      },
+      "session_tokens": {
+        "count": 3665,
+        "mean": 2376.18,
+        "median": 984,
+        "p90": 5337,
+        "max": 124533
+      },
+      "is_train_subset": false
+    }
+  },
+  "stage1_tv": {
+    "totals": {
+      "shows": 30,
+      "sessions": 2189,
+      "chars": 61040901,
+      "qwen_tokens": 16293769
+    },
+    "shows": [
+      {
+        "show_id": "24",
+        "sessions": 196,
+        "chars": 4611411,
+        "qwen_tokens": 1186651,
+        "session_tokens": {
+          "count": 196,
+          "mean": 6054.34,
+          "median": 6041,
+          "p90": 7142,
+          "max": 8814
+        }
+      },
+      {
+        "show_id": "angel",
+        "sessions": 110,
+        "chars": 4452735,
+        "qwen_tokens": 1194335,
+        "session_tokens": {
+          "count": 110,
+          "mean": 10857.59,
+          "median": 10877,
+          "p90": 12087,
+          "max": 15341
+        }
+      },
+      {
+        "show_id": "barry",
+        "sessions": 32,
+        "chars": 580825,
+        "qwen_tokens": 169540,
+        "session_tokens": {
+          "count": 32,
+          "mean": 5298.12,
+          "median": 5353,
+          "p90": 6072,
+          "max": 6766
+        }
+      },
+      {
+        "show_id": "battlestar_galactica",
+        "sessions": 75,
+        "chars": 1567932,
+        "qwen_tokens": 401305,
+        "session_tokens": {
+          "count": 75,
+          "mean": 5350.73,
+          "median": 5103,
+          "p90": 6429,
+          "max": 11905
+        }
+      },
+      {
+        "show_id": "better_call_saul",
+        "sessions": 65,
+        "chars": 1478286,
+        "qwen_tokens": 414498,
+        "session_tokens": {
+          "count": 65,
+          "mean": 6376.89,
+          "median": 6454,
+          "p90": 8071,
+          "max": 9527
+        }
+      },
+      {
+        "show_id": "bojack_horseman",
+        "sessions": 73,
+        "chars": 1582649,
+        "qwen_tokens": 423377,
+        "session_tokens": {
+          "count": 73,
+          "mean": 5799.68,
+          "median": 5851,
+          "p90": 6354,
+          "max": 6636
+        }
+      },
+      {
+        "show_id": "breaking_bad",
+        "sessions": 62,
+        "chars": 1186447,
+        "qwen_tokens": 321379,
+        "session_tokens": {
+          "count": 62,
+          "mean": 5183.53,
+          "median": 5190,
+          "p90": 6061,
+          "max": 6874
+        }
+      },
+      {
+        "show_id": "buffy_the_vampire_slayer",
+        "sessions": 145,
+        "chars": 6958832,
+        "qwen_tokens": 1813711,
+        "session_tokens": {
+          "count": 145,
+          "mean": 12508.35,
+          "median": 12423,
+          "p90": 14935,
+          "max": 23505
+        }
+      },
+      {
+        "show_id": "crazy_ex_girlfriend",
+        "sessions": 61,
+        "chars": 1904733,
+        "qwen_tokens": 529325,
+        "session_tokens": {
+          "count": 61,
+          "mean": 8677.46,
+          "median": 8694,
+          "p90": 9380,
+          "max": 10263
+        }
+      },
+      {
+        "show_id": "fleabag",
+        "sessions": 12,
+        "chars": 168078,
+        "qwen_tokens": 46574,
+        "session_tokens": {
+          "count": 12,
+          "mean": 3881.17,
+          "median": 3782,
+          "p90": 4303,
+          "max": 5203
+        }
+      },
+      {
+        "show_id": "fringe",
+        "sessions": 100,
+        "chars": 2195134,
+        "qwen_tokens": 572250,
+        "session_tokens": {
+          "count": 100,
+          "mean": 5722.5,
+          "median": 5718,
+          "p90": 6950,
+          "max": 9435
+        }
+      },
+      {
+        "show_id": "game_of_thrones",
+        "sessions": 77,
+        "chars": 2027254,
+        "qwen_tokens": 534991,
+        "session_tokens": {
+          "count": 77,
+          "mean": 6947.94,
+          "median": 6384,
+          "p90": 8891,
+          "max": 19773
+        }
+      },
+      {
+        "show_id": "house_of_the_dragon",
+        "sessions": 19,
+        "chars": 453546,
+        "qwen_tokens": 125866,
+        "session_tokens": {
+          "count": 19,
+          "mean": 6624.53,
+          "median": 6665,
+          "p90": 8252,
+          "max": 9807
+        }
+      },
+      {
+        "show_id": "jane_the_virgin",
+        "sessions": 100,
+        "chars": 2907903,
+        "qwen_tokens": 778166,
+        "session_tokens": {
+          "count": 100,
+          "mean": 7781.66,
+          "median": 7740,
+          "p90": 8519,
+          "max": 9361
+        }
+      },
+      {
+        "show_id": "lost",
+        "sessions": 117,
+        "chars": 3260127,
+        "qwen_tokens": 898224,
+        "session_tokens": {
+          "count": 117,
+          "mean": 7677.13,
+          "median": 7255,
+          "p90": 9347,
+          "max": 15257
+        }
+      },
+      {
+        "show_id": "mad_men",
+        "sessions": 87,
+        "chars": 2252236,
+        "qwen_tokens": 595423,
+        "session_tokens": {
+          "count": 87,
+          "mean": 6843.94,
+          "median": 6571,
+          "p90": 7652,
+          "max": 15662
+        }
+      },
+      {
+        "show_id": "new_girl",
+        "sessions": 142,
+        "chars": 2720991,
+        "qwen_tokens": 745153,
+        "session_tokens": {
+          "count": 142,
+          "mean": 5247.56,
+          "median": 5253,
+          "p90": 5725,
+          "max": 8056
+        }
+      },
+      {
+        "show_id": "peaky_blinders",
+        "sessions": 36,
+        "chars": 866931,
+        "qwen_tokens": 230155,
+        "session_tokens": {
+          "count": 36,
+          "mean": 6393.19,
+          "median": 6249,
+          "p90": 6970,
+          "max": 12956
+        }
+      },
+      {
+        "show_id": "person_of_interest",
+        "sessions": 103,
+        "chars": 2616360,
+        "qwen_tokens": 667103,
+        "session_tokens": {
+          "count": 103,
+          "mean": 6476.73,
+          "median": 6535,
+          "p90": 7219,
+          "max": 7856
+        }
+      },
+      {
+        "show_id": "russian_doll",
+        "sessions": 15,
+        "chars": 243563,
+        "qwen_tokens": 70923,
+        "session_tokens": {
+          "count": 15,
+          "mean": 4728.2,
+          "median": 4695,
+          "p90": 5627,
+          "max": 5937
+        }
+      },
+      {
+        "show_id": "schitt_s_creek",
+        "sessions": 81,
+        "chars": 1425537,
+        "qwen_tokens": 377676,
+        "session_tokens": {
+          "count": 81,
+          "mean": 4662.67,
+          "median": 4649,
+          "p90": 5080,
+          "max": 8743
+        }
+      },
+      {
+        "show_id": "sherlock",
+        "sessions": 14,
+        "chars": 1329767,
+        "qwen_tokens": 340032,
+        "session_tokens": {
+          "count": 14,
+          "mean": 24288.0,
+          "median": 18506,
+          "p90": 37223,
+          "max": 48335
+        }
+      },
+      {
+        "show_id": "ted_lasso",
+        "sessions": 35,
+        "chars": 963290,
+        "qwen_tokens": 286380,
+        "session_tokens": {
+          "count": 35,
+          "mean": 8182.29,
+          "median": 7940,
+          "p90": 10796,
+          "max": 14909
+        }
+      },
+      {
+        "show_id": "the_good_place",
+        "sessions": 49,
+        "chars": 967348,
+        "qwen_tokens": 251790,
+        "session_tokens": {
+          "count": 49,
+          "mean": 5138.57,
+          "median": 4760,
+          "p90": 5195,
+          "max": 9502
+        }
+      },
+      {
+        "show_id": "the_leftovers",
+        "sessions": 28,
+        "chars": 607866,
+        "qwen_tokens": 168913,
+        "session_tokens": {
+          "count": 28,
+          "mean": 6032.61,
+          "median": 5948,
+          "p90": 7245,
+          "max": 8679
+        }
+      },
+      {
+        "show_id": "the_sopranos",
+        "sessions": 82,
+        "chars": 2224086,
+        "qwen_tokens": 599063,
+        "session_tokens": {
+          "count": 82,
+          "mean": 7305.65,
+          "median": 7190,
+          "p90": 8569,
+          "max": 8927
+        }
+      },
+      {
+        "show_id": "the_wire",
+        "sessions": 59,
+        "chars": 1908186,
+        "qwen_tokens": 513864,
+        "session_tokens": {
+          "count": 59,
+          "mean": 8709.56,
+          "median": 8579,
+          "p90": 9809,
+          "max": 13624
+        }
+      },
+      {
+        "show_id": "this_is_us",
+        "sessions": 106,
+        "chars": 2810685,
+        "qwen_tokens": 788629,
+        "session_tokens": {
+          "count": 106,
+          "mean": 7439.9,
+          "median": 7559,
+          "p90": 8393,
+          "max": 9371
+        }
+      },
+      {
+        "show_id": "veronica_mars",
+        "sessions": 72,
+        "chars": 3957622,
+        "qwen_tokens": 1024713,
+        "session_tokens": {
+          "count": 72,
+          "mean": 14232.12,
+          "median": 14602,
+          "p90": 16934,
+          "max": 18771
+        }
+      },
+      {
+        "show_id": "westworld",
+        "sessions": 36,
+        "chars": 810541,
+        "qwen_tokens": 223760,
+        "session_tokens": {
+          "count": 36,
+          "mean": 6215.56,
+          "median": 6197,
+          "p90": 7369,
+          "max": 10156
+        }
+      }
+    ]
+  },
+  "stage2": {
+    "totals": {
+      "shows": 30,
+      "sessions": 2189,
+      "turns": 1274960,
+      "chars": 72940305,
+      "qwen_tokens": 19554780
+    },
+    "speaker_label_ratio": {
+      "count": 30,
+      "mean": 145.67,
+      "median": 24,
+      "p90": 589,
+      "max": 896
+    },
+    "shows": [
+      {
+        "show_id": "24",
+        "sessions": 196,
+        "turns": 107392,
+        "chars": 5781116,
+        "qwen_tokens": 1501937,
+        "avg_speaker_label_ratio": 0.03,
+        "session_tokens": {
+          "count": 196,
+          "mean": 7662.94,
+          "median": 7412,
+          "p90": 9921,
+          "max": 11661
+        }
+      },
+      {
+        "show_id": "angel",
+        "sessions": 110,
+        "turns": 65905,
+        "chars": 4906896,
+        "qwen_tokens": 1324075,
+        "avg_speaker_label_ratio": 0.589,
+        "session_tokens": {
+          "count": 110,
+          "mean": 12037.05,
+          "median": 11274,
+          "p90": 15150,
+          "max": 20145
+        }
+      },
+      {
+        "show_id": "barry",
+        "sessions": 32,
+        "turns": 14992,
+        "chars": 735568,
+        "qwen_tokens": 212285,
+        "avg_speaker_label_ratio": 0.025,
+        "session_tokens": {
+          "count": 32,
+          "mean": 6633.91,
+          "median": 6790,
+          "p90": 7572,
+          "max": 8800
+        }
+      },
+      {
+        "show_id": "battlestar_galactica",
+        "sessions": 75,
+        "turns": 40839,
+        "chars": 2016809,
+        "qwen_tokens": 521770,
+        "avg_speaker_label_ratio": 0.01,
+        "session_tokens": {
+          "count": 75,
+          "mean": 6956.93,
+          "median": 6565,
+          "p90": 8402,
+          "max": 17414
+        }
+      },
+      {
+        "show_id": "better_call_saul",
+        "sessions": 65,
+        "turns": 47063,
+        "chars": 1961771,
+        "qwen_tokens": 549584,
+        "avg_speaker_label_ratio": 0.011,
+        "session_tokens": {
+          "count": 65,
+          "mean": 8455.14,
+          "median": 8659,
+          "p90": 10866,
+          "max": 12621
+        }
+      },
+      {
+        "show_id": "bojack_horseman",
+        "sessions": 73,
+        "turns": 39366,
+        "chars": 2010487,
+        "qwen_tokens": 540368,
+        "avg_speaker_label_ratio": 0.004,
+        "session_tokens": {
+          "count": 73,
+          "mean": 7402.3,
+          "median": 7514,
+          "p90": 8461,
+          "max": 9352
+        }
+      },
+      {
+        "show_id": "breaking_bad",
+        "sessions": 62,
+        "turns": 20961,
+        "chars": 1328805,
+        "qwen_tokens": 359631,
+        "avg_speaker_label_ratio": 0.532,
+        "session_tokens": {
+          "count": 62,
+          "mean": 5800.5,
+          "median": 5659,
+          "p90": 7130,
+          "max": 7881
+        }
+      },
+      {
+        "show_id": "buffy_the_vampire_slayer",
+        "sessions": 145,
+        "turns": 69479,
+        "chars": 7180122,
+        "qwen_tokens": 1874724,
+        "avg_speaker_label_ratio": 0.795,
+        "session_tokens": {
+          "count": 145,
+          "mean": 12929.13,
+          "median": 12901,
+          "p90": 15621,
+          "max": 23514
+        }
+      },
+      {
+        "show_id": "crazy_ex_girlfriend",
+        "sessions": 61,
+        "turns": 45881,
+        "chars": 2402561,
+        "qwen_tokens": 670200,
+        "avg_speaker_label_ratio": 0.002,
+        "session_tokens": {
+          "count": 61,
+          "mean": 10986.89,
+          "median": 11216,
+          "p90": 12399,
+          "max": 13561
+        }
+      },
+      {
+        "show_id": "fleabag",
+        "sessions": 12,
+        "turns": 5905,
+        "chars": 232035,
+        "qwen_tokens": 63951,
+        "avg_speaker_label_ratio": 0.001,
+        "session_tokens": {
+          "count": 12,
+          "mean": 5329.25,
+          "median": 5114,
+          "p90": 5903,
+          "max": 7198
+        }
+      },
+      {
+        "show_id": "fringe",
+        "sessions": 100,
+        "turns": 53093,
+        "chars": 2746321,
+        "qwen_tokens": 721653,
+        "avg_speaker_label_ratio": 0.049,
+        "session_tokens": {
+          "count": 100,
+          "mean": 7216.53,
+          "median": 6969,
+          "p90": 8857,
+          "max": 11858
+        }
+      },
+      {
+        "show_id": "game_of_thrones",
+        "sessions": 77,
+        "turns": 48154,
+        "chars": 2509285,
+        "qwen_tokens": 667196,
+        "avg_speaker_label_ratio": 0.07,
+        "session_tokens": {
+          "count": 77,
+          "mean": 8664.88,
+          "median": 8214,
+          "p90": 10490,
+          "max": 21654
+        }
+      },
+      {
+        "show_id": "house_of_the_dragon",
+        "sessions": 19,
+        "turns": 13198,
+        "chars": 584762,
+        "qwen_tokens": 162792,
+        "avg_speaker_label_ratio": 0.039,
+        "session_tokens": {
+          "count": 19,
+          "mean": 8568.0,
+          "median": 8747,
+          "p90": 10783,
+          "max": 12869
+        }
+      },
+      {
+        "show_id": "jane_the_virgin",
+        "sessions": 100,
+        "turns": 85293,
+        "chars": 3823297,
+        "qwen_tokens": 1026927,
+        "avg_speaker_label_ratio": 0.024,
+        "session_tokens": {
+          "count": 100,
+          "mean": 10269.27,
+          "median": 10343,
+          "p90": 11694,
+          "max": 13271
+        }
+      },
+      {
+        "show_id": "lost",
+        "sessions": 117,
+        "turns": 47710,
+        "chars": 3338545,
+        "qwen_tokens": 921820,
+        "avg_speaker_label_ratio": 0.775,
+        "session_tokens": {
+          "count": 117,
+          "mean": 7878.8,
+          "median": 7457,
+          "p90": 9564,
+          "max": 15772
+        }
+      },
+      {
+        "show_id": "mad_men",
+        "sessions": 87,
+        "turns": 59385,
+        "chars": 2900368,
+        "qwen_tokens": 769965,
+        "avg_speaker_label_ratio": 0.01,
+        "session_tokens": {
+          "count": 87,
+          "mean": 8850.17,
+          "median": 8385,
+          "p90": 11102,
+          "max": 23360
+        }
+      },
+      {
+        "show_id": "new_girl",
+        "sessions": 142,
+        "turns": 66957,
+        "chars": 3431102,
+        "qwen_tokens": 938943,
+        "avg_speaker_label_ratio": 0.033,
+        "session_tokens": {
+          "count": 142,
+          "mean": 6612.27,
+          "median": 6751,
+          "p90": 7431,
+          "max": 8820
+        }
+      },
+      {
+        "show_id": "peaky_blinders",
+        "sessions": 36,
+        "turns": 21662,
+        "chars": 1101285,
+        "qwen_tokens": 294059,
+        "avg_speaker_label_ratio": 0.007,
+        "session_tokens": {
+          "count": 36,
+          "mean": 8168.31,
+          "median": 7756,
+          "p90": 9812,
+          "max": 18346
+        }
+      },
+      {
+        "show_id": "person_of_interest",
+        "sessions": 103,
+        "turns": 74245,
+        "chars": 3407290,
+        "qwen_tokens": 883639,
+        "avg_speaker_label_ratio": 0.001,
+        "session_tokens": {
+          "count": 103,
+          "mean": 8579.02,
+          "median": 8588,
+          "p90": 9442,
+          "max": 10841
+        }
+      },
+      {
+        "show_id": "russian_doll",
+        "sessions": 15,
+        "turns": 9507,
+        "chars": 345932,
+        "qwen_tokens": 99318,
+        "avg_speaker_label_ratio": 0.001,
+        "session_tokens": {
+          "count": 15,
+          "mean": 6621.2,
+          "median": 6638,
+          "p90": 7970,
+          "max": 8394
+        }
+      },
+      {
+        "show_id": "schitt_s_creek",
+        "sessions": 81,
+        "turns": 33746,
+        "chars": 1781298,
+        "qwen_tokens": 474398,
+        "avg_speaker_label_ratio": 0.024,
+        "session_tokens": {
+          "count": 81,
+          "mean": 5856.77,
+          "median": 5791,
+          "p90": 6480,
+          "max": 9520
+        }
+      },
+      {
+        "show_id": "sherlock",
+        "sessions": 14,
+        "turns": 23014,
+        "chars": 1499176,
+        "qwen_tokens": 384260,
+        "avg_speaker_label_ratio": 0.275,
+        "session_tokens": {
+          "count": 14,
+          "mean": 27447.14,
+          "median": 24756,
+          "p90": 38456,
+          "max": 50162
+        }
+      },
+      {
+        "show_id": "ted_lasso",
+        "sessions": 35,
+        "turns": 38474,
+        "chars": 1376608,
+        "qwen_tokens": 398684,
+        "avg_speaker_label_ratio": 0.001,
+        "session_tokens": {
+          "count": 35,
+          "mean": 11390.97,
+          "median": 11176,
+          "p90": 15023,
+          "max": 20753
+        }
+      },
+      {
+        "show_id": "the_good_place",
+        "sessions": 49,
+        "turns": 24661,
+        "chars": 1232224,
+        "qwen_tokens": 323975,
+        "avg_speaker_label_ratio": 0.003,
+        "session_tokens": {
+          "count": 49,
+          "mean": 6611.73,
+          "median": 6099,
+          "p90": 6900,
+          "max": 12452
+        }
+      },
+      {
+        "show_id": "the_leftovers",
+        "sessions": 28,
+        "turns": 22198,
+        "chars": 844017,
+        "qwen_tokens": 234409,
+        "avg_speaker_label_ratio": 0.002,
+        "session_tokens": {
+          "count": 28,
+          "mean": 8371.75,
+          "median": 8242,
+          "p90": 10239,
+          "max": 10835
+        }
+      },
+      {
+        "show_id": "the_sopranos",
+        "sessions": 82,
+        "turns": 39149,
+        "chars": 2649689,
+        "qwen_tokens": 713900,
+        "avg_speaker_label_ratio": 0.017,
+        "session_tokens": {
+          "count": 82,
+          "mean": 8706.1,
+          "median": 8734,
+          "p90": 10299,
+          "max": 12080
+        }
+      },
+      {
+        "show_id": "the_wire",
+        "sessions": 59,
+        "turns": 33013,
+        "chars": 2260854,
+        "qwen_tokens": 610124,
+        "avg_speaker_label_ratio": 0.022,
+        "session_tokens": {
+          "count": 59,
+          "mean": 10341.08,
+          "median": 10133,
+          "p90": 12063,
+          "max": 16879
+        }
+      },
+      {
+        "show_id": "this_is_us",
+        "sessions": 106,
+        "turns": 70152,
+        "chars": 3542787,
+        "qwen_tokens": 993439,
+        "avg_speaker_label_ratio": 0.031,
+        "session_tokens": {
+          "count": 106,
+          "mean": 9372.07,
+          "median": 9382,
+          "p90": 11054,
+          "max": 11781
+        }
+      },
+      {
+        "show_id": "veronica_mars",
+        "sessions": 72,
+        "turns": 33389,
+        "chars": 4006352,
+        "qwen_tokens": 1038036,
+        "avg_speaker_label_ratio": 0.896,
+        "session_tokens": {
+          "count": 72,
+          "mean": 14417.17,
+          "median": 14602,
+          "p90": 16999,
+          "max": 18771
+        }
+      },
+      {
+        "show_id": "westworld",
+        "sessions": 36,
+        "turns": 20177,
+        "chars": 1002943,
+        "qwen_tokens": 278718,
+        "avg_speaker_label_ratio": 0.091,
+        "session_tokens": {
+          "count": 36,
+          "mean": 7742.17,
+          "median": 7871,
+          "p90": 9071,
+          "max": 11881
+        }
+      }
+    ]
+  },
+  "eval_sets": {
+    "msc": {
+      "train": {
+        "rows": 17940,
+        "turns": 236987,
+        "chars": 19525293,
+        "qwen_tokens": 4731924
+      },
+      "validation": {
+        "rows": 3000,
+        "turns": 39257,
+        "chars": 3699116,
+        "qwen_tokens": 886632
+      },
+      "test": {
+        "rows": 2505,
+        "turns": 30320,
+        "chars": 3464720,
+        "qwen_tokens": 822675
+      }
+    },
+    "locomo_mc10": {
+      "items": 1986,
+      "question_types": {
+        "multi_hop": 321,
+        "temporal_reasoning": 96,
+        "single_hop": 282,
+        "open_domain": 841,
+        "adversarial": 446
+      },
+      "num_sessions": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 0
+      }
+    }
+  }
+}

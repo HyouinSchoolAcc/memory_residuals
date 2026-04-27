@@ -109,40 +109,56 @@ Depth-wise routing frameworks treat each layer's output as a source tensor of sh
 
 Each position $s$ attends over the $K$ memory slots independently, so the readout is inherently query-dependent: tokens discussing a family conflict route mass onto slots encoding family context, while tokens about dinner plans attend elsewhere. Because $m^t$ has exactly the shape of a standard attention layer's output, it drops directly into the depth-wise routing pool described below without any special-casing.
 
-\paragraph{Registering Memory as the Foundational Layer.}
-Let a model have $L$ layers. In a depth-wise attention system, layer outputs act as source tensors $v_1, \ldots, v_{L-1}$ (each of shape $S \times d$) that can be queried by subsequent layers. We introduce the per-position memory readout as the foundational source at index 0:
+\paragraph{Why Block AttnRes, Not Full AttnRes.}
+A naive integration would make $m^t$ a foundational source for a \emph{full} depth-wise softmax over all $L{-}1$ preceding layer outputs. While conceptually clean, Full AttnRes incurs $O(Ld)$ per-token memory and---under pipeline parallelism---$O(Ld)$ cross-stage communication, which the AttnRes authors flag as the dominant scaling obstacle at frontier model sizes \cite{du2026attention}. We therefore adopt the \emph{Block} variant: the $L$ transformer layers are partitioned into $N$ blocks of $S_B = L/N$ layers each, with intra-block accumulation reduced to a standard summation and inter-block aggregation handled by softmax attention over only the $N$ block-level summaries. This collapses depth-wise memory and communication from $O(Ld)$ to $O(Nd)$ ($N \approx 8$ in practice), making memory-augmented depth routing a practical drop-in for standard residual connections at scale.
+
+\paragraph{Registering Memory as a Foundational Block Source.}
+Let $\mathcal{B}_n$ denote the set of layer indices in block $n$, for $n = 1, \ldots, N$. Following \cite{du2026attention}, the intra-block partial sum after the first $i$ layers of block $n$ is:
 
 \begin{equation}
-    v_0 := m^t \quad \in \mathbb{R}^{S \times d}
-\end{equation}
-
-The input to any downstream layer $l$ is computed as a depth-wise softmax attention over all preceding sources, \textit{including} the episodic memory:
-
-\begin{equation}
-    h_l = \sum_{i=0}^{l-1} \alpha_{i \to l} \cdot v_i,
+    b_n^{i} = \sum_{j \in \mathcal{B}_n^{\,1:i}} f_j(h_j) \in \mathbb{R}^{S \times d},
     \qquad
-    \alpha_{i \to l} = \frac{\phi(w_l,\, k_i)}{\sum_{j=0}^{l-1} \phi(w_l,\, k_j)}
-    \label{eq:memres_attn}
+    b_n := b_n^{S_B} \quad \text{(completed block representation)}
 \end{equation}
 
-where $\phi(q, k) = \exp\!\left(q^\top \operatorname{RMSNorm}(k)\right)$ and $w_l \in \mathbb{R}^d$ is a learned pseudo-query for layer $l$. The keys are defined simply as:
+The token embedding occupies the conventional foundational slot $b_0 := h_1$. We register the per-position memory readout as a parallel \emph{external} foundational source, prepended to the block pool:
 
 \begin{equation}
-    k_i = v_i =
+    b_{-1} := m^t \quad \in \mathbb{R}^{S \times d}
+\end{equation}
+
+This index choice keeps the AttnRes recurrence (which sets $b_0 = h_1$) intact while exposing lifelong episodic memory as a sibling foundational source that every subsequent layer in every block can query.
+
+\paragraph{Inter-Block Attention with Memory.}
+For the $i$-th layer of block $n$, the value pool aggregates the memory source, the embedding, all completed prior block summaries, and---for layers beyond the first in the current block---the running intra-block partial sum:
+
+\begin{equation}
+    \mathcal{V}_{n,i} =
     \begin{cases}
-        m^t & i = 0 \quad \text{(episodic memory)} \\
-        f_i(h_i) & 1 \leq i \leq l-1 \quad \text{(layer outputs)}
+        \bigl[\, b_{-1},\; b_0,\; b_1,\; \dots,\; b_{n-1} \,\bigr]                  & i = 1, \\[3pt]
+        \bigl[\, b_{-1},\; b_0,\; b_1,\; \dots,\; b_{n-1},\; b_n^{\,i-1} \,\bigr]   & i \geq 2.
     \end{cases}
 \end{equation}
 
+The input to the $i$-th layer of block $n$ is then a softmax attention over this pool:
+
+\begin{equation}
+    h_{n,i} = \sum_{v \in \mathcal{V}_{n,i}} \alpha_{v \to (n,i)} \cdot v,
+    \qquad
+    \alpha_{v \to (n,i)} = \frac{\phi\!\left(w_{n,i},\, v\right)}{\sum_{v' \in \mathcal{V}_{n,i}} \phi\!\left(w_{n,i},\, v'\right)}
+    \label{eq:memres_block_attnres}
+\end{equation}
+
+where $\phi(q, v) = \exp\!\left(q^\top \operatorname{RMSNorm}(v)\right)$ and $w_{n,i} \in \mathbb{R}^d$ is a learned pseudo-query for the $i$-th layer of block $n$, initialized to zero so that initial weights $\alpha_{v \to (n,i)}$ are uniform across sources \cite{du2026attention}. Setting $N = L$ (one layer per block) recovers Full AttnRes, while $N = 1$ degenerates to a standard residual stream with $b_{-1}$ and $b_0$ isolated as the only non-trivial sources. The pool size is $|\mathcal{V}_{n,i}| \in \{n{+}1,\, n{+}2\}$, bounded by $N{+}2$ regardless of $L$.
+
 \paragraph{Implicit Cognitive Routing.}
-By integrating memory directly into the layer-to-layer residual stream, the model gains the ability to implicitly control memory recall without gating heuristics. During a content-rich conversational turn, the recent hidden states ($v_1, \ldots, v_{l-1}$) will naturally dominate the softmax competition, suppressing $\alpha_{0 \to l}$ and bypassing historical memory. Conversely, during a sparse or ambiguous turn (e.g., a bare pronoun callback like "Did you ask her yet?"), the absence of dominant local features allows the memory source $v_0$ to attract higher attention weight. This structurally replicates the selective, top-down nature of human cognitive retrieval.
+By integrating memory directly into the block-wise residual stream, the model gains the ability to implicitly control memory recall without gating heuristics. During a content-rich conversational turn, the recent block summaries ($b_1, \ldots, b_{n-1}$) and the running partial sum $b_n^{i-1}$ will naturally dominate the softmax competition, suppressing $\alpha_{b_{-1} \to (n,i)}$ and bypassing historical memory. Conversely, during a sparse or ambiguous turn (e.g., a bare pronoun callback like ``Did you ask her yet?''), the absence of dominant local features allows the memory source $b_{-1} = m^t$ to attract higher attention weight. This structurally replicates the selective, top-down nature of human cognitive retrieval, while the block partition keeps the cross-stage communication budget independent of model depth.
 
 \section{Distinction from Existing Paradigms}
 While our approach shares philosophical DNA with several recent works, it uniquely resolves the limitations of modern agentic workflows:
 \begin{itemize}
     \item \textbf{Versus Standard RAG and MemGPT:} Memory Residuals are entirely end-to-end differentiable. The model learns \textit{how} to encode implicit user preferences based on backpropagated loss, eliminating the need for rigid vector databases and lossy text-summarization prompts.
-    \item \textbf{Versus Attention Residuals \cite{du2026attention}:} While recent work replaces uniform depth-wise addition with a softmax attention mechanism over \textit{internal} layer outputs, Memory Residuals expand this paradigm to the \textit{external} temporal domain. By injecting a per-position cross-session readout $m^t$ as the foundational source ($v_0$), we bridge the gap between intra-session depth routing and lifelong memory retrieval while preserving the query-dependent selectivity of standard attention.
+    \item \textbf{Versus Attention Residuals \cite{du2026attention}:} While recent work replaces uniform depth-wise addition with softmax attention over \textit{internal} layer outputs (and its scalable Block AttnRes variant over $N$ block-level summaries), Memory Residuals expand this paradigm to the \textit{external} temporal domain. By prepending the per-position cross-session readout $m^t$ as a sibling foundational source ($b_{-1}$) inside the same Block AttnRes pool used for intra-session depth routing, we bridge the gap between depth-wise aggregation and lifelong memory retrieval while preserving both the query-dependent selectivity of standard attention and the $O(Nd)$ depth-wise communication budget that makes the mechanism practical at scale.
     \item \textbf{Versus Perceiver IO \cite{jaegle2021perceiver}:} While Perceiver uses cross-attention bottlenecks to handle large inputs, Memory Residuals embed this bottleneck specifically as a \textit{softmax-weighted depth source}, allowing context-dependent querying on a turn-by-turn basis.
     \item \textbf{Versus Recurrent Memory Transformer (RMT) \cite{bulatov2022recurrent}:} Models like RMT prepend memory embeddings directly to the context window. Memory Residuals remove memory from the standard $O(N^2)$ sequence entirely, isolating it in the orthogonal depth-wise routing pool.
 \end{itemize}

@@ -1,0 +1,7 @@
+{
+  "n": 256,
+  "rag_finetuned_ce": 3.256730380933732,
+  "top_k": 3,
+  "embedder": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_path": "output/run3_qwen3-0.6b-large/best"
+}

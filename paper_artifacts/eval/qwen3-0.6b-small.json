@@ -1,0 +1,16 @@
+{
+  "model_path": "paper_artifacts/runs/qwen3-0.6b-small/final",
+  "data_path": "paper_artifacts/pairs/stage1_validation.jsonl",
+  "memres": {
+    "n": 32,
+    "with_memory_ce": 8.621407479047775,
+    "no_memory_ce": 8.372764244675636,
+    "delta_no_memory_minus_memory": -0.24864323437213898,
+    "shuffle_history_ce": 8.622933372855186,
+    "delta_shuffle_minus_memory": 0.0015258938074111938
+  },
+  "base": {
+    "n": 32,
+    "base_ce": 4.364658035337925
+  }
+}

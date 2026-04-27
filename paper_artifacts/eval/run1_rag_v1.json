@@ -1,0 +1,7 @@
+{
+  "n": 128,
+  "rag_ce": 3.5227278685197234,
+  "top_k": 3,
+  "embedder": "sentence-transformers/all-MiniLM-L6-v2",
+  "base_model": "Qwen/Qwen3-0.6B"
+}
