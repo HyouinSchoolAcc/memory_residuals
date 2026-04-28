@@ -56,7 +56,21 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--preset", choices=sorted(PRESETS), default=None)
     p.add_argument("--pretrained", default=None)
-    p.add_argument("--memres_mode", choices=("residual", "block_attnres"), default="residual")
+    p.add_argument(
+        "--memres_mode",
+        choices=("residual", "block_attnres"),
+        default="block_attnres",
+        help="block_attnres (default) = full Block AttnRes routing pool; "
+        "use --no-block_attnres_parity_init to disable init parity. "
+        "residual = legacy ReZero-style additive memory injection.",
+    )
+    p.add_argument(
+        "--block_attnres_parity_init",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="(block_attnres only) initialise the router so step-0 logits "
+        "match the bare backbone exactly. Default: on.",
+    )
     p.add_argument("--init_from", default=None,
                    help="Optional: warm-start from a Phase-0 (pair-trained) checkpoint")
 
@@ -386,6 +400,7 @@ class Trainer:
             memres_extraction_depth=a.memres_extraction_depth,
             memres_num_blocks=a.memres_num_blocks,
             memres_mode=a.memres_mode,
+            block_attnres_parity_init=a.block_attnres_parity_init,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)

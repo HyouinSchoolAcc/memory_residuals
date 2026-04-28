@@ -113,8 +113,8 @@ class Qwen3MemResConfig(Qwen3Config):
         memres_num_vectors: int = 128,
         memres_extraction_depth: int = 0,
         memres_num_blocks: int = 4,
-        memres_mode: str = "residual",
-        block_attnres_parity_init: bool = False,
+        memres_mode: str = "block_attnres",
+        block_attnres_parity_init: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)

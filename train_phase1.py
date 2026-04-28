@@ -62,10 +62,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--memres_mode",
         choices=("residual", "block_attnres"),
-        default="residual",
-        help="residual = preserve standard residuals + gated memory injection "
-        "(default, recommended for pretrained backbones); "
-        "block_attnres = full Block AttnRes routing pool (from-scratch).",
+        default="block_attnres",
+        help="block_attnres (default) = full Block AttnRes routing pool; "
+        "with --block_attnres_parity_init the router is initialised so the "
+        "augmented model is bit-identical to the bare backbone at step 0. "
+        "residual = legacy ReZero-style additive memory injection on the "
+        "standard residual stream.",
+    )
+    p.add_argument(
+        "--block_attnres_parity_init",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="(block_attnres only) initialise the router so step-0 logits "
+        "match the bare backbone exactly. See "
+        "paper_artifacts/eval/init_parity_test.json. Default: on.",
     )
 
     # Backbone overrides for from-scratch runs
@@ -387,7 +397,8 @@ class Trainer:
             f"  run_name        : {a.run_name}\n"
             f"  preset          : {a.preset}\n"
             f"  pretrained      : {a.pretrained}\n"
-            f"  memres_mode     : {a.memres_mode}\n"
+            f"  memres_mode     : {a.memres_mode}"
+            f"{' (parity_init)' if a.memres_mode == 'block_attnres' and a.block_attnres_parity_init else ''}\n"
             f"  K, L_E, N       : {a.memres_num_vectors}, "
             f"{a.memres_extraction_depth}, {a.memres_num_blocks}\n"
             f"  history/current : {a.history_len}/{a.current_len}\n"
@@ -425,6 +436,7 @@ class Trainer:
             memres_extraction_depth=a.memres_extraction_depth,
             memres_num_blocks=a.memres_num_blocks,
             memres_mode=a.memres_mode,
+            block_attnres_parity_init=a.block_attnres_parity_init,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)

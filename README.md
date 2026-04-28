@@ -1,204 +1,130 @@
 # Memory Residuals
 
-A Qwen3 variant implementing the Memory Residuals architecture from the paper:
-end-to-end differentiable lifelong memory via two key advances.
+We are training **Memory Residuals** on top of a Qwen3 backbone. The
+default routing mode is **`block_attnres` with `parity_init=True`** — at
+step 0 the augmented model produces bit-identical logits to bare Qwen3
+(`paper_artifacts/eval/init_parity_test.json`), so all "memory" learning
+is additive on top of the pretrained behaviour.
 
-**Advance 1 — Two-Stage QKV Competition (Section 2.1):**
-A recurrent memory block that distills each session into a `(K, d)`
-candidate `M_new` via a stack of `1 + L_E` cross-attention layers
-(initial `M_in` compression followed by Perceiver-style refinement),
-then forces old memory and new candidate into zero-sum softmax
-competition via judging queries `M_judge`.  Mundane filler sessions
-pass old memory through untouched; critical state-changes overwrite.
+The architecture is described in [`memory_residuals.pdf`](memory_residuals.pdf)
+(position paper) and [`atn_residuals.pdf`](atn_residuals.pdf) (the Block
+Attention Residuals routing primitive we build on).
 
-**Advance 2 — Depth-Wise Residual Stream Injection (Section 2.2):**
-Each position in the current session queries the memory matrix `M_c`
-via cross-attention, yielding a per-position readout `m^t` of shape
-`(B, S, d)` — indistinguishable from any attention layer's output.
-This readout is registered as `b_{-1}` in a Block AttnRes pool; each
-attention/MLP sublayer input is a softmax-weighted mix of prior block
-summaries, the running intra-block partial sum, the embedding source `b_0`,
-and this memory source, using `phi(q, k) = exp(q^T RMSNorm(k))` with a
-learned per-sublayer pseudo-query `w_l`.  During filler turns, local layer
-outputs dominate the softmax; during callbacks, mass shifts onto `b_{-1}`.
+For everything else — full design rationale, every prior run and how it
+failed, compute-targeted next-step plans, paper-to-code map, eval
+methodology — see [`COMPREHENSIVE.md`](COMPREHENSIVE.md).
 
-> **Paper:** see [`memory_residuals.pdf`](memory_residuals.pdf) in this repo for
-> the full theoretical framework and the call for collaboration.
+## Idea
 
-Four scripts:
-- `train_memres.py` — train (from scratch or attached to pretrained Qwen3)
-- `eval_memres.py` — measure loss gain from having memory vs not
-- `probe_memres.py` — measure whether routing is semantic (callback > filler)
-- `visualize_memres.py` — plot per-layer routing mass
+Maintain a fixed-size recurrent memory matrix
+$M_c \in \mathbb{R}^{K \times d}$ (one per chain, not per token).
+Update it once per session via two-stage QKV competition (extract a
+candidate $E_t$ from the new session, then judge it against the prior
+$M_c^{t-1}$ in a zero-sum softmax over a $2K$-row pool). At read
+time, every position in the next session cross-attends $M_c$ once to
+produce a per-position memory readout $m^t$, which is injected into
+the depth-wise residual stream via the Block AttnRes router as
+source $b_{-1}$. End-to-end differentiable; the persistent state
+$M_c$ is shaped by the language-modelling loss alone.
 
-The canonical implementation lives in `modeling_memres.py` (all four scripts
-import from it). `modeling_memory_residuals.py` is an earlier variant kept for
-reference and is not imported by the current pipeline.
+## Dataset
 
----
+Pre-tokenized chain corpora live in `paper_artifacts/chains/`
+(produced from the sibling `memory_residuals_data/` folder; not
+re-built here):
 
-## Paper-to-Code Map
+| split | file | source | sessions |
+|---|---|---|---|
+| train | `stage1_train_s512.pt` (gitignored, 176 MB) | PG-19 books + 30 TV transcripts | ~89K |
+| val | `stage1_validation_s512.pt` | PG-19 validation | small |
+| test | `stage1_test_s512.pt` | PG-19 test | small |
+| TV-only ablation | `tv_train_s512.pt` | 30 TV transcripts | small |
+| eval | `locomo_s512.pt` | LoCoMo (10 conversation chains) | eval-only |
 
-| Paper Section / Equation | Module in `modeling_memres.py` |
+All tensors are packed to `session_len=512`. Pair-format windows for
+warm-up training are produced on the fly by
+`paper_tools/prepare_pairs.py`.
+
+## How to train
+
+Single-GPU recurrent chain TBPTT (the experiment that exercises $M_c$
+end-to-end across consecutive sessions):
+
+```bash
+python -u train_chain.py \
+  --preset qwen3-0.6b-large \
+  --window_k 8 --session_len 512 \
+  --steps 5000 --batch_size 2 --grad_accum 2 \
+  --warmup 200 --lr 5e-4 --lr_backbone 1e-5 \
+  --memory_dropout 0.10 --context_dropout 0.30 \
+  --neg_chain_weight 0.5 --neg_chain_margin 0.05 \
+  --gradient_checkpointing \
+  --out_dir output/chain_neg_repro
+```
+
+Eval (memory vs no-memory vs shuffled-memory vs oracle, on a held-out chain corpus):
+
+```bash
+python paper_tools/eval_chain.py \
+  --model_path output/chain_neg_repro/best \
+  --corpora paper_artifacts/chains/stage1_validation_s512.pt \
+            paper_artifacts/chains/locomo_s512.pt \
+  --names pg19_validation locomo \
+  --score_window 4 --oracle_window 4 \
+  --output paper_artifacts/eval/chain_neg_repro_eval.json
+```
+
+## Experiments — results so far
+
+The headline metrics are
+$\Delta_{nm-m} = \mathrm{CE}_{\text{nomem}} - \mathrm{CE}_{\text{mem}}$
+(memory help) and
+$\Delta_{sh-m} = \mathrm{CE}_{\text{shuffle}} - \mathrm{CE}_{\text{mem}}$
+(history specificity — positive means the model uses *this* chain's
+memory, not a generic style prior).
+
+| run | trainer | data | steps | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ | verdict |
+|---|---|---|---:|---:|---:|---|
+| `run3_qwen3-0.6b-large` | `train_phase1.py` (pair) | PG-19 + TV pairs | 8 000 | +0.026 | +0.029 | works on pair eval; explodes on chain eval (CE 8.7) |
+| `chain2_qwen3-0.6b-large` | `train_chain.py`, warm-started from run3 | PG-19 + TV chains, k=4 | 3 000 | +0.063 (PG-19) | −0.014 (PG-19) | shortcut learning — memory became style-only |
+| `chain_fresh1` | fresh init | PG-19 + TV chains, k=8 | 5 000 | +0.008 | −0.036 (PG-19) | stable to 30+ sessions, still shortcut-learns |
+| `chain_tv1`, `chain_tv2` | TV-only | TV chains, k=8 | 6 000 | small + | +0.011, +0.002 (LoCoMo @ step 500) | brief positive then overfits |
+| `chain_neg1` | chain TBPTT + negative-chain contrastive ($\lambda=0.5$, m=0.05) | PG-19 + TV chains, k=8 | 5 000 (in progress) | −0.0003 | +0.014 (in-trainer step 1000) | currently the most promising recipe |
+
+Init-parity diagnostic (`paper_artifacts/eval/init_parity_test.json`,
+Qwen3-0.6B, bf16, 30 prompt + 27 history tokens):
+
+| mode | max\|Δ_logit\| vs bare Qwen3 |
 |---|---|
-| Section 2.1, Eq. 1 — Initial extraction | `MemoryBlock.extraction_layers[0]` |
-| Section 2.1.1, Eqs. 3-4 — Refinement (L_E layers) | `MemoryBlock.extraction_layers[1:]` (residual) |
-| Section 2.1, Eq. 2 / 2.1.1 Eq. 5 — Judging | `MemoryBlock.judge()` via `CrossAttention` |
-| M_in (extraction queries) | `MemoryBlock.M_in` |
-| M_judge (judging queries) | `MemoryBlock.M_judge` |
-| Section 2.2, Eq. 6 — Per-position readout | `MemoryReadout.forward()` (cross-attn, queries = `inputs_embeds`) |
-| Section 2.2, Eq. 8 — `b_{-1} := m^t` (shape `(B,S,d)`) | `Qwen3MemResModel.forward()` (`b_minus_1 = m_t`) |
-| Section 2.2, Eqs. 9-10 — Block depth-wise routing | `BlockAttnResRouter.route()` |
-| phi(q,k) = exp(q^T RMSNorm(k)) | `BlockAttnResRouter.route()` (scores computation) |
-| w_l (per-sublayer pseudo-query) | `BlockAttnResRouter.w` |
-| W_Q/W_K/W_V (readout projections) | `MemoryReadout.W_Q/W_K/W_V` |
+| `residual` (ReZero gate $g_\ell{=}0$), no memory | **0.000** |
+| `residual` (ReZero gate $g_\ell{=}0$), memory | **0.000** |
+| `block_attnres` default (uniform softmax over deltas) | 34.5 |
+| `block_attnres_parity_init` (cumulative pool + recent_bias = +32) | **0.000** |
 
----
+## Future TODO
 
-## Train from scratch
+In rough priority order — see `COMPREHENSIVE.md` Part I §3–4 for the
+full compute-targeted plans (2× H100, 24 h plan and 20× A100, 168 GPU-h plan).
 
-Small sanity run (~20M params, single GPU):
+- [ ] Land positive $\Delta_{sh-m}$ on the **rigorous standalone eval** for both PG-19 and LoCoMo. `chain_neg1` is the active attempt; in-trainer numbers are positive but standalone numbers are pending.
+- [ ] Run `paper_tools/callback_probe.py` on `chain_neg1/best` and verify the per-callback help ratio is > 1.5× on PG-19 and LoCoMo (we have it for `run3` only).
+- [ ] Long-horizon test at chain length ≥ 30 sessions (LoCoMo conv-41 has 32). Report whether memory benefit decays gracefully or collapses (the LRMT failure mode).
+- [ ] 8B-class run with `--preset qwen3-8b-large --shard_strategy fsdp_full --gradient_checkpointing`. Untried; ~1 GPU-day on 2× H100 expected.
+- [ ] Burn-in stability: the no-grad burn-in path produces $M_c$ states out-of-distribution for the readout (loss spikes at step 5). Either widen the gradient-tracked window or warm-start from a chain-trained checkpoint.
+- [ ] Ablate the new `block_attnres_parity_init` mode against `residual` end-to-end (init-parity is matched; need to compare downstream training dynamics).
+- [ ] Decide on MSC v2 / Persona-Chat inclusion for *training* (currently eval-only) once the data licence question is settled.
 
-```bash
-torchrun --nproc_per_node=1 train_memres.py \
-    --data_path data/friends_scripts.jsonl \
-    --hidden_size 128 --num_layers 4 --num_heads 4 --num_kv_heads 2 \
-    --intermediate_size 256 --head_dim 32 \
-    --memres_num_vectors 32 \
-    --history_len 256 --current_len 128 \
-    --steps 200 --batch_size 2 --out_dir output/test_memres
+## Layout
+
 ```
-
-Larger from-scratch run (~80M):
-
-```bash
-torchrun --nproc_per_node=1 train_memres.py \
-    --data_path data/friends_scripts.jsonl \
-    --hidden_size 512 --num_layers 12 --num_heads 8 --num_kv_heads 4 \
-    --intermediate_size 1536 \
-    --memres_num_vectors 128 --memres_extraction_depth 0 \
-    --history_len 512 --current_len 256 \
-    --steps 3000 --batch_size 2 --grad_accum 2 \
-    --out_dir output/bigger_memres
-```
-
-## Attach MemRes on top of a pretrained Qwen3
-
-The base weights load from the HF checkpoint; MemRes params (memory block,
-readout, depth-wise router) stay randomly initialized and learn from scratch.
-
-```bash
-torchrun --nproc_per_node=1 train_memres.py \
-    --pretrained Qwen/Qwen3-0.6B \
-    --data_path data/friends_scripts.jsonl \
-    --memres_num_vectors 128 --memres_extraction_depth 0 \
-    --history_len 512 --current_len 256 \
-    --steps 2000 --batch_size 1 --grad_accum 4 \
-    --lr 2e-5 --warmup 100 \
-    --out_dir output/qwen3_0p6b_memres
-```
-
----
-
-## Arguments
-
-### Data
-
-- `--data_path` — JSONL file with `{"history": "...", "current": "..."}` per
-  line. `history` is compressed into memory; `current` is the target sequence.
-- `--simulate_sessions` — alternative to `--data_path`. Streams raw text and
-  splits each document in half (first half = history, second half = current).
-- `--dataset`, `--dataset_name` — HuggingFace dataset id when using
-  `--simulate_sessions` (default `HuggingFaceFW/fineweb-edu`).
-
-### Model size (from-scratch only, ignored when `--pretrained` is set)
-
-- `--hidden_size` — model dim `d`.
-- `--num_layers` — transformer blocks.
-- `--num_heads` — attention heads.
-- `--num_kv_heads` — grouped-query KV heads (must divide `num_heads`).
-- `--intermediate_size` — MLP hidden dim.
-- `--head_dim` — overrides `hidden_size / num_heads` if set.
-
-### Memory Residual knobs
-
-- `--memres_num_vectors K` — number of latent memory slots (K in the paper).
-  Fixed, independent of history length. Common values: 32 (small), 128
-  (default), 256 (big).
-- `--memres_extraction_depth L_E` — number of Perceiver-style refinement
-  layers stacked on top of the initial `M_in` cross-attention
-  (Section 2.1.1, Eqs. 3-4). Default 0 (single-layer extraction, i.e. Eq. 1).
-  Higher values (2-8) add non-linear distillation capacity for extracting
-  multi-hop semantic content from long raw sessions.
-- `--memres_num_blocks N` — number of Block AttnRes summaries over the
-  attention/MLP sublayer sequence. `N = 2 * num_layers` recovers Full
-  AttnRes; smaller values keep the routing pool bounded near `N + 2`.
-
-### Sequence lengths
-
-- `--history_len` — token length of the past session compressed into memory.
-- `--current_len` — token length of the future session scored for loss.
-
-### Optimization
-
-- `--steps` — optimizer steps (after gradient accumulation).
-- `--batch_size` — per-step micro-batch.
-- `--grad_accum` — micro-batches per optimizer step.
-- `--lr`, `--lr_min` — cosine schedule endpoints.
-- `--warmup` — linear warmup steps.
-- `--max_norm` — gradient clipping.
-- `--detach_history_embeddings` — opt-in memory saver that detaches history
-  token embeddings before memory compression. By default, training is
-  end-to-end through the history embedding lookup.
-- `--save_every`, `--log_every` — checkpoint and log cadence.
-- `--out_dir` — where to save.
-- `--wandb_project`, `--wandb_entity`, `--run_name` — optional W&B logging.
-- `--seed` — RNG seed.
-
----
-
-## Evaluate
-
-Scores each held-out `(history, current)` pair twice: once with memory, once
-without. Reports mean cross-entropy and the delta.
-
-```bash
-python eval_memres.py \
-    --model_path output/qwen3_0p6b_memres/final \
-    --data_path data/friends_scripts.jsonl \
-    --history_len 512 --current_len 256 --num_eval 32
-```
-
----
-
-## Probe (is routing actually semantic?)
-
-Compresses a history once, then feeds two paired continuations:
-- a **callback** ("Remember what we just talked about? ...")
-- a **filler** ("The quick brown fox ...")
-
-Measures `alpha_{b_-1->l}` (attention mass routed to `b_{-1} = m^t`) at each
-depth-wise routing layer. Positive `callback - filler` delta means the model
-opens memory more on callbacks than filler.
-
-```bash
-python probe_memres.py \
-    --model_path output/qwen3_0p6b_memres/final \
-    --data_path data/friends_scripts.jsonl \
-    --num_samples 16
-```
-
----
-
-## Visualize
-
-Same measurement as the probe, plotted as (a) per-layer bar chart and
-(b) per-sample x per-layer delta-alpha heatmap.
-
-```bash
-python visualize_memres.py \
-    --model_path output/qwen3_0p6b_memres/final \
-    --data_path data/friends_scripts.jsonl \
-    --num_samples 16 \
-    --output memres_routing.png
+modeling_memres.py          model + Block AttnRes routing (parity_init)
+presets.py                  named (backbone, K, L_E, N) tuples
+train_phase1.py             pair-based warm-up trainer
+train_chain.py              recurrent chain TBPTT trainer
+paper_tools/                eval, probes, RAG baselines, audit, parity test
+paper_artifacts/            eval JSONs, plots, pre-tokenized chain caches
+output/                     training checkpoints  (gitignored)
+memory_residuals.{pdf,txt}  position paper
+atn_residuals.pdf           Block Attention Residuals reference paper
+COMPREHENSIVE.md            everything that used to be in BRIEFING + SUMMARY
 ```
