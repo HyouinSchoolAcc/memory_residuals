@@ -7,37 +7,44 @@ init) — at step 0 the augmented model produces bit-identical logits to
 bare Qwen3 (`paper_artifacts/eval/init_parity_test.json`), so all
 "memory" learning is additive on top of the pretrained behaviour.
 
-## Pick up here tomorrow (snapshot taken Apr 28, ~02:15 local)
+## Pick up here tomorrow (Apr 28 — both runs stopped by user request, ~02:32 local)
 
-**State on disk** — both runs were live when the server was shut down;
-their best-so-far checkpoints persisted on disk. The exact step they
-died at depends on when shutdown landed, but the `output/<run>/best/`
-dirs always reflect the highest-composite-metric eval seen up to that
-point.
+**Final state.** Both trainers received `SIGTERM` and exited cleanly; their
+checkpoints persisted on disk and the per-step trajectories were saved into
+`paper_artifacts/eval/chain_v2_phaseA_trajectories.{json,md}` (which *is*
+in git, unlike `logs/`). The two GPUs are now idle.
 
-| run | mode | output dir | last EVAL captured | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ |
-|---|---|---|---:|---:|---:|
-| A — head-to-head pool | soft `attention_parity` (`mem_bias=-4`, `recent_bias=+4`) | `output/chain_v2_phaseA_softparity_b4` | step 1800 (still climbing) | **+0.0102** | **+0.0240** |
-| B — head-to-head gate | `simple_gate` (legacy `--memres_mode residual`) | `output/chain_v2_abl_residual_mode` | step 4800 (plateau ~3500) | +0.0088 | +0.0243 |
+| run | mode | output dir | killed at step | last EVAL | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ |
+|---|---|---|---:|---:|---:|---:|
+| A — head-to-head pool | soft `attention_parity` (`mem_bias=-4`, `recent_bias=+4`) | `output/chain_v2_phaseA_softparity_b4` | 2125 / 6000 | step 2000 | **+0.0107** | **+0.0272** |
+| B — head-to-head gate | `simple_gate` | `output/chain_v2_abl_residual_mode` | 5275 / 6000 | step 5200 | +0.0090 | +0.0249 |
 
-The matched-step head-to-head was the point of these runs. At every
-checkpoint up to where they overlap (steps 200–1800), soft
-`attention_parity` recruited memory **1.6×–3.8× faster** than
-`simple_gate` on identical data, lr, and seed. By step 1800,
-`attention_parity` had already matched what `simple_gate` reached at
-step 4800 (Δ_sh-m ≈ +0.024) — i.e. **~2.7× more sample-efficient**.
-This is the routing-pool-vs-scalar-gate result the paper hinges on.
+Run A was killed mid-curve, *still on the upward portion* (Δ_sh-m grew
+from +0.0107 at step 800 to +0.0272 at step 2000, with no sign of
+plateauing). Run B was killed deep into its plateau (Δ_sh-m has been
+oscillating in [+0.0234, +0.0249] since step 4000 and the gate parameters
+have stopped moving — `gate_max=0.0366` for ~600 steps).
 
-The full per-step trajectory is in `logs/chain_v2_phaseA_softparity_b4.log`
-and `logs/chain_v2_abl_residual_mode.log` (logs/ is gitignored, lives
-on disk only).
+**The headline.** At matched compute, soft `attention_parity` outpaced
+`simple_gate` by **1.6×–3.8×** on every checkpoint they overlap on (steps
+200–2000). And the run-A step-2000 numbers have **already surpassed
+run-B's terminal plateau** on every memory metric — which means soft
+`attention_parity` reached `simple_gate`'s asymptote in ~2/5 the steps
+and was still climbing when killed. This is the routing-pool-vs-scalar-gate
+sample-efficiency result the paper turns on.
 
-### First 30 min tomorrow — turn the in-trainer numbers into rigorous standalone eval
+Full trajectory and bottom-line table:
+[`paper_artifacts/eval/chain_v2_phaseA_trajectories.md`](paper_artifacts/eval/chain_v2_phaseA_trajectories.md).
 
-The `EVAL @ step N` lines above are computed inside the trainer with
-n=92 sessions and `eval_window=4`. Re-run on the same `best/` ckpts
-through `paper_tools/eval_chain.py` to get the paper-grade numbers
-on PG-19 val + LoCoMo (and PG-19 test, which has been held out):
+### Tomorrow — do these in order
+
+#### 1. First 30 min: turn the in-trainer numbers into rigorous standalone eval
+
+The `EVAL @ step N` lines were computed inside the trainer with n=92
+sessions and `eval_window=4`. Re-run on the same `best/` ckpts through
+`paper_tools/eval_chain.py` to get paper-grade numbers on PG-19 val +
+PG-19 test (held out) + LoCoMo. **This is the gating step before any
+result above can be quoted in writing**, so do it first:
 
 ```bash
 cd ~/Desktop/fine-tune/memory_residuals
@@ -55,10 +62,10 @@ done
 ```
 
 Then `paper_tools/callback_probe.py` for the per-callback help ratio
-on each (we want > 1.5× on PG-19 and LoCoMo) and
+on each (target: > 1.5× on PG-19 and LoCoMo) and
 `paper_tools/horizon_analysis.py` to bucket help by chain length.
 
-### Then choose A, B, or C for the day's compute
+#### 2. Then choose A, B, or C for the day's compute
 
 **A — Extend the soft-parity run to step 6000** (deterministic).
 The trainer doesn't checkpoint optimizer/scheduler state, so a true
@@ -139,6 +146,14 @@ gives the paper a clean step-6000 number for soft `attention_parity`
 *and* fills in the missing `attention_base` row of the ablation
 table, in one ~10 h day. Phase B (option B) becomes the next day's
 work from A's step-6000 best ckpt.
+
+**Why A specifically:** the killed run was *still climbing* at
+step 2000 (Δ_sh-m = +0.0272, still no sign of plateauing). The first
+65% of the planned curve has not yet been observed, and `simple_gate`'s
+plateau (+0.0244 at step 5000) gives a concrete reference point — if
+A's extension stays above that line through step 6000, the paper has
+a single trajectory chart that shows the routing pool not just
+*reaching* the scalar-gate asymptote earlier, but *exceeding* it.
 
 ### Phone notifications while you're away
 
