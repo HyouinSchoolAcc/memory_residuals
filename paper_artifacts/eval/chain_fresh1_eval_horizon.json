@@ -1,0 +1,155 @@
+{
+  "pg19_validation": {
+    "n_chains_total": 47,
+    "buckets": [
+      {
+        "lo": 0,
+        "hi": 7,
+        "label": "0-7",
+        "n_chains": 3,
+        "mean_chain_length": 5.333333333333333,
+        "ce_mem": 2.9778057436148324,
+        "ce_nomem": 2.9885516266028085,
+        "ce_shuffle": 2.9914563496907554,
+        "ce_oracle": 2.8933117389678955,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.010745882987976074,
+        "delta_shuffle_minus_mem": 0.013650606075922944,
+        "delta_oracle_minus_mem": -0.0844940046469369
+      },
+      {
+        "lo": 8,
+        "hi": 15,
+        "label": "8-15",
+        "n_chains": 10,
+        "mean_chain_length": 11.7,
+        "ce_mem": 2.778639356791973,
+        "ce_nomem": 2.7828284546732904,
+        "ce_shuffle": 2.8231487080454825,
+        "ce_oracle": 2.7011824518442156,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.004189097881317494,
+        "delta_shuffle_minus_mem": 0.04450935125350952,
+        "delta_oracle_minus_mem": -0.07745690494775737
+      },
+      {
+        "lo": 16,
+        "hi": 31,
+        "label": "16-31",
+        "n_chains": 13,
+        "mean_chain_length": 20.153846153846153,
+        "ce_mem": 3.287712266811958,
+        "ce_nomem": 3.2953954614125767,
+        "ce_shuffle": 3.3126813769340515,
+        "ce_oracle": 3.1866669058799744,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.007683194600618837,
+        "delta_shuffle_minus_mem": 0.024969110122093685,
+        "delta_oracle_minus_mem": -0.10104536093198346
+      },
+      {
+        "lo": 32,
+        "hi": 63,
+        "label": "32-63",
+        "n_chains": 9,
+        "mean_chain_length": 44.77777777777778,
+        "ce_mem": 3.2392051219940186,
+        "ce_nomem": 3.249153607421451,
+        "ce_shuffle": 3.146492660045624,
+        "ce_oracle": 3.1537420087390475,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.00994848542743254,
+        "delta_shuffle_minus_mem": -0.09271246194839478,
+        "delta_oracle_minus_mem": -0.08546311325497102
+      },
+      {
+        "lo": 64,
+        "hi": 127,
+        "label": "64-127",
+        "n_chains": 9,
+        "mean_chain_length": 87.66666666666667,
+        "ce_mem": 3.153265804052353,
+        "ce_nomem": 3.162706741028362,
+        "ce_shuffle": 3.8186278343200684,
+        "ce_oracle": 3.066570538613531,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.009440936976008896,
+        "delta_shuffle_minus_mem": 0.6653620302677155,
+        "delta_oracle_minus_mem": -0.08669526543882178
+      },
+      {
+        "lo": 128,
+        "hi": 1000000000,
+        "label": "128+",
+        "n_chains": 3,
+        "mean_chain_length": 184.66666666666666,
+        "ce_mem": 2.919301817814509,
+        "ce_nomem": 2.931561380624771,
+        "ce_shuffle": null,
+        "ce_oracle": 2.7803962032000222,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.012259562810262192,
+        "delta_oracle_minus_mem": -0.1389056146144867
+      }
+    ]
+  },
+  "locomo": {
+    "n_chains_total": 10,
+    "buckets": [
+      {
+        "lo": 0,
+        "hi": 7,
+        "label": "0-7",
+        "n_chains": 0
+      },
+      {
+        "lo": 8,
+        "hi": 15,
+        "label": "8-15",
+        "n_chains": 0
+      },
+      {
+        "lo": 16,
+        "hi": 31,
+        "label": "16-31",
+        "n_chains": 9,
+        "mean_chain_length": 26.666666666666668,
+        "ce_mem": 2.5298592845598855,
+        "ce_nomem": 2.5084317293432026,
+        "ce_shuffle": 2.510136140244348,
+        "ce_oracle": 2.339633345603943,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": -0.021427555216682936,
+        "delta_shuffle_minus_mem": -0.019723144315537677,
+        "delta_oracle_minus_mem": -0.19022593895594264
+      },
+      {
+        "lo": 32,
+        "hi": 63,
+        "label": "32-63",
+        "n_chains": 1,
+        "mean_chain_length": 32.0,
+        "ce_mem": 2.4920244216918945,
+        "ce_nomem": 2.474246919155121,
+        "ce_shuffle": 2.5157755613327026,
+        "ce_oracle": 2.3018620014190674,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": -0.01777750253677368,
+        "delta_shuffle_minus_mem": 0.023751139640808105,
+        "delta_oracle_minus_mem": -0.19016242027282715
+      },
+      {
+        "lo": 64,
+        "hi": 127,
+        "label": "64-127",
+        "n_chains": 0
+      },
+      {
+        "lo": 128,
+        "hi": 1000000000,
+        "label": "128+",
+        "n_chains": 0
+      }
+    ]
+  }
+}

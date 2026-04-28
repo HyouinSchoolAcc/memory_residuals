@@ -103,6 +103,79 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 
+# Canonical MemRes routing modes.  See `_normalise_memres_mode` for the
+# legacy-string translation table that keeps old checkpoints / scripts
+# working.
+MEMRES_MODES: tuple[str, ...] = (
+    # "Toy-example" path: keep the pretrained Qwen3 residual flow exactly
+    # as-is and add the memory readout m^t into each sublayer input through
+    # a per-sublayer ReZero-style scalar gate g_l (init 0).  The depth-wise
+    # routing pool is unused on the forward path; only the gate, M_c, and
+    # the readout participate in gradient flow.  Bit-exact init parity by
+    # construction.  This is the simplification we run as a baseline.
+    "simple_gate",
+    # "Full implementation" path, no init parity: the depth-wise routing
+    # pool stores per-sublayer *deltas* and m^t is one source among many.
+    # Each routed sublayer's input is a softmax-weighted average over the
+    # delta pool.  This matches the original AttnRes paper, but cannot
+    # recover the bare residual stream from any one-hot softmax setting,
+    # so step-0 logits are perturbed (~34 max|Δ| on Qwen3-0.6B) and the
+    # optimiser has to absorb that perturbation before memory learning
+    # starts.
+    "attention_base",
+    # "Full implementation" path, with init parity: the depth-wise routing
+    # pool stores *cumulative* hidden-state checkpoints (b_0 = h_0,
+    # b_k = h_k, partial = h_current) and the router is initialised with
+    # mem_bias = -32 / recent_bias = +32 so the softmax is one-hot on the
+    # most-recent slot.  Combined, this makes the routed sublayer input
+    # equal to the bare residual stream input at step 0.  The cost is a
+    # saturated softmax that needs bias warm-up to learn to mix non-recent
+    # sources.
+    "attention_parity",
+)
+
+
+def _normalise_memres_mode(
+    memres_mode: str | None,
+    block_attnres_parity_init: bool | None,
+) -> str:
+    """Translate any (mode, parity_init) tuple -- legacy or new -- to a
+    canonical mode string in `MEMRES_MODES`.
+
+    Legacy mapping (kept so existing config.json / shell scripts work):
+
+        memres_mode="residual"                              -> "simple_gate"
+        memres_mode="block_attnres", parity_init=False      -> "attention_base"
+        memres_mode="block_attnres", parity_init=True       -> "attention_parity"
+
+    A canonical input is returned unchanged.  When `memres_mode` is one of
+    the new canonical names but `block_attnres_parity_init` is also given
+    (e.g. an old script paired with a new mode flag), `parity_init` is
+    silently ignored because the new mode already disambiguates.
+    """
+    if memres_mode in MEMRES_MODES:
+        return memres_mode
+    if memres_mode == "residual":
+        return "simple_gate"
+    if memres_mode == "block_attnres":
+        # Preserve the legacy CLI default: when block_attnres was paired
+        # with an unspecified parity_init flag (None), the trainers used
+        # to default the flag to True.  Old shell scripts passing only
+        # `--memres_mode block_attnres` therefore expected the parity
+        # variant -- we keep that mapping here.
+        if block_attnres_parity_init is None:
+            block_attnres_parity_init = True
+        return (
+            "attention_parity"
+            if bool(block_attnres_parity_init)
+            else "attention_base"
+        )
+    raise ValueError(
+        f"Unknown memres_mode {memres_mode!r}; expected one of "
+        f"{MEMRES_MODES} (or legacy 'residual' / 'block_attnres')."
+    )
+
+
 class Qwen3MemResConfig(Qwen3Config):
     """Qwen3Config extended with Memory Residuals hyper-parameters."""
 
@@ -113,8 +186,18 @@ class Qwen3MemResConfig(Qwen3Config):
         memres_num_vectors: int = 128,
         memres_extraction_depth: int = 0,
         memres_num_blocks: int = 4,
-        memres_mode: str = "block_attnres",
-        block_attnres_parity_init: bool = True,
+        memres_mode: str = "attention_parity",
+        block_attnres_parity_init: bool | None = None,
+        # Optional explicit overrides for the BlockAttnResRouter's init
+        # biases.  When None (default), the router falls back to mode-derived
+        # defaults: attention_parity uses (-32, +32) for bit-exact init
+        # parity at the cost of a saturated softmax; attention_base /
+        # simple_gate uses (-8, 0).  Setting these to less extreme values
+        # (e.g. -4 / +4) trades a small amount of init parity for a
+        # softmax that has gradient signal on the pseudo-queries from
+        # step 0, which lets the router actually learn to recruit memory.
+        router_mem_bias_init: float | None = None,
+        router_recent_bias_init: float | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -128,37 +211,25 @@ class Qwen3MemResConfig(Qwen3Config):
         # non-trivial sources.  Defaults to 4 (well-suited to small/medium
         # research models, ~3 attn/MLP sublayers per block at L=12).
         self.memres_num_blocks = memres_num_blocks
-        # Routing mode.  "residual" (default) preserves the pretrained
-        # backbone's standard residual flow and injects memory through a
-        # per-sublayer gated additive contribution
-        #     h_pre_l = h_residual_l + sigma(g_l) * m^t
-        # where the per-sublayer gate scalar g_l is initialised to a strong
-        # negative number (sigma(g_l) ~ 0) so the augmented model is
-        # behaviourally identical to the bare Qwen3 backbone at step 0.  This
-        # is the recommended mode whenever the backbone is pretrained.
-        # "block_attnres" recovers the original Block Attention Residuals
-        # routing (Eqs. 9-10) and is intended for from-scratch ablations.
-        if memres_mode not in {"residual", "block_attnres"}:
-            raise ValueError(
-                f"Unknown memres_mode {memres_mode!r}; choose 'residual' or "
-                "'block_attnres'."
-            )
-        self.memres_mode = memres_mode
-        # When True, the Block AttnRes routing pool stores cumulative
-        # hidden-state checkpoints (b_0=h_0, b_k=h_k, partial=h_current)
-        # instead of the default delta-only sources, AND the router is
-        # initialised with a strong positive bias on the most-recent source
-        # in the pool together with a strong negative bias on b_{-1}=m^t.
-        # The combination produces a one-hot softmax at step 0 that selects
-        # the running cumulative state, which is exactly the standard
-        # residual stream input to the next sublayer -- so the augmented
-        # model is forward-identical to the bare backbone at step 0 even in
-        # block_attnres mode (see paper_artifacts/eval/init_parity_test.json).
-        # The trade-off is a saturated softmax at init, so the router needs
-        # explicit bias warm-up to learn to mix non-recent sources.  Default
-        # False (use delta-pool, non-parity init) to match the original
-        # AttnRes formulation.
-        self.block_attnres_parity_init = block_attnres_parity_init
+        # Canonical routing mode (see MEMRES_MODES above for the three
+        # variants).  Legacy values (memres_mode="residual" /
+        # "block_attnres" + block_attnres_parity_init) are silently
+        # translated so saved checkpoints and existing shell scripts keep
+        # working.
+        self.memres_mode = _normalise_memres_mode(
+            memres_mode, block_attnres_parity_init
+        )
+        # Derived alias kept for backward compatibility with downstream
+        # tooling that reads `config.block_attnres_parity_init` directly
+        # (eval scripts, init_parity_test.py, older notebooks).  Always
+        # consistent with the canonical mode.
+        self.block_attnres_parity_init = (
+            self.memres_mode == "attention_parity"
+        )
+        # Optional router-bias overrides; None means "use mode-derived
+        # default" (resolved in Qwen3MemResModel.__init__).
+        self.router_mem_bias_init = router_mem_bias_init
+        self.router_recent_bias_init = router_recent_bias_init
 
 
 # ---------------------------------------------------------------------------
@@ -633,14 +704,14 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         # Block AttnRes router: one pseudo-query w_{n,i} per routed sublayer
         # after the first. AttnRes treats attention and MLP as separate layers;
         # the first attention sublayer receives b_0 = inputs_embeds directly.
-        # In "residual" mode the router is unused on the forward path but the
-        # parameters are still constructed so checkpoints stay shape-stable
+        # In "simple_gate" mode the router is unused on the forward path but
+        # the parameters are still constructed so checkpoints stay shape-stable
         # across modes.
-        # When parity_init is on we configure the router with a strong
-        # positive bias on the most-recent source and a strongly negative
-        # mem_bias so the softmax is one-hot at step 0; combined with the
-        # cumulative-state value pool (see forward()) this makes the
-        # block_attnres mode forward-identical to the bare backbone.  The
+        # When the canonical mode is "attention_parity" we configure the router
+        # with a strong positive bias on the most-recent source and a strongly
+        # negative mem_bias so the softmax is one-hot at step 0; combined with
+        # the cumulative-state value pool (see forward()) this makes the
+        # attention pool forward-identical to the bare backbone.  The
         # +/- 32 magnitude is chosen so that alpha_other ~ exp(-32)/N is
         # well below bf16 precision (~1e-14) for every off-recent source.
         # Empirically (paper_artifacts/eval/init_parity_test.json) this
@@ -649,13 +720,27 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         # of Qwen3-0.6B; +/- 16 leaves ~3e-7 mass per off-source which
         # compounds to ~3e-1 in the final logits because the routed
         # error feeds back into the next sublayer's input.
-        parity_init = bool(getattr(config, "block_attnres_parity_init", False))
+        parity_init = (
+            getattr(config, "memres_mode", "attention_parity")
+            == "attention_parity"
+        )
+        # Resolve router init biases.  Explicit overrides on the config
+        # (e.g. softened parity at -4/+4) take precedence; otherwise we
+        # use the mode-derived defaults documented above.
+        mem_bias_default = -32.0 if parity_init else -8.0
+        recent_bias_default = 32.0 if parity_init else 0.0
+        mem_bias_init = getattr(config, "router_mem_bias_init", None)
+        recent_bias_init = getattr(config, "router_recent_bias_init", None)
+        if mem_bias_init is None:
+            mem_bias_init = mem_bias_default
+        if recent_bias_init is None:
+            recent_bias_init = recent_bias_default
         self.depth_router = BlockAttnResRouter(
             config.hidden_size,
             num_routing_steps=max(2 * config.num_hidden_layers - 1, 0),
             eps=config.rms_norm_eps,
-            mem_bias_init=-32.0 if parity_init else -8.0,
-            recent_bias_init=32.0 if parity_init else 0.0,
+            mem_bias_init=float(mem_bias_init),
+            recent_bias_init=float(recent_bias_init),
         )
         # Per-sublayer gate for residual memory injection.  We have one gate
         # per attention or MLP transform (so 2 * num_hidden_layers gates),
@@ -812,19 +897,23 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         position_embeddings = self.rotary_emb(inputs_embeds, position_ids)
 
         # ── Layer loop dispatch ──
-        # In "residual" mode we keep the standard pretrained residual flow
+        # In "simple_gate" mode we keep the standard pretrained residual flow
         #     h_post = h_pre + f(h_pre)
         # and inject the memory readout m^t additively at each sublayer
         # input through a per-sublayer ReZero-style gate
         #     h_pre = h_post_prev + sigma(g_l) * m^t.
-        # In "block_attnres" mode we recover the original Block Attention
-        # Residuals routing (Eqs. 9-10), with m^t entering as b_{-1}.
+        # In "attention_base" / "attention_parity" mode we recover the
+        # original Block Attention Residuals routing (Eqs. 9-10), with m^t
+        # entering as b_{-1}.
         b_minus_1 = m_t  # may be None
         has_memory = b_minus_1 is not None
         alpha_trace: list | None = [] if collect_alpha_trace else None
-        memres_mode = getattr(self.config, "memres_mode", "residual")
+        memres_mode = _normalise_memres_mode(
+            getattr(self.config, "memres_mode", "simple_gate"),
+            getattr(self.config, "block_attnres_parity_init", None),
+        )
 
-        if memres_mode == "residual":
+        if memres_mode == "simple_gate":
             h_post = inputs_embeds
             sublayer_idx = 0
 
@@ -884,30 +973,27 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
 
             hidden_states = self.norm(h_post)
         else:
-            # Block AttnRes routing (Eqs. 9-10).
+            # Attention-pool routing (Eqs. 9-10).
             #
-            # Two pool conventions are supported.  In the default
-            # (`block_attnres_parity_init=False`) the pool stores
-            # *deltas* -- b_0 is the embedding and each completed block
-            # summary / running partial sum is a sum of sublayer deltas.
-            # In this regime the standard residual stream
+            # Two pool conventions are supported.  In "attention_base" the
+            # pool stores *deltas* -- b_0 is the embedding and each
+            # completed block summary / running partial sum is a sum of
+            # sublayer deltas.  In this regime the standard residual stream
             #     h_{n,i-1} = b_0 + sum_k b_k + b_n^{i-1}
             # is decomposed across multiple slots, so a softmax that is
             # constrained to weights summing to 1 cannot reconstruct it
             # from any one-hot init -- forward init-parity with the bare
             # backbone is therefore impossible in this regime.
             #
-            # In the parity-init regime (`block_attnres_parity_init=True`)
-            # the pool stores *cumulative hidden-state checkpoints*
+            # In "attention_parity" mode the pool stores *cumulative
+            # hidden-state checkpoints*
             #     b_0 = h_0,   b_k = h_k (after block k),   partial = h_curr
             # so the most-recent source IS the standard residual stream
             # input to the next sublayer.  Combined with the router's
             # `recent_bias` init this makes the augmented model
             # forward-identical to the bare backbone at step 0 even in
-            # block_attnres mode.
-            parity_init = bool(
-                getattr(self.config, "block_attnres_parity_init", False)
-            )
+            # attention-pool mode.
+            parity_init = memres_mode == "attention_parity"
             b_0 = inputs_embeds
             completed_blocks: list[torch.Tensor] = []
             partial_sum: torch.Tensor | None = None

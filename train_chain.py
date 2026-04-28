@@ -43,7 +43,11 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from transformers import AutoConfig, AutoTokenizer
 
-from modeling_memres import Qwen3MemResConfig, Qwen3MemResForCausalLM
+from modeling_memres import (
+    Qwen3MemResConfig,
+    Qwen3MemResForCausalLM,
+    _normalise_memres_mode,
+)
 from presets import PRESETS, apply_preset
 
 
@@ -58,21 +62,52 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pretrained", default=None)
     p.add_argument(
         "--memres_mode",
-        choices=("residual", "block_attnres"),
-        default="block_attnres",
-        help="block_attnres (default) = full Block AttnRes routing pool; "
-        "use --no-block_attnres_parity_init to disable init parity. "
-        "residual = legacy ReZero-style additive memory injection.",
+        # Canonical names: simple_gate / attention_base / attention_parity.
+        # Legacy names "residual" / "block_attnres" are accepted and folded
+        # into the canonical set after parsing (see _normalise_memres_args)
+        # so old shell scripts and saved checkpoints keep working.
+        choices=(
+            "simple_gate", "attention_base", "attention_parity",
+            "residual", "block_attnres",
+        ),
+        default="attention_parity",
+        help="simple_gate = ReZero-style scalar-gate injection (toy/baseline); "
+             "attention_base = full Block AttnRes routing pool, delta sources, "
+             "no init parity; "
+             "attention_parity = full Block AttnRes pool, cumulative sources, "
+             "step-0 logits bit-identical to the bare backbone (default). "
+             "Legacy: 'residual' -> simple_gate, "
+             "'block_attnres' -> attention_parity (or attention_base when "
+             "paired with --no-block_attnres_parity_init).",
     )
     p.add_argument(
         "--block_attnres_parity_init",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="(block_attnres only) initialise the router so step-0 logits "
-        "match the bare backbone exactly. Default: on.",
+        default=None,
+        help="DEPRECATED -- use --memres_mode attention_base / "
+        "attention_parity directly. Only honoured when --memres_mode is the "
+        "legacy 'block_attnres' string; ignored otherwise.",
     )
     p.add_argument("--init_from", default=None,
                    help="Optional: warm-start from a Phase-0 (pair-trained) checkpoint")
+
+    # Router init-bias overrides.  Default (None / None) -> mode-derived
+    # defaults: attention_parity uses (-32, +32) for bit-exact init parity
+    # with a saturated softmax; attention_base / simple_gate uses (-8, 0).
+    # Setting these to less extreme magnitudes (e.g. -4 / +4) softens the
+    # parity init: step-0 logits drift slightly from bare Qwen3, but the
+    # softmax has non-trivial gradient on the pseudo-queries from step 0
+    # and the router can actually learn to recruit memory.
+    p.add_argument(
+        "--router_mem_bias_init", type=float, default=None,
+        help="Override BlockAttnResRouter.mem_bias init value. "
+             "Default: -32 (attention_parity) / -8 (other modes).",
+    )
+    p.add_argument(
+        "--router_recent_bias_init", type=float, default=None,
+        help="Override BlockAttnResRouter.recent_bias init value. "
+             "Default: +32 (attention_parity) / 0 (other modes).",
+    )
 
     # MemRes hyper-params (overridden by --preset)
     p.add_argument("--memres_num_vectors", type=int, default=128)
@@ -126,8 +161,21 @@ def parse_args() -> argparse.Namespace:
                         "that shuffle memory, and add  alpha * max(0, "
                         "L_match - L_shuffle + margin)  to the total loss. "
                         "This is the PITFALLS.md §3 prescription against "
-                        "style-only / shortcut-learning collapse.  0 disables."
+                        "style-only / shortcut-learning collapse.  0 disables. "
+                        "When --neg_chain_warmup_steps > 0 this is the FINAL "
+                        "weight, ramped linearly from --neg_chain_initial_weight."
                    )
+    p.add_argument("--neg_chain_initial_weight", type=float, default=None,
+                   help="Initial value of neg_chain_weight at step 0; ramps "
+                        "linearly to --neg_chain_weight over "
+                        "--neg_chain_warmup_steps. Default: equal to "
+                        "--neg_chain_weight (no ramp).")
+    p.add_argument("--neg_chain_warmup_steps", type=int, default=0,
+                   help="Number of steps over which to linearly ramp "
+                        "neg_chain_weight from initial -> final. The "
+                        "COMPREHENSIVE.md §4.1 Phase B curriculum uses "
+                        "0.05 -> 0.2 -> 0.5 in three phases; in this "
+                        "trainer we fold that into a single linear ramp.")
     p.add_argument("--neg_chain_margin", type=float, default=0.05,
                    help="Margin for the negative-chain auxiliary loss.")
     p.add_argument("--burn_in_max", type=int, default=12,
@@ -136,7 +184,19 @@ def parse_args() -> argparse.Namespace:
                         "the model see M_c states from realistic recurrence "
                         "depths during training; needed because eval-time "
                         "chains are 20+ sessions long while TBPTT is only "
-                        "k sessions deep.")
+                        "k sessions deep. With --burn_in_resample, the actual "
+                        "burn-in is sampled per-step in {0..burn_in_max} "
+                        "(LRMT failure-mode defense, COMPREHENSIVE §4.1).")
+    p.add_argument("--burn_in_resample", action="store_true",
+                   help="If set, resample burn-in per chain in {0,4,8,...,burn_in_max} "
+                        "so the model sees M_c states from a range of recurrence "
+                        "depths during training.")
+    p.add_argument("--save_best_metric", choices=("ce_mem", "composite"),
+                   default="composite",
+                   help="ce_mem: legacy; minimised. composite: maximise "
+                        "delta_nomem_minus_mem + 2*delta_shuffle_minus_mem "
+                        "(penalises both channel collapse and shortcut "
+                        "learning). Default: composite.")
 
     # IO + logging
     p.add_argument("--out_dir", default="output/chain_run")
@@ -159,6 +219,10 @@ def parse_args() -> argparse.Namespace:
     a = p.parse_args()
     if a.preset is not None:
         apply_preset(a, a.preset)
+    a.memres_mode = _normalise_memres_mode(
+        a.memres_mode, a.block_attnres_parity_init
+    )
+    a.block_attnres_parity_init = a.memres_mode == "attention_parity"
     return a
 
 
@@ -401,6 +465,8 @@ class Trainer:
             memres_num_blocks=a.memres_num_blocks,
             memres_mode=a.memres_mode,
             block_attnres_parity_init=a.block_attnres_parity_init,
+            router_mem_bias_init=a.router_mem_bias_init,
+            router_recent_bias_init=a.router_recent_bias_init,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)
@@ -431,7 +497,11 @@ class Trainer:
             print(f"  warm-started {loaded}/{len(memres_keys)} memres params")
 
     def _apply_freeze(self) -> None:
-        if self.args.memres_mode == "residual":
+        # In simple_gate mode the depth_router is constructed (so checkpoint
+        # shapes stay stable across modes) but unused on the forward path,
+        # so its parameters never receive gradient and we freeze them
+        # explicitly to keep the optimiser / DDP graph tight.
+        if self.args.memres_mode == "simple_gate":
             for name, p in self.model.named_parameters():
                 if "depth_router" in name:
                     p.requires_grad = False
@@ -511,9 +581,21 @@ class Trainer:
         # tail-truncated (we keep the most recent burn_in_max sessions).
         windows = []
         burn_ins: list[torch.Tensor | None] = []
+        # Long-horizon training protocol: when --burn_in_resample is set, draw
+        # a per-chain burn-in length from {0, 4, 8, ..., burn_in_max} so the
+        # judge step sees M_c at a range of recurrence depths each batch.
+        # Otherwise, behave as before: cap at burn_in_max, full prefix.
         for _ in range(a.batch_size):
             _, _, w, b = self.train_sampler.sample_window()
-            if b is not None and a.burn_in_max > 0 and b.shape[0] > a.burn_in_max:
+            if a.burn_in_resample and a.burn_in_max > 0 and b is not None:
+                step = max(4, a.burn_in_max // 5)
+                choices = [0] + list(range(step, a.burn_in_max + 1, step))
+                pick = rng.choice(choices)
+                if pick == 0 or b.shape[0] == 0:
+                    b = None
+                else:
+                    b = b[-pick:]
+            elif b is not None and a.burn_in_max > 0 and b.shape[0] > a.burn_in_max:
                 b = b[-a.burn_in_max:]
             elif a.burn_in_max == 0:
                 b = None
@@ -623,7 +705,15 @@ class Trainer:
         # any random window) and score the same matched-chain last session
         # under it.  We push the matched loss to be at least `margin` below
         # the shuffle loss; otherwise we add the gap to the total loss.
-        if a.neg_chain_weight > 0.0:
+        if a.neg_chain_warmup_steps > 0:
+            init_w = a.neg_chain_initial_weight
+            if init_w is None:
+                init_w = a.neg_chain_weight
+            ramp = min(1.0, self.global_step / max(1, a.neg_chain_warmup_steps))
+            cur_neg_weight = init_w + (a.neg_chain_weight - init_w) * ramp
+        else:
+            cur_neg_weight = a.neg_chain_weight
+        if cur_neg_weight > 0.0:
             with torch.no_grad():
                 shuffle_windows = []
                 for _ in range(a.batch_size):
@@ -661,7 +751,7 @@ class Trainer:
             )
             loss_shuffle = out_sh.loss
             margin_loss = (loss_match - loss_shuffle + a.neg_chain_margin).clamp(min=0.0)
-            total_loss = total_loss + a.neg_chain_weight * margin_loss
+            total_loss = total_loss + cur_neg_weight * margin_loss
 
         total_loss = total_loss / a.grad_accum
         total_loss.backward()
@@ -849,9 +939,26 @@ class Trainer:
                         wandb.log({f"eval/{k}": v for k, v in metrics.items()
                                    if isinstance(v, (int, float))},
                                   step=self.global_step)
-                    if metrics["ce_mem"] < self.best_eval_ce:
-                        self.best_eval_ce = metrics["ce_mem"]
-                        self._save("best", eval_metrics=metrics)
+                    # COMPREHENSIVE.md §4.1: minimising ce_mem alone is
+                    # gameable by channel collapse (the model can null memory
+                    # and still drop ce_mem by overfitting the bare backbone).
+                    # The composite (Δ_nm-m + 2·Δ_sh-m) penalises both
+                    # collapse (Δ_nm-m -> 0) and shortcut learning
+                    # (Δ_sh-m -> 0 or negative). We negate so "lower is
+                    # better" semantics of best_eval_ce remain.
+                    if a.save_best_metric == "ce_mem":
+                        score = metrics["ce_mem"]
+                    else:
+                        d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
+                        d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0
+                        score = -(d_nm + 2.0 * d_sh)
+                    if score < self.best_eval_ce:
+                        self.best_eval_ce = score
+                        self._save("best", eval_metrics={
+                            **metrics,
+                            "_save_best_metric": a.save_best_metric,
+                            "_save_best_score": score,
+                        })
 
             if self.global_step % a.save_every == 0:
                 self._save(f"step-{self.global_step}")

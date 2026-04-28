@@ -6,14 +6,14 @@ not) leave the forward pass bit-equivalent to the bare backbone at step 0.
 
 Six cases are measured:
 
-    case                                               | expected
-    ---------------------------------------------------+----------
-    memres_mode="residual",     no memory injection    | parity (0 backbone perturbation)
-    memres_mode="residual",     memory injection on    | parity (gate g_l = 0)
-    memres_mode="block_attnres", default,  no memory   | broken (1/N uniform mix)
-    memres_mode="block_attnres", default,  memory on   | broken
-    memres_mode="block_attnres", parity_init, no mem   | parity (one-hot recent + cumulative pool)
-    memres_mode="block_attnres", parity_init, mem on   | parity (mem_bias -> -inf)
+    case                                                  | expected
+    ------------------------------------------------------+----------
+    memres_mode="simple_gate",       no memory injection  | parity (0 backbone perturbation)
+    memres_mode="simple_gate",       memory injection on  | parity (gate g_l = 0)
+    memres_mode="attention_base",    no memory            | broken (1/N uniform mix)
+    memres_mode="attention_base",    memory on            | broken
+    memres_mode="attention_parity",  no memory            | parity (one-hot recent + cumulative pool)
+    memres_mode="attention_parity",  memory on            | parity (mem_bias -> -inf)
 
 For each case we report the max absolute logit difference vs the bare
 backbone on a fixed text prompt, and a pass/fail at a 1e-3 tolerance
@@ -57,7 +57,6 @@ def build_memres(
     pretrained: str,
     base_state_dict: dict[str, torch.Tensor],
     memres_mode: str,
-    block_attnres_parity_init: bool,
     device: torch.device,
     dtype: torch.dtype,
 ) -> Qwen3MemResForCausalLM:
@@ -75,7 +74,6 @@ def build_memres(
         memres_extraction_depth=0,
         memres_num_blocks=8,
         memres_mode=memres_mode,
-        block_attnres_parity_init=block_attnres_parity_init,
     )
     model = Qwen3MemResForCausalLM.from_pretrained(
         pretrained, config=cfg, dtype=dtype
@@ -165,21 +163,19 @@ def main() -> None:
           f"dtype={base_out.dtype}")
 
     cases = [
-        # (label, memres_mode, parity_init, attach_memory, expect_parity)
-        ("residual_no_mem", "residual", False, False, True),
-        ("residual_with_mem", "residual", False, True, True),
-        ("block_attnres_default_no_mem", "block_attnres", False, False, False),
-        ("block_attnres_default_with_mem", "block_attnres", False, True, False),
-        ("block_attnres_parity_init_no_mem", "block_attnres", True, False, True),
-        ("block_attnres_parity_init_with_mem", "block_attnres", True, True, True),
+        # (label, memres_mode, attach_memory, expect_parity)
+        ("simple_gate_no_mem",          "simple_gate",      False, True),
+        ("simple_gate_with_mem",        "simple_gate",      True,  True),
+        ("attention_base_no_mem",       "attention_base",   False, False),
+        ("attention_base_with_mem",     "attention_base",   True,  False),
+        ("attention_parity_no_mem",     "attention_parity", False, True),
+        ("attention_parity_with_mem",   "attention_parity", True,  True),
     ]
 
     results: list[dict] = []
-    for label, mode, parity_init, attach_mem, expect_parity in cases:
+    for label, mode, attach_mem, expect_parity in cases:
         torch.manual_seed(0)  # MemoryReadout.W_V is normal-init -- pin RNG.
-        model = build_memres(
-            a.pretrained, base_sd, mode, parity_init, device, dtype
-        )
+        model = build_memres(a.pretrained, base_sd, mode, device, dtype)
         h = history_ids if attach_mem else None
         # Probe the router's per-step bias and gate inits (helps diagnose
         # why parity does or doesn't hold).
@@ -199,15 +195,14 @@ def main() -> None:
         verdict = "PARITY" if passed else "PERTURBED"
         ok = "OK " if passed == expect_parity else "MISMATCH"
         print(
-            f"[parity] {label:<38s}  mode={mode:<13s} parity_init={parity_init} "
-            f"mem={attach_mem}  max|Δ|={stats['max_abs']:.3e}  "
+            f"[parity] {label:<32s}  mode={mode:<18s} mem={attach_mem}  "
+            f"max|Δ|={stats['max_abs']:.3e}  "
             f"mean|Δ|={stats['mean_abs']:.3e}  -> {verdict:<9s} ({ok})"
         )
         results.append(
             {
                 "label": label,
                 "memres_mode": mode,
-                "block_attnres_parity_init": parity_init,
                 "memory_attached": attach_mem,
                 "expect_parity": expect_parity,
                 "logit_diff_vs_base": stats,

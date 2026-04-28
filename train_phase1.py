@@ -46,6 +46,7 @@ from modeling_memres import (
     Qwen3MemResConfig,
     Qwen3MemResDecoderLayer,
     Qwen3MemResForCausalLM,
+    _normalise_memres_mode,
 )
 from presets import PRESETS, apply_preset
 
@@ -61,21 +62,42 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pretrained", default=None)
     p.add_argument(
         "--memres_mode",
-        choices=("residual", "block_attnres"),
-        default="block_attnres",
-        help="block_attnres (default) = full Block AttnRes routing pool; "
-        "with --block_attnres_parity_init the router is initialised so the "
-        "augmented model is bit-identical to the bare backbone at step 0. "
-        "residual = legacy ReZero-style additive memory injection on the "
-        "standard residual stream.",
+        # Canonical names: simple_gate / attention_base / attention_parity.
+        # Legacy names "residual" / "block_attnres" are accepted and folded
+        # into the canonical set after parsing so old shell scripts and
+        # saved checkpoints keep working.
+        choices=(
+            "simple_gate", "attention_base", "attention_parity",
+            "residual", "block_attnres",
+        ),
+        default="attention_parity",
+        help="simple_gate = ReZero-style scalar-gate injection (toy/baseline); "
+             "attention_base = full Block AttnRes routing pool, delta sources, "
+             "no init parity; "
+             "attention_parity = full Block AttnRes pool, cumulative sources, "
+             "step-0 logits bit-identical to the bare backbone (default). "
+             "Legacy: 'residual' -> simple_gate, "
+             "'block_attnres' -> attention_parity (or attention_base when "
+             "paired with --no-block_attnres_parity_init).",
     )
     p.add_argument(
         "--block_attnres_parity_init",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="(block_attnres only) initialise the router so step-0 logits "
-        "match the bare backbone exactly. See "
-        "paper_artifacts/eval/init_parity_test.json. Default: on.",
+        default=None,
+        help="DEPRECATED -- use --memres_mode attention_base / "
+        "attention_parity directly. Only honoured when --memres_mode is the "
+        "legacy 'block_attnres' string; ignored otherwise.",
+    )
+    # Router init-bias overrides (None -> mode-derived defaults: attention_parity
+    # uses (-32, +32), other modes use (-8, 0)).  Soften (e.g. -4 / +4) to
+    # trade init parity for non-saturated router gradients at step 0.
+    p.add_argument(
+        "--router_mem_bias_init", type=float, default=None,
+        help="Override BlockAttnResRouter.mem_bias init value.",
+    )
+    p.add_argument(
+        "--router_recent_bias_init", type=float, default=None,
+        help="Override BlockAttnResRouter.recent_bias init value.",
     )
 
     # Backbone overrides for from-scratch runs
@@ -178,6 +200,10 @@ def parse_args() -> argparse.Namespace:
         apply_preset(args, args.preset)
     if args.lr_memres is None:
         args.lr_memres = args.lr
+    args.memres_mode = _normalise_memres_mode(
+        args.memres_mode, args.block_attnres_parity_init
+    )
+    args.block_attnres_parity_init = args.memres_mode == "attention_parity"
     return args
 
 
@@ -397,8 +423,7 @@ class Trainer:
             f"  run_name        : {a.run_name}\n"
             f"  preset          : {a.preset}\n"
             f"  pretrained      : {a.pretrained}\n"
-            f"  memres_mode     : {a.memres_mode}"
-            f"{' (parity_init)' if a.memres_mode == 'block_attnres' and a.block_attnres_parity_init else ''}\n"
+            f"  memres_mode     : {a.memres_mode}\n"
             f"  K, L_E, N       : {a.memres_num_vectors}, "
             f"{a.memres_extraction_depth}, {a.memres_num_blocks}\n"
             f"  history/current : {a.history_len}/{a.current_len}\n"
@@ -437,6 +462,8 @@ class Trainer:
             memres_num_blocks=a.memres_num_blocks,
             memres_mode=a.memres_mode,
             block_attnres_parity_init=a.block_attnres_parity_init,
+            router_mem_bias_init=a.router_mem_bias_init,
+            router_recent_bias_init=a.router_recent_bias_init,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)
@@ -463,10 +490,11 @@ class Trainer:
         )
 
     def _apply_freeze(self) -> None:
-        # In "residual" mode the depth_router is unused on the forward path,
+        # In simple_gate mode the depth_router is constructed (so checkpoint
+        # shapes stay stable across modes) but unused on the forward path,
         # so always disable its gradients to keep the optimizer / DDP graph
         # tight.
-        if self.args.memres_mode == "residual":
+        if self.args.memres_mode == "simple_gate":
             for name, p in self.model.named_parameters():
                 if "depth_router" in name:
                     p.requires_grad = False
@@ -480,7 +508,8 @@ class Trainer:
             n_total += p.numel()
             if any(m in name for m in markers):
                 if not (
-                    self.args.memres_mode == "residual" and "depth_router" in name
+                    self.args.memres_mode == "simple_gate"
+                    and "depth_router" in name
                 ):
                     p.requires_grad = True
                     n_train += p.numel()
@@ -516,10 +545,10 @@ class Trainer:
         return DDP(
             self.model,
             device_ids=[self.local_rank],
-            # In "residual" mode the depth_router is constructed but unused
-            # on the forward path; some routes also drop the memory channel
-            # under memory_dropout.  Setting find_unused_parameters=True
-            # avoids hangs on all_reduce when graph topology varies.
+            # In "simple_gate" mode the depth_router is constructed but
+            # unused on the forward path; some routes also drop the memory
+            # channel under memory_dropout.  Setting find_unused_parameters
+            # =True avoids hangs on all_reduce when graph topology varies.
             find_unused_parameters=True,
             broadcast_buffers=False,
         )

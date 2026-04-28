@@ -10,3 +10,6 @@ build/
 data_pipeline/
 tea_debug.log
 paper_artifacts/chains/stage1_train_s512.pt
+paper_artifacts/chains/stage1_train_s512_full.pt
+paper_artifacts/pairs/
+logs/

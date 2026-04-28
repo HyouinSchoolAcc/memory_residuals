@@ -91,31 +91,33 @@ proposes either:
   $b_0 = h_1$ and the prior block summaries $b_1, \dots, b_{n-1}$.
   Per-sublayer pseudo-queries $w_{n,i}$ govern a depth-wise softmax
   $\alpha_{v\to(n,i)}$ over the pool (the paper's preferred formulation).
-- **ReZero-style gated injection** (the variant the codebase actually
-  defaults to via `memres_mode="residual"`):
+- **ReZero-style gated injection** (the codebase's `simple_gate` mode
+  — a strict simplification of the routing pool used as the toy /
+  baseline variant):
   $h^{\text{pre}}_\ell = h^{\text{post}}_{\ell-1} + g_\ell \cdot m^t$.
   All per-sublayer scalar gates $g_\ell$ are zero-initialized so the
   augmented model is *exactly* equivalent to the bare backbone at step 0,
   while $W_V^{\text{read}}$ retains its default normal init so $m^t$ has
   non-zero magnitude and gate gradients flow non-trivially from step 1.
 
-The "residual" mode was introduced specifically because the *default*
-Block AttnRes init (zero pseudo-queries, single negative bias on the
-memory source) leaves all $N$ non-memory sources with weight $\approx
-1/N$ in the softmax. That uniform average over the embedding, every
-prior block output, and the running intra-block partial is **not** the
-same forward pass as the bare backbone — which at sublayer $(n,i)$
-takes the single accumulated state $h_{n,i-1}$ as input — so the
-pretrained residual-stream conditioning is disturbed at step 0 and
-several thousand steps of warm-up are needed to recover it.
+The `simple_gate` mode was introduced specifically because the
+*delta-pool* Block AttnRes init (zero pseudo-queries, single negative
+bias on the memory source) leaves all $N$ non-memory sources with
+weight $\approx 1/N$ in the softmax. That uniform average over the
+embedding, every prior block output, and the running intra-block
+partial is **not** the same forward pass as the bare backbone —
+which at sublayer $(n,i)$ takes the single accumulated state
+$h_{n,i-1}$ as input — so the pretrained residual-stream conditioning
+is disturbed at step 0 and several thousand steps of warm-up are
+needed to recover it.
 
-With the ReZero/`residual` gate at zero, attaching MemRes to a Qwen3
-checkpoint is *exactly* equivalent to the bare backbone at step 0
-(both forward and backward through the trunk), and the gradient into
-the memory module itself is identically zero at step 0 because $g_\ell
-= 0$ multiplies $\partial L / \partial h_\ell$ before it reaches
-$W^{\text{read}}_{V}$. This is the "provably non-disruptive at
-$t{=}0$" property, verified by
+With the ReZero/`simple_gate` gate at zero, attaching MemRes to a
+Qwen3 checkpoint is *exactly* equivalent to the bare backbone at step
+0 (both forward and backward through the trunk), and the gradient
+into the memory module itself is identically zero at step 0 because
+$g_\ell = 0$ multiplies $\partial L / \partial h_\ell$ before it
+reaches $W^{\text{read}}_{V}$. This is the "provably non-disruptive
+at $t{=}0$" property, verified by
 `paper_artifacts/eval/init_parity_test.json` to within $10^{-5}$ on
 logits.
 
@@ -131,39 +133,45 @@ cumulative-source pool already contains the residual stream as the
 most-recent slot; and (ii) the router needs a strong positive bias
 on the most-recent source so the softmax is one-hot at init.
 
-Both options are now implemented and tested side-by-side:
+Both options are implemented as separate canonical modes and tested
+side-by-side:
 
 | mode | $\max\lvert\Delta_{\text{logit}}\rvert$ vs bare Qwen3-0.6B (bf16) | verdict |
 | --- | --- | --- |
-| `residual` (ReZero gate $g_\ell{=}0$), no memory | $0.000$ | bit-exact parity |
-| `residual` (ReZero gate $g_\ell{=}0$), memory attached | $0.000$ | bit-exact parity |
-| `block_attnres` default (uniform softmax over deltas), no memory | $34.5$ | massively perturbed |
-| `block_attnres` default (uniform softmax over deltas), memory | $34.4$ | massively perturbed |
-| `block_attnres_parity_init` (cumulative pool + recent_bias = +32), no memory | $0.000$ | bit-exact parity |
-| `block_attnres_parity_init` (cumulative pool + recent_bias = +32), memory | $0.000$ | bit-exact parity |
+| `simple_gate` (ReZero gate $g_\ell{=}0$), no memory | $0.000$ | bit-exact parity |
+| `simple_gate` (ReZero gate $g_\ell{=}0$), memory attached | $0.000$ | bit-exact parity |
+| `attention_base` (uniform softmax over delta sources), no memory | $34.5$ | massively perturbed |
+| `attention_base` (uniform softmax over delta sources), memory | $34.4$ | massively perturbed |
+| `attention_parity` (cumulative pool + `recent_bias = +32`), no memory | $0.000$ | bit-exact parity |
+| `attention_parity` (cumulative pool + `recent_bias = +32`), memory | $0.000$ | bit-exact parity |
 
 (Source: `paper_artifacts/eval/init_parity_test.json`, reproducible
 via `python paper_tools/init_parity_test.py`.) The
 `+32`/`-32` bias magnitudes are needed because per-step softmax
 leakage compounds across all $2L = 56$ routed sublayers; at
-recent_bias $=+16$ each off-source still carries $\sim e^{-16}/N
+`recent_bias` $=+16$ each off-source still carries $\sim e^{-16}/N
 \approx 3\!\times\!10^{-7}$ of mass, which feeds back into the next
 sublayer's input and accumulates to $\sim\!0.31$ in the final
 logits. At $+32$ the off-source mass drops to $\sim e^{-32}\approx
 1.3\!\times\!10^{-14}$, well below bf16 precision, and parity is
 exact.
 
-The trade-off is that `block_attnres_parity_init` puts the model in
-a saturated-softmax regime: the per-source pseudo-queries $w_{n,i}$
+The trade-off is that `attention_parity` puts the model in a
+saturated-softmax regime: the per-source pseudo-queries $w_{n,i}$
 get effectively zero gradient at step 0, so the router can only
-learn by first relaxing the bias, which makes it an objectively
-clunkier place to start training a *recurrent* memory module. This
-is why the `residual` mode remains the recommended default for
-attaching MemRes to pretrained checkpoints — it avoids the warm-up
-problem entirely with one learnable scalar per sublayer. The
-`block_attnres_parity_init` mode is included for direct comparison
-and as the natural starting point for from-scratch ablations of the
-full Block AttnRes architecture.
+learn by first relaxing the bias. The `simple_gate` mode avoids the
+warm-up problem entirely with one learnable scalar per sublayer, but
+it sacrifices the depth-wise pool semantics that motivate Block
+AttnRes in the first place — it is the **toy / baseline simplification**
+we run to isolate the contribution of the routing pool from the
+contribution of the memory module.  The `attention_parity` mode is
+the **full implementation** we ultimately want to ship, and the
+ablation table will compare them head-to-head.
+
+(Naming back-compat: the old strings `residual` and `block_attnres`
+are still accepted everywhere; `residual` translates to `simple_gate`,
+`block_attnres` translates to `attention_parity` by default and to
+`attention_base` when paired with `--no-block_attnres_parity_init`.)
 
 ### 1.3 Five non-negotiable design choices
 
@@ -543,7 +551,7 @@ submission":
 5. $L_E \in \{0, 2, 4, 8\}$ extraction-depth sweep (4 runs; 0 and 4
    already baked into the presets).
 6. TBPTT window $k \in \{1, 2, 4, 8, 16\}$ (5 runs).
-7. `memres_mode` $\in \{$residual, block_attnres$\}$ comparison (1 run).
+7. `memres_mode` $\in \{$`simple_gate`, `attention_base`, `attention_parity`$\}$ comparison (3 runs).
 8. Aux loss spectrum: A only / A+B / A+B+C / A+B+C+D (4 runs).
 
 That's $4+1+1+1+4+5+1+4 = 21$ ablation runs at the 0.6B scale. At ~5
@@ -784,7 +792,7 @@ memory_residuals/
 
 | Run | Trainer | Data | Steps | Memory eval (rigorous) | Notes |
 |---|---|---|---:|---|---|
-| `run3_qwen3-0.6b-large` | `train_phase1.py` (pair) | PG-19+TV pairs | 8000 | $\Delta_{nm-m}=+0.026$, $\Delta_{sh-m}=+0.029$ on **pair** eval (n=256); explodes to mem CE=8.7 on long-horizon **chain** eval | Pair-trained warm-up.  Two architectural fixes landed here: zero-init $g_\ell$ (gate) and `memres_mode="residual"` to keep the backbone residual stream intact |
+| `run3_qwen3-0.6b-large` | `train_phase1.py` (pair) | PG-19+TV pairs | 8000 | $\Delta_{nm-m}=+0.026$, $\Delta_{sh-m}=+0.029$ on **pair** eval (n=256); explodes to mem CE=8.7 on long-horizon **chain** eval | Pair-trained warm-up.  Two architectural fixes landed here: zero-init $g_\ell$ (gate) and `memres_mode=simple_gate` (legacy `residual`) to keep the backbone residual stream intact |
 | `chain2_qwen3-0.6b-large` | `train_chain.py` warm-started from `run3` | PG-19+TV chains, k=4 | 3000 | $\Delta_{sh-m}=-0.014$ PG-19, $-0.012$ LoCoMo | First chain run with `judge_norm` RMSNorm.  Stable but PITFALLS §3 shortcut-learning failure — memory had become style-only |
 | `chain_fresh1` | fresh init, no warm-start | PG-19+TV chains, k=8 | 5000 | $\Delta_{sh-m}=-0.036$ PG-19, $-0.016$ LoCoMo (standalone); $+0.020$ PG-19 in-trainer eval | Stable at 30+ session unrolls.  In-trainer Δ_sh-m drifted positive but the rigorous standalone eval revealed the in-trainer protocol was overstating specificity |
 | `chain_tv1`, `chain_tv2` | TV-only training | TV chains, k=8 | 6000 | LoCoMo eval positive at step 500 ($\Delta_{sh-m}=+0.011$, $+0.002$), then overfit | Useful as a domain-shift ablation; not a final result |
