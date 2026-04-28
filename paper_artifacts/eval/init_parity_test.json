@@ -1,0 +1,131 @@
+{
+  "pretrained": "Qwen/Qwen3-0.6B",
+  "dtype": "bfloat16",
+  "device": "cuda:0",
+  "current_tokens": 30,
+  "history_tokens": 27,
+  "tolerance": 0.001,
+  "cases": [
+    {
+      "label": "residual_no_mem",
+      "memres_mode": "residual",
+      "block_attnres_parity_init": false,
+      "memory_attached": false,
+      "expect_parity": true,
+      "logit_diff_vs_base": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rms": 0.0
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -8.0,
+        "depth_router.recent_bias[0]": 0.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PARITY",
+      "matches_expectation": true
+    },
+    {
+      "label": "residual_with_mem",
+      "memres_mode": "residual",
+      "block_attnres_parity_init": false,
+      "memory_attached": true,
+      "expect_parity": true,
+      "logit_diff_vs_base": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rms": 0.0
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -8.0,
+        "depth_router.recent_bias[0]": 0.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PARITY",
+      "matches_expectation": true
+    },
+    {
+      "label": "block_attnres_default_no_mem",
+      "memres_mode": "block_attnres",
+      "block_attnres_parity_init": false,
+      "memory_attached": false,
+      "expect_parity": false,
+      "logit_diff_vs_base": {
+        "max_abs": 34.5,
+        "mean_abs": 13.109683990478516,
+        "rms": 13.945368766784668
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -8.0,
+        "depth_router.recent_bias[0]": 0.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PERTURBED",
+      "matches_expectation": true
+    },
+    {
+      "label": "block_attnres_default_with_mem",
+      "memres_mode": "block_attnres",
+      "block_attnres_parity_init": false,
+      "memory_attached": true,
+      "expect_parity": false,
+      "logit_diff_vs_base": {
+        "max_abs": 34.375,
+        "mean_abs": 13.115762710571289,
+        "rms": 13.951844215393066
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -8.0,
+        "depth_router.recent_bias[0]": 0.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PERTURBED",
+      "matches_expectation": true
+    },
+    {
+      "label": "block_attnres_parity_init_no_mem",
+      "memres_mode": "block_attnres",
+      "block_attnres_parity_init": true,
+      "memory_attached": false,
+      "expect_parity": true,
+      "logit_diff_vs_base": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rms": 0.0
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -32.0,
+        "depth_router.recent_bias[0]": 32.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PARITY",
+      "matches_expectation": true
+    },
+    {
+      "label": "block_attnres_parity_init_with_mem",
+      "memres_mode": "block_attnres",
+      "block_attnres_parity_init": true,
+      "memory_attached": true,
+      "expect_parity": true,
+      "logit_diff_vs_base": {
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "rms": 0.0
+      },
+      "init_diagnostics": {
+        "depth_router.mem_bias[0]": -32.0,
+        "depth_router.recent_bias[0]": 32.0,
+        "depth_router.w[0].abs.max": 0.0,
+        "memory_gate.gate[0]": 0.0
+      },
+      "verdict": "PARITY",
+      "matches_expectation": true
+    }
+  ],
+  "all_match_expectation": true
+}

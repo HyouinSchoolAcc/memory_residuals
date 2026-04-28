@@ -114,6 +114,7 @@ class Qwen3MemResConfig(Qwen3Config):
         memres_extraction_depth: int = 0,
         memres_num_blocks: int = 4,
         memres_mode: str = "residual",
+        block_attnres_parity_init: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -143,6 +144,21 @@ class Qwen3MemResConfig(Qwen3Config):
                 "'block_attnres'."
             )
         self.memres_mode = memres_mode
+        # When True, the Block AttnRes routing pool stores cumulative
+        # hidden-state checkpoints (b_0=h_0, b_k=h_k, partial=h_current)
+        # instead of the default delta-only sources, AND the router is
+        # initialised with a strong positive bias on the most-recent source
+        # in the pool together with a strong negative bias on b_{-1}=m^t.
+        # The combination produces a one-hot softmax at step 0 that selects
+        # the running cumulative state, which is exactly the standard
+        # residual stream input to the next sublayer -- so the augmented
+        # model is forward-identical to the bare backbone at step 0 even in
+        # block_attnres mode (see paper_artifacts/eval/init_parity_test.json).
+        # The trade-off is a saturated softmax at init, so the router needs
+        # explicit bias warm-up to learn to mix non-recent sources.  Default
+        # False (use delta-pool, non-parity init) to match the original
+        # AttnRes formulation.
+        self.block_attnres_parity_init = block_attnres_parity_init
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +232,12 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
         # step 0 even though the depth-wise pseudo-queries are zero
         # (otherwise uniform softmax dilutes other sources by 1/N).
         nn.init.constant_(module.mem_bias, module._mem_bias_init)
+        # Default 0 (uniform softmax over non-memory sources).  When set to
+        # a large positive value via `recent_bias_init`, the softmax
+        # collapses onto the most-recent source -- combined with a
+        # cumulative-state value pool this is what lets block_attnres mode
+        # achieve forward init-parity with the bare backbone.
+        nn.init.constant_(module.recent_bias, module._recent_bias_init)
     elif isinstance(module, MemoryGate):
         nn.init.constant_(module.gate, module._init)
 
@@ -413,6 +435,7 @@ class BlockAttnResRouter(nn.Module):
         num_routing_steps: int,
         eps: float = 1e-6,
         mem_bias_init: float = -8.0,
+        recent_bias_init: float = 0.0,
     ):
         super().__init__()
         self.w = nn.ParameterList(
@@ -427,6 +450,19 @@ class BlockAttnResRouter(nn.Module):
         # As training progresses the model can move this bias up.
         self._mem_bias_init = mem_bias_init
         self.mem_bias = nn.Parameter(torch.empty(num_routing_steps))
+        # Per-sublayer additive bias on the *last* (most recent) source in
+        # the value pool.  Default 0 reproduces the original AttnRes
+        # softmax over uniformly-treated sources.  When initialized to a
+        # large positive number (e.g. +8) and the value pool stores
+        # cumulative hidden-state checkpoints (Qwen3MemResConfig
+        # `block_attnres_parity_init=True`), the softmax is one-hot on the
+        # most recent cumulative source which equals the standard residual
+        # stream input -- giving forward-identity to the bare backbone at
+        # step 0.  The trade-off is a saturated softmax that requires a
+        # bias warm-up to relax before the pseudo-queries can route
+        # anywhere else.
+        self._recent_bias_init = recent_bias_init
+        self.recent_bias = nn.Parameter(torch.empty(num_routing_steps))
         self.norm = Qwen3RMSNorm(hidden_size, eps=eps)
 
     def route(
@@ -451,17 +487,15 @@ class BlockAttnResRouter(nn.Module):
         stacked = torch.stack(sources, dim=2)  # (B, S, n_src, d)
         normed = self.norm(stacked)
         scores = torch.einsum("d,bsnd->bsn", w, normed)  # (B, S, n_src)
+        # Build a (n_src,)-shaped bias vector containing the per-source
+        # init biases: mem_bias on the b_{-1} slot, recent_bias on the
+        # final slot (the most-recent source in the pool), zeros elsewhere.
+        n_src = scores.shape[-1]
+        bias = torch.zeros(n_src, dtype=scores.dtype, device=scores.device)
         if has_memory:
-            # Additive bias on the memory source (index 0).  This shifts the
-            # softmax distribution towards zero memory weight at init so that
-            # the augmented model is behaviourally identical to the base
-            # model when W_V_read = 0; gradients can later push the bias up.
-            mem_bias = self.mem_bias[router_idx]
-            bias_vec = torch.zeros_like(scores[..., :1])
-            bias_vec = bias_vec + mem_bias
-            zeros_rest = torch.zeros_like(scores[..., 1:])
-            score_bias = torch.cat([bias_vec, zeros_rest], dim=-1)
-            scores = scores + score_bias
+            bias[0] = self.mem_bias[router_idx].to(bias.dtype)
+        bias[-1] = bias[-1] + self.recent_bias[router_idx].to(bias.dtype)
+        scores = scores + bias
         alphas = F.softmax(scores, dim=-1)  # (B, S, n_src)
         h = torch.einsum("bsn,bsnd->bsd", alphas, stacked)  # (B, S, d)
 
@@ -602,10 +636,26 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         # In "residual" mode the router is unused on the forward path but the
         # parameters are still constructed so checkpoints stay shape-stable
         # across modes.
+        # When parity_init is on we configure the router with a strong
+        # positive bias on the most-recent source and a strongly negative
+        # mem_bias so the softmax is one-hot at step 0; combined with the
+        # cumulative-state value pool (see forward()) this makes the
+        # block_attnres mode forward-identical to the bare backbone.  The
+        # +/- 32 magnitude is chosen so that alpha_other ~ exp(-32)/N is
+        # well below bf16 precision (~1e-14) for every off-recent source.
+        # Empirically (paper_artifacts/eval/init_parity_test.json) this
+        # is what's needed to keep the depth-compounded perturbation
+        # under the 1e-3 logit tolerance across 2L = 56 routed sublayers
+        # of Qwen3-0.6B; +/- 16 leaves ~3e-7 mass per off-source which
+        # compounds to ~3e-1 in the final logits because the routed
+        # error feeds back into the next sublayer's input.
+        parity_init = bool(getattr(config, "block_attnres_parity_init", False))
         self.depth_router = BlockAttnResRouter(
             config.hidden_size,
             num_routing_steps=max(2 * config.num_hidden_layers - 1, 0),
             eps=config.rms_norm_eps,
+            mem_bias_init=-32.0 if parity_init else -8.0,
+            recent_bias_init=32.0 if parity_init else 0.0,
         )
         # Per-sublayer gate for residual memory injection.  We have one gate
         # per attention or MLP transform (so 2 * num_hidden_layers gates),
@@ -835,6 +885,29 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             hidden_states = self.norm(h_post)
         else:
             # Block AttnRes routing (Eqs. 9-10).
+            #
+            # Two pool conventions are supported.  In the default
+            # (`block_attnres_parity_init=False`) the pool stores
+            # *deltas* -- b_0 is the embedding and each completed block
+            # summary / running partial sum is a sum of sublayer deltas.
+            # In this regime the standard residual stream
+            #     h_{n,i-1} = b_0 + sum_k b_k + b_n^{i-1}
+            # is decomposed across multiple slots, so a softmax that is
+            # constrained to weights summing to 1 cannot reconstruct it
+            # from any one-hot init -- forward init-parity with the bare
+            # backbone is therefore impossible in this regime.
+            #
+            # In the parity-init regime (`block_attnres_parity_init=True`)
+            # the pool stores *cumulative hidden-state checkpoints*
+            #     b_0 = h_0,   b_k = h_k (after block k),   partial = h_curr
+            # so the most-recent source IS the standard residual stream
+            # input to the next sublayer.  Combined with the router's
+            # `recent_bias` init this makes the augmented model
+            # forward-identical to the bare backbone at step 0 even in
+            # block_attnres mode.
+            parity_init = bool(
+                getattr(self.config, "block_attnres_parity_init", False)
+            )
             b_0 = inputs_embeds
             completed_blocks: list[torch.Tensor] = []
             partial_sum: torch.Tensor | None = None
@@ -864,9 +937,15 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                     alpha_trace.append(alpha_mem)
                 return routed
 
-            def accumulate(delta: torch.Tensor) -> None:
+            def accumulate(delta: torch.Tensor, h_post_after: torch.Tensor) -> None:
                 nonlocal partial_sum, sublayer_idx
-                partial_sum = delta if partial_sum is None else partial_sum + delta
+                if parity_init:
+                    # Cumulative checkpoint -- partial_sum tracks h itself.
+                    partial_sum = h_post_after
+                else:
+                    partial_sum = (
+                        delta if partial_sum is None else partial_sum + delta
+                    )
                 sublayer_idx += 1
                 if sublayer_idx in self._block_end_sublayers:
                     completed_blocks.append(partial_sum)
@@ -897,7 +976,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                         position_embeddings=position_embeddings,
                     )
                 h_post = h_pre + attn_delta
-                accumulate(attn_delta)
+                accumulate(attn_delta, h_post)
 
                 h_pre = route_if_needed()
                 if self.gradient_checkpointing and self.training:
@@ -907,7 +986,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
                 else:
                     mlp_delta = layer.mlp_delta(h_pre)
                 h_post = h_pre + mlp_delta
-                accumulate(mlp_delta)
+                accumulate(mlp_delta, h_post)
 
             hidden_states = self.norm(h_post)
 

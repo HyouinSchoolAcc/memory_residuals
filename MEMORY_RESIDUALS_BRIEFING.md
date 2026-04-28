@@ -84,13 +84,71 @@ proposes either:
   while $W_V^{\text{read}}$ retains its default normal init so $m^t$ has
   non-zero magnitude and gate gradients flow non-trivially from step 1.
 
-The "residual" mode was introduced specifically because the full Block
-AttnRes pool dilutes any single source by $\sim 1/N$ at initialization,
-which destroys the pretrained backbone's residual-stream conditioning
-and adds several thousand steps of warm-up cost. With the per-sublayer
-scalar gate at zero, attaching MemRes to a Qwen3 checkpoint is provably
-non-disruptive — verified by `paper_artifacts/eval/init_parity_test.json`
-to within $10^{-5}$ on logits.
+The "residual" mode was introduced specifically because the *default*
+Block AttnRes init (zero pseudo-queries, single negative bias on the
+memory source) leaves all $N$ non-memory sources with weight $\approx
+1/N$ in the softmax. That uniform average over the embedding, every
+prior block output, and the running intra-block partial is **not** the
+same forward pass as the bare backbone — which at sublayer $(n,i)$
+takes the single accumulated state $h_{n,i-1}$ as input — so the
+pretrained residual-stream conditioning is disturbed at step 0 and
+several thousand steps of warm-up are needed to recover it.
+
+With the ReZero/`residual` gate at zero, attaching MemRes to a Qwen3
+checkpoint is *exactly* equivalent to the bare backbone at step 0
+(both forward and backward through the trunk), and the gradient into
+the memory module itself is identically zero at step 0 because $g_\ell
+= 0$ multiplies $\partial L / \partial h_\ell$ before it reaches
+$W^{\text{read}}_{V}$. This is the "provably non-disruptive at
+$t{=}0$" property, verified by
+`paper_artifacts/eval/init_parity_test.json` to within $10^{-5}$ on
+logits.
+
+**A nuance worth flagging.** The Block AttnRes pool *can* in
+principle be init-parity'd, but it requires two coupled changes the
+brief originally elided: (i) the value pool must store *cumulative
+hidden-state checkpoints* ($b_0=h_0$, $b_k=h_k$ at end of block $k$,
+running partial $h_{n,i-1}$) instead of the original AttnRes
+delta-only sources; under softmax (weights summing to $1$) the
+delta-source pool literally cannot reconstruct the residual stream
+$h = b_0 + \sum b_k + b_n^{i-1}$ from any one-hot, while the
+cumulative-source pool already contains the residual stream as the
+most-recent slot; and (ii) the router needs a strong positive bias
+on the most-recent source so the softmax is one-hot at init.
+
+Both options are now implemented and tested side-by-side:
+
+| mode | $\max\lvert\Delta_{\text{logit}}\rvert$ vs bare Qwen3-0.6B (bf16) | verdict |
+| --- | --- | --- |
+| `residual` (ReZero gate $g_\ell{=}0$), no memory | $0.000$ | bit-exact parity |
+| `residual` (ReZero gate $g_\ell{=}0$), memory attached | $0.000$ | bit-exact parity |
+| `block_attnres` default (uniform softmax over deltas), no memory | $34.5$ | massively perturbed |
+| `block_attnres` default (uniform softmax over deltas), memory | $34.4$ | massively perturbed |
+| `block_attnres_parity_init` (cumulative pool + recent_bias = +32), no memory | $0.000$ | bit-exact parity |
+| `block_attnres_parity_init` (cumulative pool + recent_bias = +32), memory | $0.000$ | bit-exact parity |
+
+(Source: `paper_artifacts/eval/init_parity_test.json`, reproducible
+via `python paper_tools/init_parity_test.py`.) The
+`+32`/`-32` bias magnitudes are needed because per-step softmax
+leakage compounds across all $2L = 56$ routed sublayers; at
+recent_bias $=+16$ each off-source still carries $\sim e^{-16}/N
+\approx 3\!\times\!10^{-7}$ of mass, which feeds back into the next
+sublayer's input and accumulates to $\sim\!0.31$ in the final
+logits. At $+32$ the off-source mass drops to $\sim e^{-32}\approx
+1.3\!\times\!10^{-14}$, well below bf16 precision, and parity is
+exact.
+
+The trade-off is that `block_attnres_parity_init` puts the model in
+a saturated-softmax regime: the per-source pseudo-queries $w_{n,i}$
+get effectively zero gradient at step 0, so the router can only
+learn by first relaxing the bias, which makes it an objectively
+clunkier place to start training a *recurrent* memory module. This
+is why the `residual` mode remains the recommended default for
+attaching MemRes to pretrained checkpoints — it avoids the warm-up
+problem entirely with one learnable scalar per sublayer. The
+`block_attnres_parity_init` mode is included for direct comparison
+and as the natural starting point for from-scratch ablations of the
+full Block AttnRes architecture.
 
 ### 1.3 Five non-negotiable design choices
 
