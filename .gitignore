@@ -11,6 +11,10 @@ data_pipeline/
 tea_debug.log
 paper_artifacts/chains/stage1_train_s512.pt
 paper_artifacts/chains/stage1_train_s512_full.pt
+paper_artifacts/chains/msc_train_s512.pt
+paper_artifacts/chains/msc_val_s512.pt
+paper_artifacts/chains/stage1_msc_train_s512.pt
+paper_artifacts/chains/stage1_msc_val_s512.pt
 paper_artifacts/pairs/
 logs/
 paper_tools/cloud_watchdog/queue/
