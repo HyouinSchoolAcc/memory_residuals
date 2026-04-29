@@ -323,11 +323,7 @@ $\{C_1, \dots, C_k\}$
        \Comment{Eq.~\ref{eq:judge} feeding Eq.~\ref{eq:extract}}
 \EndFor
 \State $L \gets \frac{1}{k} \sum_t L_t$
-\If{negative-chain auxiliary loss is enabled}
-  \State sample a different chain's window; build shuffle $\Mc^{\text{sh}}$
-  \State $L_{\text{sh}} \gets$ NLL of $C_k$ under $\Mc^{\text{sh}}$
-  \State $L \gets L + \lambda \cdot \max(0, L_k - L_{\text{sh}} + m)$
-\EndIf
+\Comment{plain next-token NLL; auxiliary contrastive losses are out of scope here, see companion training-recipe paper}
 \State backward through $L$; clip; AdamW step
 \end{algorithmic}
 \end{algorithm}
@@ -672,12 +668,15 @@ the architecture scales gracefully; the empirical demonstration of
 that claim at the 8B class is left to a follow-up. The chain-recurrent
 training data is restricted to PG-19 plus 30 TV transcripts; the
 LoCoMo / MSC families are synthetic-or-crowdsourced and held out
-from training by user mandate. We have no Phase-2 conversational SFT
-result yet; the architecture's behaviour under instruction tuning is
-unknown. The shuffle test as currently implemented compares against
-``a different chain in the same corpus'' -- a stronger test would be
-``a different chain in the same domain but with adversarially
-similar style'', which we discuss in Appendix~\ref{app:shuffle}.
+from training by user mandate. The behaviour of the same primitive
+on multi-session conversational data, under richer extract sources
+(contextual hidden states rather than token embeddings), and with
+auxiliary contrastive losses, is the subject of a companion
+training-recipe paper and is intentionally out of scope here. The
+shuffle test as currently implemented compares against ``a different
+chain in the same corpus'' -- a stronger test would be ``a different
+chain in the same domain but with adversarially similar style'',
+which we discuss in Appendix~\ref{app:shuffle}.
 
 \section{Conclusion}
 We have described and empirically studied a chain-persistent

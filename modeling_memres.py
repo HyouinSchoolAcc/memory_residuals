@@ -198,6 +198,26 @@ class Qwen3MemResConfig(Qwen3Config):
         # step 0, which lets the router actually learn to recruit memory.
         router_mem_bias_init: float | None = None,
         router_recent_bias_init: float | None = None,
+        # Source of the per-token representation C_t fed to the extraction
+        # stack.  Two modes:
+        #   "embed"      -- C_t = embed_tokens(input_ids).  This is the
+        #                   bag-of-token-embeddings extraction; the
+        #                   compressor never sees contextual information
+        #                   about the session and can only learn to attend
+        #                   to a weighted average of token embeddings.
+        #                   Empirically this collapses to style/lexical
+        #                   memory (high in-trainer Δ_sh-m on PG-19 books,
+        #                   null effect on dialogue).  Default historically
+        #                   for back-compat.
+        #   "hidden_<L>" -- run a no_grad bare-backbone forward and use
+        #                   hidden_states[L] as C_t.  This gives the
+        #                   compressor a contextualised representation of
+        #                   the session (syntax, anaphora, entity binding)
+        #                   so it can extract semantic content rather than
+        #                   bag-of-tokens.  Cost: one extra backbone
+        #                   forward per session boundary (~50% per-step
+        #                   overhead on Qwen3-0.6B).
+        memres_extract_source: str = "embed",
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -230,6 +250,8 @@ class Qwen3MemResConfig(Qwen3Config):
         # default" (resolved in Qwen3MemResModel.__init__).
         self.router_mem_bias_init = router_mem_bias_init
         self.router_recent_bias_init = router_recent_bias_init
+        # Extraction source policy (see __init__ docstring above).
+        self.memres_extract_source = memres_extract_source
 
 
 # ---------------------------------------------------------------------------
@@ -784,6 +806,140 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         """Per-position readout: X (B, S, d) queries M_c (B, K, d) -> (B, S, d)."""
         return self.memory_readout(X, M_c)
 
+    def _resolve_extract_layer(self) -> int:
+        """Return the integer layer index to use for the extract source.
+
+        - "embed"       -> -1   (raw token-embedding lookup; legacy)
+        - "hidden_<L>"  ->  L   (mid-layer contextualised hidden state;
+                                 L is interpreted as a 1-indexed layer
+                                 of the backbone, matching the position
+                                 in BaseModelOutputWithPast.hidden_states
+                                 -- index 0 is post-embedding, index L is
+                                 the output of the L-th decoder layer).
+        """
+        src = getattr(self.config, "memres_extract_source", "embed")
+        if src == "embed":
+            return -1
+        if src.startswith("hidden_"):
+            try:
+                return int(src.split("_", 1)[1])
+            except ValueError as e:
+                raise ValueError(
+                    f"Unparsable memres_extract_source={src!r}; "
+                    f"expected 'embed' or 'hidden_<int>'."
+                ) from e
+        raise ValueError(
+            f"Unknown memres_extract_source={src!r}; "
+            f"expected 'embed' or 'hidden_<int>'."
+        )
+
+    @torch.no_grad()
+    def extract_source(
+        self,
+        input_ids: torch.LongTensor,
+        layer: int | None = None,
+    ) -> torch.Tensor:
+        """Compute the per-token representation C_t fed to MemoryBlock.extract.
+
+        The default behaviour is governed by ``config.memres_extract_source``:
+
+        - ``"embed"`` returns the raw token-embedding lookup (legacy
+          bag-of-token-embeddings extraction).  No backbone forward is run
+          and the result is gradient-tracked through the embedding table
+          (matching prior chain-trainer behaviour).
+        - ``"hidden_<L>"`` runs a no_grad standard-residual partial forward
+          (no memory injection, no Block-AttnRes routing -- just the bare
+          ``h <- h + attn(h) + mlp(h)`` recurrence) over the first ``L``
+          decoder layers and returns the post-layer-L hidden state.  This
+          gives the compressor a contextualised representation of the
+          session (syntax, anaphora, entity binding) so it can extract
+          *semantic content* rather than bag-of-tokens.  The result is
+          detached so the extract step adds gradient only through the
+          M_in / extraction-layer parameters and the judge step, never
+          through the backbone for *this* session's extraction.
+
+        The early-exit at layer L means cost scales as L/L_total of one
+        backbone forward (e.g. layer 14 on a 28-layer Qwen3-0.6B is ~50%
+        of one full forward pass per session boundary).
+
+        Why a *standard-residual* forward and not the Block-AttnRes
+        routing forward with ``M_c=None``?  Because at parity init the two
+        are bit-identical, and after training the routing pool's learned
+        pseudo-queries reflect *how the model recruits memory*, which is
+        exactly the signal we do not want to bake into the extract source
+        (it would couple extract with read-side learning in a way that
+        confounds the empirical claim that "contextualised extract beats
+        bag-of-token extract"). Standard-residual extract gives a clean,
+        bare-backbone-shaped representation throughout training.
+        """
+        if layer is None:
+            layer = self._resolve_extract_layer()
+        if layer < 0:
+            # Legacy bag-of-token-embeddings path.  NOT wrapped in
+            # no_grad: the embedding table is shared with the LM head and
+            # gradients should flow through it the same way they do in
+            # the pre-extract_source codebase.
+            with torch.enable_grad():
+                return self.embed_tokens(input_ids)
+
+        # Bare-backbone partial forward over layers [0, layer).
+        # Save and restore train mode so any layer-internal dropout uses
+        # eval semantics (extract should be deterministic given input_ids).
+        was_training = self.training
+        self.eval()
+        try:
+            n_layers = len(self.layers)
+            if not (1 <= layer <= n_layers):
+                raise ValueError(
+                    f"extract_source layer={layer} out of range [1, {n_layers}] "
+                    f"for this backbone."
+                )
+
+            inputs_embeds = self.embed_tokens(input_ids)
+            B, S = inputs_embeds.shape[:2]
+            device = inputs_embeds.device
+
+            # Position ids and rotary embeddings.
+            position_ids = torch.arange(S, device=device).unsqueeze(0).expand(B, S)
+            position_embeddings = self.rotary_emb(inputs_embeds, position_ids)
+
+            # Plain causal mask (additive bf16 bias).  The backbone's
+            # standard mask machinery wants more arguments than we have
+            # context for here, so we build the simple full-causal mask
+            # by hand -- which is what the chain trainer also does
+            # (single full_attention type).
+            neg_inf = torch.finfo(inputs_embeds.dtype).min
+            causal_bias = torch.zeros(
+                1, 1, S, S, device=device, dtype=inputs_embeds.dtype
+            )
+            upper = torch.triu(
+                torch.ones(S, S, device=device), diagonal=1
+            ).bool()
+            causal_bias[:, :, upper] = neg_inf
+
+            h = inputs_embeds
+            for i in range(layer):
+                lyr = self.layers[i]
+                # Standard residual recurrence: h = h + attn(h) + mlp(h).
+                # No Block-AttnRes routing pool, no memory injection -- this
+                # is the "what bare Qwen3 thinks of this session" signal.
+                attn_delta = lyr.attention_delta(
+                    hidden_states=h,
+                    attention_mask=causal_bias,
+                    position_ids=position_ids,
+                    past_key_values=None,
+                    use_cache=False,
+                    cache_position=None,
+                    position_embeddings=position_embeddings,
+                )
+                h = h + attn_delta
+                mlp_delta = lyr.mlp_delta(h)
+                h = h + mlp_delta
+        finally:
+            if was_training:
+                self.train()
+        return h.detach()
+
     def compute_memory(
         self,
         history_ids: torch.Tensor,
@@ -796,13 +952,18 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         readout m^t depends on the *current* session and is therefore
         computed inside ``forward`` from ``M_c`` and ``inputs_embeds``.
 
+        Honours ``config.memres_extract_source``: if set to a
+        ``"hidden_<L>"`` policy, the bare-backbone hidden state at layer
+        L is used instead of raw token embeddings.
+
         When detach_embeddings is True the embedding lookup is detached so
         gradients flow through the memory block but not through the shared
-        embedding table for the history tokens.  It is False by default to
-        preserve the paper's end-to-end differentiability claim.
+        embedding table for the history tokens.  Only meaningful in the
+        legacy ``"embed"`` extract source (the hidden-state path always
+        detaches; see ``extract_source``).
         """
-        C = self.embed_tokens(history_ids)
-        if detach_embeddings:
+        C = self.extract_source(history_ids)
+        if detach_embeddings and self._resolve_extract_layer() < 0:
             C = C.detach()
         return self.compress_session(C, M_c_prev)
 

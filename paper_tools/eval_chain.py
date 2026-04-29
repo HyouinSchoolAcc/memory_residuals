@@ -71,7 +71,7 @@ def build_M_c(
     M_c = torch.zeros(1, K, d, device=device, dtype=torch.bfloat16)
     for j in range(end):
         sess = chain_session_at(blob, chain_idx, j).to(device).unsqueeze(0)
-        C = model.model.embed_tokens(sess[:, :-1])
+        C = model.model.extract_source(sess[:, :-1])
         M_c = model.model.compress_session(C, M_c)
     return M_c
 
@@ -122,7 +122,7 @@ def evaluate_corpus(
         prefix_M = [M_c.clone()]   # M_c at *position 0* (no sessions seen yet)
         for end in range(length):
             sess = chain_session_at(blob, ci, end).to(device).unsqueeze(0)
-            C = model.model.embed_tokens(sess[:, :-1])
+            C = model.model.extract_source(sess[:, :-1])
             M_c = model.model.compress_session(C, M_c)
             prefix_M.append(M_c.clone())   # M_c after seeing sessions 0..end
 
@@ -135,7 +135,7 @@ def evaluate_corpus(
             shuffle_M_at[0] = M_sh.clone()
             for j in range(min(length, shuffle_len)):
                 ssess = chain_session_at(blob, shuffle_idx, j).to(device).unsqueeze(0)
-                C_sh = model.model.embed_tokens(ssess[:, :-1])
+                C_sh = model.model.extract_source(ssess[:, :-1])
                 M_sh = model.model.compress_session(C_sh, M_sh)
                 shuffle_M_at[j + 1] = M_sh.clone()
 

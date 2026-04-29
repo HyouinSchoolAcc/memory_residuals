@@ -113,6 +113,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--memres_num_vectors", type=int, default=128)
     p.add_argument("--memres_extraction_depth", type=int, default=0)
     p.add_argument("--memres_num_blocks", type=int, default=8)
+    p.add_argument(
+        "--memres_extract_source", default="embed",
+        help="Source for the per-token representation C_t fed to the "
+             "extraction stack. 'embed' = bag-of-token-embeddings (legacy "
+             "default); 'hidden_<L>' = bare-backbone hidden state at "
+             "layer L (no_grad, detached) -- contextualised representation "
+             "that carries syntax/anaphora/entity binding into M_in's "
+             "cross-attention. 'hidden_14' is the recommended default for "
+             "a 28-layer Qwen3 backbone (mid-stack, semantic).",
+    )
 
     # Data
     p.add_argument("--train_chains",
@@ -126,9 +136,12 @@ def parse_args() -> argparse.Namespace:
                         "the recurrent judge stack per step.")
     p.add_argument("--source_weights",
                    default=None,
-                   help="Optional JSON like '{\"tv_up\": 4.0}' to up-weight "
-                        "chains that come from TV directories.  Auto-detect "
-                        "is by chain_name not starting with a digit.")
+                   help="Optional JSON mapping source -> upweight, e.g. "
+                        "'{\"pg19\":1.0,\"tv\":4.0,\"msc\":3.0}'.  "
+                        "Source is detected from chain_name prefix: "
+                        "'msc_' -> 'msc', leading digit -> 'pg19', "
+                        "anything else -> 'tv'.  Default weights are "
+                        "{pg19:1.0, tv:4.0, msc:3.0}.")
 
     # Optimization
     p.add_argument("--steps", type=int, default=4000)
@@ -178,6 +191,45 @@ def parse_args() -> argparse.Namespace:
                         "trainer we fold that into a single linear ramp.")
     p.add_argument("--neg_chain_margin", type=float, default=0.05,
                    help="Margin for the negative-chain auxiliary loss.")
+
+    # Intra-chain perturbation contrastive loss.  A *strictly stronger*
+    # version of the inter-chain neg_chain_weight loss:
+    #
+    # - neg_chain_weight: contrasts same-chain last session under
+    #   different-chain M_c.  Catches "memory learned style" but not
+    #   "memory drops salient facts under interference from sessions
+    #   between fact and recall".
+    # - in_chain_contrast_weight: contrasts same-chain last session
+    #   under same-chain M_c with one earlier session swapped for a
+    #   random distractor.  The contrast concentrates on fact-recall
+    #   tokens because most of the last-session NLL is invariant to
+    #   the swap.  Gradient flows through the judge step at every
+    #   intermediate session, putting direct pressure on the two-stage
+    #   QKV competition to *preserve* fact-bearing channels even while
+    #   sessions in between are pushing irrelevant updates.
+    p.add_argument("--in_chain_contrast_weight", type=float, default=0.0,
+                   help="Weight on the intra-chain perturbation "
+                        "contrastive loss.  0 disables.  See block "
+                        "comment in the trainer for the full spec.")
+    p.add_argument("--in_chain_contrast_initial_weight", type=float, default=None,
+                   help="Initial value of in_chain_contrast_weight at "
+                        "step 0; ramps linearly to "
+                        "--in_chain_contrast_weight over "
+                        "--in_chain_contrast_warmup_steps. "
+                        "Default: equal to --in_chain_contrast_weight (no ramp).")
+    p.add_argument("--in_chain_contrast_warmup_steps", type=int, default=0,
+                   help="Linear warmup for in_chain_contrast_weight.")
+    p.add_argument("--in_chain_contrast_margin", type=float, default=0.05,
+                   help="Margin for the in-chain contrastive loss.")
+    p.add_argument("--in_chain_perturb_strategy",
+                   choices=("session_zero", "random_earlier"),
+                   default="random_earlier",
+                   help="Which session in the window to swap for the "
+                        "perturbed M_c. session_zero: always perturb "
+                        "session 0 (the persona prefix in MSC). "
+                        "random_earlier (default): perturb a random "
+                        "session in [0, window_k-2] each step, so "
+                        "every position gets pressured over training.")
     p.add_argument("--burn_in_max", type=int, default=12,
                    help="Maximum number of sessions to unroll under "
                         "no_grad before the TBPTT window starts.  This lets "
@@ -197,6 +249,25 @@ def parse_args() -> argparse.Namespace:
                         "delta_nomem_minus_mem + 2*delta_shuffle_minus_mem "
                         "(penalises both channel collapse and shortcut "
                         "learning). Default: composite.")
+
+    # Conversational-pipeline knobs
+    p.add_argument("--mask_padding_loss", action="store_true",
+                   help="Mask EOS-padding positions from the LM loss. "
+                        "Essential for conversational corpora (MSC) where "
+                        "sessions are ~150 tokens padded with EOS to "
+                        "session_len; without masking ~70%% of the loss "
+                        "is EOS-on-EOS noise. Detected by the first EOS "
+                        "in each row of input_ids -- safe iff the "
+                        "tokeniser only emits EOS as trailing padding "
+                        "(which is what pretokenize_chains.py does).")
+    p.add_argument("--score_tail_frac", type=float, default=1.0,
+                   help="Score only the last fraction of each session's "
+                        "*non-padding* content.  E.g. 0.5 means only the "
+                        "second half of each session contributes to the "
+                        "LM loss; the first half is treated as context. "
+                        "Concentrates gradient on the response tail "
+                        "where memory should matter most.  Default 1.0 "
+                        "= legacy (score the entire content).")
 
     # IO + logging
     p.add_argument("--out_dir", default="output/chain_run")
@@ -271,6 +342,20 @@ class ChainCorpus:
         return self.session_ids[s : s + end]
 
 
+def _detect_source(name: str) -> str:
+    """Detect the corpus source of a chain from its name.
+
+    'msc_<id>'  -> 'msc'   (multi-session chat dialogues)
+    leading digit -> 'pg19'   (PG-19 books are named '<book_id>')
+    anything else -> 'tv'    (TV episode chains have show-name prefixes)
+    """
+    if name.startswith("msc_"):
+        return "msc"
+    if name[:1].isdigit():
+        return "pg19"
+    return "tv"
+
+
 class ChainSampler:
     def __init__(
         self,
@@ -279,7 +364,7 @@ class ChainSampler:
         world_size: int,
         seed: int,
         window_k: int,
-        tv_up_weight: float = 4.0,
+        source_weights: dict[str, float] | None = None,
     ):
         self.corpus = corpus
         self.rank = rank
@@ -287,17 +372,32 @@ class ChainSampler:
         self.window_k = window_k
         self.rng = random.Random(seed + rank * 7919)
 
+        # Default source up-weights.  PG-19 has ~218k chains so it dominates
+        # by token count; TV (~30 chains) and MSC (~4k chains) get
+        # multiplicative up-weight on per-chain length so the sampler
+        # actually visits them.
+        default_w = {"pg19": 1.0, "tv": 4.0, "msc": 3.0}
+        if source_weights:
+            default_w.update(source_weights)
+
         weights: list[float] = []
+        source_counts: dict[str, int] = {}
         for ci, name in enumerate(corpus.chain_names):
             length = int(corpus.chain_lengths[ci])
-            if length < window_k + 1:
+            src = _detect_source(name)
+            source_counts[src] = source_counts.get(src, 0) + 1
+            # Eligibility: a chain of length L can produce a window of
+            # window_k sessions iff L >= window_k (start=0 is always
+            # legal even when no burn-in prefix is available).  This is
+            # critical for short conversational chains (MSC): 3-session
+            # dialogues are eligible at window_k=3 with start=0.
+            if length < window_k:
                 weights.append(0.0)
                 continue
-            # Heuristic: chain_name is numeric for PG-19 books, alphabetic
-            # for TV shows.  Up-weight TV to compensate for the imbalance.
-            tv = not name[:1].isdigit()
-            w = tv_up_weight if tv else 1.0
+            w = default_w.get(src, 1.0)
             weights.append(w * length)
+        self._source_counts = source_counts
+        self._effective_weights = default_w
         self.weights = weights
         self.cum = []
         running = 0.0
@@ -348,6 +448,13 @@ class Trainer:
         self.is_main = self.rank == 0
         self.use_wandb = self._init_wandb()
         self.tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_path())
+        # EOS token id used by pretokenize_chains.py to right-pad sessions
+        # to session_len.  Conversational corpora (MSC) have sessions
+        # ~150 tokens padded to 512, so masking padding from the LM loss
+        # is essential -- otherwise ~70%% of the loss is the easy
+        # EOS-on-EOS prediction and gradient signal on real content
+        # collapses.
+        self.eos_id = int(self.tokenizer.eos_token_id)
 
         if self.is_main:
             print(self._banner())
@@ -362,15 +469,25 @@ class Trainer:
         if self.is_main:
             print(f"  loading train chains: {args.train_chains}", flush=True)
         self.train_corpus = ChainCorpus(Path(args.train_chains))
+        sw = None
+        if args.source_weights:
+            try:
+                sw = json.loads(args.source_weights)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"--source_weights must be valid JSON; got {args.source_weights!r}"
+                ) from e
         self.train_sampler = ChainSampler(
             self.train_corpus, self.rank, self.world_size, args.seed,
-            args.window_k,
+            args.window_k, source_weights=sw,
         )
         if self.is_main:
             print(
                 f"  train: {len(self.train_corpus)} chains, "
                 f"{self.train_sampler.eligible} eligible "
-                f"(window_k={args.window_k})",
+                f"(window_k={args.window_k}); "
+                f"source counts={self.train_sampler._source_counts}; "
+                f"weights={self.train_sampler._effective_weights}",
                 flush=True,
             )
 
@@ -467,6 +584,7 @@ class Trainer:
             block_attnres_parity_init=a.block_attnres_parity_init,
             router_mem_bias_init=a.router_mem_bias_init,
             router_recent_bias_init=a.router_recent_bias_init,
+            memres_extract_source=a.memres_extract_source,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)
@@ -573,6 +691,44 @@ class Trainer:
         mask[:, :, cutoff:, :cutoff] = neg_inf
         return {"full_attention": mask}
 
+    def _build_labels(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Construct loss labels honouring --mask_padding_loss / --score_tail_frac.
+
+        Logic:
+        - If neither knob is set, labels == input_ids (legacy behaviour).
+        - With --mask_padding_loss, every position where input_ids == eos_id
+          is set to -100 so it does not contribute to the LM loss.  This
+          assumes EOS only appears as trailing right-padding (true for
+          pretokenize_chains.py output).
+        - With --score_tail_frac F < 1.0, the first (1-F) fraction of each
+          row's *non-padding* content is also masked to -100, so only the
+          tail F contributes to loss.  Computed per-row from the row's
+          actual content length.
+        """
+        a = self.args
+        if not a.mask_padding_loss and a.score_tail_frac >= 1.0:
+            return input_ids
+        labels = input_ids.clone()
+        is_pad = input_ids == self.eos_id  # (B, S) bool
+        if a.mask_padding_loss:
+            labels = labels.masked_fill(is_pad, -100)
+        if a.score_tail_frac < 1.0:
+            # content_len[bi] = number of non-padding tokens in row bi.
+            # When mask_padding_loss is also set, this matches the number
+            # of positions still contributing to loss after masking.
+            # When it's not set, we still use the same definition so the
+            # tail fraction is over real content (not over padded length).
+            content_len = (~is_pad).long().sum(dim=1)
+            B = input_ids.shape[0]
+            for bi in range(B):
+                cl = int(content_len[bi].item())
+                if cl <= 0:
+                    continue
+                head_cut = int(cl * (1.0 - a.score_tail_frac))
+                if head_cut > 0:
+                    labels[bi, :head_cut] = -100
+        return labels
+
     def _train_step(self, rng: random.Random,
                     carry: torch.Tensor | None) -> tuple[float, torch.Tensor | None]:
         a = self.args
@@ -616,6 +772,13 @@ class Trainer:
         else:
             M_c = torch.zeros(B, K, d, device=self.device, dtype=torch.bfloat16)
 
+        # Snapshot M_c at the START of the TBPTT window (after burn-in,
+        # after carry-state).  The intra-chain contrastive loss
+        # re-builds a perturbed M_c starting from this exact state, so
+        # positive and perturbed only differ in one swapped session.
+        # Captured here before the main loop mutates M_c.
+        M_c_window_start: torch.Tensor | None = None
+
         # Burn-in: process each batch element's prefix under no_grad, building
         # a per-element M_c at the right recurrence depth, then stack.
         # Non-uniform burn-in lengths require we process each element separately.
@@ -629,10 +792,11 @@ class Trainer:
                         bp = bp.to(self.device)
                         for j in range(bp.shape[0]):
                             sess_j = bp[j].unsqueeze(0)
-                            C_j = model.model.embed_tokens(sess_j[:, :-1])
+                            C_j = model.model.extract_source(sess_j[:, :-1])
                             m = model.model.compress_session(C_j, m)
                     burn_M.append(m)
                 M_c = torch.cat(burn_M, dim=0).detach()
+        M_c_window_start = M_c.detach().clone()
 
         # Pre-compute a trivial causal mask we can always pass; we'll
         # optionally OR-in a context-dropout block.  The MemRes backbone
@@ -657,7 +821,7 @@ class Trainer:
         for t in range(a.window_k):
             session = window[:, t]                         # (B, S)
             input_ids = session[:, :-1]
-            labels = input_ids
+            labels = self._build_labels(input_ids)
 
             # Memory dropout: zero out M_c (don't change topology).
             drop_mem = rng.random() < a.memory_dropout
@@ -694,7 +858,10 @@ class Trainer:
                 last_M_c_pre = read_M  # what the loss above conditioned on
 
             # Recurrent memory update: M_c <- judge(M_c, extract(C_t)).
-            C_t = model.model.embed_tokens(input_ids)
+            # extract_source honours config.memres_extract_source: 'embed'
+            # for legacy bag-of-token-embeddings, 'hidden_<L>' for the
+            # contextualised mid-layer hidden state path.
+            C_t = model.model.extract_source(input_ids)
             M_c = model.model.compress_session(C_t, M_c)
 
         loss_match = torch.stack(losses).mean()
@@ -731,12 +898,12 @@ class Trainer:
                         sb = sb.to(self.device)
                         for j in range(sb.shape[0]):
                             sj = sb[j].unsqueeze(0)
-                            Cj = model.model.embed_tokens(sj[:, :-1])
+                            Cj = model.model.extract_source(sj[:, :-1])
                             m = model.model.compress_session(Cj, m)
                     sw = sw.to(self.device)
                     for j in range(sw.shape[0]):
                         sj = sw[j].unsqueeze(0)
-                        Cj = model.model.embed_tokens(sj[:, :-1])
+                        Cj = model.model.extract_source(sj[:, :-1])
                         m = model.model.compress_session(Cj, m)
                     M_sh_list.append(m)
                 M_sh = torch.cat(M_sh_list, 0).detach()
@@ -752,6 +919,87 @@ class Trainer:
             loss_shuffle = out_sh.loss
             margin_loss = (loss_match - loss_shuffle + a.neg_chain_margin).clamp(min=0.0)
             total_loss = total_loss + cur_neg_weight * margin_loss
+
+        # ------------------------------------------------------------
+        # Intra-chain perturbation contrastive loss (the "did the fact
+        # survive interference?" loss).
+        #
+        # Build a perturbed M_c by re-running TBPTT through the same
+        # window with ONE earlier session swapped for a random
+        # other-chain session.  Score the matched chain's last session
+        # under both positive and perturbed M_c; require positive to be
+        # at least `margin` lower in NLL.
+        #
+        # Gradient through the perturbed-build pressures the judge step
+        # at every intermediate session to PRESERVE channels carrying
+        # information that turns out to matter at the recall position
+        # -- the QKV competition is forced to defend M_c_prev when
+        # M_new (current session) does not contain the salient content.
+        #
+        # Cost: one extra TBPTT chain build (with grad) + one extra
+        # forward+backward on the recall session.  ~30%% per-step
+        # overhead at window_k=3.
+        if a.in_chain_contrast_warmup_steps > 0:
+            ic_init = a.in_chain_contrast_initial_weight
+            if ic_init is None:
+                ic_init = a.in_chain_contrast_weight
+            ic_ramp = min(
+                1.0,
+                self.global_step / max(1, a.in_chain_contrast_warmup_steps),
+            )
+            cur_ic_weight = ic_init + (a.in_chain_contrast_weight - ic_init) * ic_ramp
+        else:
+            cur_ic_weight = a.in_chain_contrast_weight
+        if cur_ic_weight > 0.0 and a.window_k >= 2 and M_c_window_start is not None:
+            # 1. Pick the perturbation slot.  random_earlier rotates the
+            #    pressure across all earlier slots so the model can't
+            #    learn to "skip" a fixed position.
+            if a.in_chain_perturb_strategy == "session_zero":
+                F = 0
+            else:  # random_earlier
+                F = rng.randint(0, max(0, a.window_k - 2))
+
+            # 2. Sample a distractor session per batch element by
+            #    drawing a random other-chain window and taking its
+            #    session 0.  no_grad: just data plumbing, no params.
+            with torch.no_grad():
+                distractor_list = []
+                for _ in range(B):
+                    _, _, dw, _ = self.train_sampler.sample_window()
+                    distractor_list.append(dw[0])
+                distractor_F = torch.stack(distractor_list).to(self.device)
+
+            # 3. Re-build M_c through the window with session F swapped.
+            #    WITH grad -- this is what carries the recall signal
+            #    backwards into the intermediate judge / extract steps.
+            M_c_pert = M_c_window_start.clone()
+            for t in range(a.window_k - 1):
+                if t == F:
+                    sess_t = distractor_F
+                else:
+                    sess_t = window[:, t]
+                ids_t = sess_t[:, :-1]
+                C_t_pert = model.model.extract_source(ids_t)
+                M_c_pert = model.model.compress_session(C_t_pert, M_c_pert)
+
+            # 4. Score the recall session under the perturbed M_c.
+            out_pert = self.wrapped(
+                input_ids=last_input_ids,
+                labels=last_labels,
+                M_c=M_c_pert,
+                attention_mask=causal_mask_dict,
+            )
+            loss_pert = out_pert.loss
+
+            # 5. Margin loss on the recall position only.  We use
+            #    losses[-1] (the last-session loss with the same
+            #    dropout state as the recall forward) so positive and
+            #    perturbed are compared like-for-like.
+            loss_recall = losses[-1]
+            ic_margin = (
+                loss_recall - loss_pert + a.in_chain_contrast_margin
+            ).clamp(min=0.0)
+            total_loss = total_loss + cur_ic_weight * ic_margin
 
         total_loss = total_loss / a.grad_accum
         total_loss.backward()
@@ -801,7 +1049,7 @@ class Trainer:
                             M_sh = None
                             for j in range(clamp):
                                 osess = ev.chain_session_at(other_idx, j).to(self.device).unsqueeze(0)
-                                C_o = model.model.embed_tokens(osess[:, :-1])
+                                C_o = model.model.extract_source(osess[:, :-1])
                                 M_sh = model.model.compress_session(C_o, M_sh)
                             out_sh = model(input_ids=input_ids, labels=labels, M_c=M_sh)
                             ce_shuffle.append(out_sh.loss.item())
@@ -822,7 +1070,7 @@ class Trainer:
                         ce_oracle.append(out_or.loss.item())
 
                 # Recurrent memory update is mandatory regardless of scoring.
-                C_t = model.model.embed_tokens(sess[:, :-1])
+                C_t = model.model.extract_source(sess[:, :-1])
                 M_c = model.model.compress_session(C_t, M_c)
         model.train()
 
