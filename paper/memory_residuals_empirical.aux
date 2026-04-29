@@ -1,0 +1,115 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{liu2024lostmiddle}
+\citation{lewis2020retrieval}
+\citation{daiTransformerXL2019,rae2019compressive,bulatov2022rmt,hutchins2022blockrecurrent,wu2022memorising}
+\citation{liu2025memres}
+\citation{du2025blockattnres}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\citation{daiTransformerXL2019}
+\citation{rae2019compressive}
+\citation{bulatov2022rmt}
+\citation{hutchins2022blockrecurrent}
+\citation{wu2022memorising}
+\citation{xie2024lrmt}
+\citation{du2025blockattnres}
+\citation{jaegle2021perceiver}
+\citation{bachlechner2021rezero}
+\citation{gu2023mamba}
+\citation{xu2022msc}
+\citation{maharana2024locomo}
+\@writefile{toc}{\contentsline {paragraph}{Contributions.}{2}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background and related work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{2}{Background and related work}{section.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Recurrent memory in Transformers.}{2}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Block attention residuals.}{2}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Building blocks the architecture borrows.}{2}{section*.4}\protected@file@percent }
+\citation{liu2025memres}
+\citation{du2025blockattnres}
+\@writefile{toc}{\contentsline {paragraph}{Conversational long-term memory.}{3}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}The Memory Residuals architecture}{3}{section.3}\protected@file@percent }
+\newlabel{sec:method}{{3}{3}{The Memory Residuals architecture}{section.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Memory state.}{3}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stage 1 (extract).}{3}{section*.7}\protected@file@percent }
+\newlabel{eq:extract}{{1}{3}{Stage 1 (extract)}{equation.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Stage 2 (judge).}{3}{section*.8}\protected@file@percent }
+\newlabel{eq:judge}{{2}{3}{Stage 2 (judge)}{equation.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Off-sequence read.}{3}{section*.9}\protected@file@percent }
+\newlabel{eq:read}{{3}{3}{Off-sequence read}{equation.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Routing primitive A: \textsc  {simple\_gate}.}{3}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Routing primitive B: \textsc  {attention\_base}.}{3}{section*.11}\protected@file@percent }
+\citation{qwen3}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Recurrent chain training step (one micro-batch).}}{4}{algorithm.1}\protected@file@percent }
+\newlabel{alg:tbptt}{{1}{4}{The recurrent training loop}{algorithm.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Init parity verification on Qwen3-0.6B (bf16). Maximum per-token absolute logit deviation between each augmented model at step~0 and the bare backbone, on a 30-prompt batch with 27 tokens of prefix. Bit-exact parity ($\Delta < 10^{-6}$) is the requirement for ``additive on top of the pretrained behaviour'' to hold. See \texttt  {paper\_artifacts/eval/init\_parity\_test.json} for the machine-readable record.}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:init_parity}{{1}{4}{Init parity verification on Qwen3-0.6B (bf16). Maximum per-token absolute logit deviation between each augmented model at step~0 and the bare backbone, on a 30-prompt batch with 27 tokens of prefix. Bit-exact parity ($\Delta < 10^{-6}$) is the requirement for ``additive on top of the pretrained behaviour'' to hold. See \texttt {paper\_artifacts/eval/init\_parity\_test.json} for the machine-readable record}{table.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Routing primitive C: \textsc  {attention\_parity}.}{4}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Init parity.}{4}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The recurrent training loop.}{4}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental setup}{4}{section.4}\protected@file@percent }
+\newlabel{sec:setup}{{4}{4}{Experimental setup}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Backbone.}{4}{section*.15}\protected@file@percent }
+\citation{rae2019compressive}
+\@writefile{toc}{\contentsline {paragraph}{Memory hyperparameters.}{5}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Data.}{5}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Training.}{5}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Evaluation.}{5}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Experiments}{5}{section.5}\protected@file@percent }
+\newlabel{sec:experiments}{{5}{5}{Experiments}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Routing-primitive head-to-head}{5}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:headtohead}{{5.1}{5}{Routing-primitive head-to-head}{subsection.5.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces In-trainer eval trajectory under matched compute on Qwen3-0.6B. Left: aggregate memory help $\Delta _{\text  {nm-m}}$. Right: history-specificity $\Delta _{\text  {sh-m}}$. Both axes are nats; positive is good. Soft \textsc  {attention\_parity} (blue) reaches \textsc  {simple\_gate}'s (green) terminal $\Delta _{\text  {sh-m}}$ plateau in roughly $2/5$ of the steps, and continues climbing. The plateaued green is \textsc  {simple\_gate} run to step~5\,200 in a separate session. \textsc  {attention\_base} (orange) starts from a $\sim $34-nat init perturbation and at the same step budget has not yet recovered to bare-backbone parity, let alone surpassed it.}}{6}{figure.1}\protected@file@percent }
+\newlabel{fig:trajectory}{{1}{6}{In-trainer eval trajectory under matched compute on Qwen3-0.6B. Left: aggregate memory help $\dnm $. Right: history-specificity $\dsh $. Both axes are nats; positive is good. Soft \textsc {attention\_parity} (blue) reaches \textsc {simple\_gate}'s (green) terminal $\dsh $ plateau in roughly $2/5$ of the steps, and continues climbing. The plateaued green is \textsc {simple\_gate} run to step~5\,200 in a separate session. \textsc {attention\_base} (orange) starts from a $\sim $34-nat init perturbation and at the same step budget has not yet recovered to bare-backbone parity, let alone surpassed it}{figure.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces In-trainer eval $\Delta _{\text  {sh-m}}$ trajectory (matched seed, $n=92$, window 4). Higher is better.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:headtohead_traj}{{2}{6}{In-trainer eval $\dsh $ trajectory (matched seed, $n=92$, window 4). Higher is better}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Standalone evaluation, callback probe, horizon analysis}{6}{subsection.5.2}\protected@file@percent }
+\newlabel{sec:diagnostics}{{5.2}{6}{Standalone evaluation, callback probe, horizon analysis}{subsection.5.2}{}}
+\citation{xie2024lrmt}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Rigorous standalone eval after training. Score positions per row; positive $\Delta _{\text  {nm-m}}$ means memory helps the bare backbone in the aggregate, positive $\Delta _{\text  {sh-m}}$ means the model is using \emph  {this} chain's memory rather than a generic style prior. Capture ratio $= \Delta _{\text  {nm-m}}/ \Delta _{\text  {or-m}}$ (\textit  {less negative oracle = larger capture ratio}, so PG-19's small oracle ceiling makes capture sensitive). Numbers shown for the checkpoints available at submission time; \S  \ref {sec:setup} describes the training that produced them.}}{7}{table.3}\protected@file@percent }
+\newlabel{tab:standalone}{{3}{7}{Rigorous standalone eval after training. Score positions per row; positive $\dnm $ means memory helps the bare backbone in the aggregate, positive $\dsh $ means the model is using \emph {this} chain's memory rather than a generic style prior. Capture ratio $= \dnm / \dor $ (\textit {less negative oracle = larger capture ratio}, so PG-19's small oracle ceiling makes capture sensitive). Numbers shown for the checkpoints available at submission time; \S \ref {sec:setup} describes the training that produced them}{table.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces History-specific memory benefit $\Delta _{\text  {sh-m}}$ on PG-19 test, bucketed by chain length. Both routing primitives carry positive $\Delta _{\text  {sh-m}}$ across the medium-horizon buckets; the very-long horizon ($\geq 64$ sessions) bucket has too few chains in PG-19 test to draw conclusions from at this checkpoint.}}{7}{figure.2}\protected@file@percent }
+\newlabel{fig:horizon}{{2}{7}{History-specific memory benefit $\dsh $ on PG-19 test, bucketed by chain length. Both routing primitives carry positive $\dsh $ across the medium-horizon buckets; the very-long horizon ($\geq 64$ sessions) bucket has too few chains in PG-19 test to draw conclusions from at this checkpoint}{figure.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Horizon-bucketed analysis.}{7}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Callback-token probe.}{7}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Per-sublayer learned routing weights.}{7}{section*.22}\protected@file@percent }
+\citation{liu2025memres}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Per-callback NLL probe on PG-19 test held-out pairs. The ``callback'' bucket consists of tokens that are part of a capitalised multi-character word also present in the history; ``filler'' is everything else. A ratio above $1.5\times $ is the success criterion. (Filled in by the \texttt  {post\_train\_pipeline.sh} wrapper after both chain-v3 runs finish.)}}{8}{table.4}\protected@file@percent }
+\newlabel{tab:callback}{{4}{8}{Per-callback NLL probe on PG-19 test held-out pairs. The ``callback'' bucket consists of tokens that are part of a capitalised multi-character word also present in the history; ``filler'' is everything else. A ratio above $1.5\times $ is the success criterion. (Filled in by the \texttt {post\_train\_pipeline.sh} wrapper after both chain-v3 runs finish.)}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Per-sublayer learned routing weight on the memory source. \textsc  {simple\_gate} concentrates routing mass at the deepest sublayers (gates initialised at zero, allowed to drift away from zero); \textsc  {attention\_parity} (soft) maintains a non-trivial mass at every depth via the depth-wise pool.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:gate}{{3}{8}{Per-sublayer learned routing weight on the memory source. \textsc {simple\_gate} concentrates routing mass at the deepest sublayers (gates initialised at zero, allowed to drift away from zero); \textsc {attention\_parity} (soft) maintains a non-trivial mass at every depth via the depth-wise pool}{figure.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{8}{section.6}\protected@file@percent }
+\newlabel{sec:discussion}{{6}{8}{Discussion}{section.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{What's load-bearing.}{8}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Methodological note on $\Delta _{\text  {sh-m}}$ in-trainer vs. standalone.}{8}{section*.24}\protected@file@percent }
+\newlabel{sec:limits}{{6}{8}{Limitations}{section*.25}{}}
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{8}{section*.25}\protected@file@percent }
+\bibstyle{plain}
+\bibdata{references}
+\bibcite{bachlechner2021rezero}{{1}{}{{}}{{}}}
+\bibcite{bulatov2022rmt}{{2}{}{{}}{{}}}
+\bibcite{daiTransformerXL2019}{{3}{}{{}}{{}}}
+\bibcite{du2025blockattnres}{{4}{}{{}}{{}}}
+\bibcite{gu2023mamba}{{5}{}{{}}{{}}}
+\bibcite{hutchins2022blockrecurrent}{{6}{}{{}}{{}}}
+\bibcite{jaegle2021perceiver}{{7}{}{{}}{{}}}
+\bibcite{lewis2020retrieval}{{8}{}{{}}{{}}}
+\bibcite{liu2024lostmiddle}{{9}{}{{}}{{}}}
+\bibcite{liu2025memres}{{10}{}{{}}{{}}}
+\bibcite{maharana2024locomo}{{11}{}{{}}{{}}}
+\bibcite{qwen3}{{12}{}{{}}{{}}}
+\bibcite{rae2019compressive}{{13}{}{{}}{{}}}
+\bibcite{wu2022memorising}{{14}{}{{}}{{}}}
+\bibcite{xie2024lrmt}{{15}{}{{}}{{}}}
+\bibcite{xu2022msc}{{16}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{9}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reproducibility.}{9}{section*.26}\protected@file@percent }
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Horizon-bucketed standalone eval on PG-19 test for soft \textsc  {attention\_parity} @ step 2000. ``$n$'' is number of chains in the bucket. Values that are absent (---) indicate the bucket contained too few chains with a valid shuffle reference at that length.}}{10}{table.5}\protected@file@percent }
+\newlabel{tab:horizon-pg19test}{{5}{10}{Horizon-bucketed standalone eval on PG-19 test for soft \textsc {attention\_parity} @ step 2000. ``$n$'' is number of chains in the bucket. Values that are absent (---) indicate the bucket contained too few chains with a valid shuffle reference at that length}{table.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Horizon-bucketed numbers}{10}{appendix.A}\protected@file@percent }
+\newlabel{app:horizon}{{A}{10}{Horizon-bucketed numbers}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}The shuffle test in detail}{10}{appendix.B}\protected@file@percent }
+\newlabel{app:shuffle}{{B}{10}{The shuffle test in detail}{appendix.B}{}}
+\gdef \@abspage@last{10}

@@ -1,326 +1,280 @@
 # Memory Residuals
 
-We are training **Memory Residuals** on top of a Qwen3 backbone. The
-default routing mode is **`attention_parity`** (the full Block AttnRes
-routing pool with cumulative-state sources and a parity-preserving
-init) — at step 0 the augmented model produces bit-identical logits to
-bare Qwen3 (`paper_artifacts/eval/init_parity_test.json`), so all
-"memory" learning is additive on top of the pretrained behaviour.
+## Introduction
 
-## Pick up here tomorrow (Apr 28 — both runs stopped by user request, ~02:32 local)
+Hi! Welcome to the memory residuals repo.
 
-**Final state.** Both trainers received `SIGTERM` and exited cleanly; their
-checkpoints persisted on disk and the per-step trajectories were saved into
-`paper_artifacts/eval/chain_v2_phaseA_trajectories.{json,md}` (which *is*
-in git, unlike `logs/`). The two GPUs are now idle.
+We want to create the **first usable backpropagating memory system for
+conversational AI**. The core idea is a fixed-size recurrent memory matrix
+$M_c \in \mathbb{R}^{K \times d}$ that gets updated end-to-end through the
+language-modelling loss — no retrieval index, no separate memory controller,
+no hand-engineered gating heuristic. Just a learned compression of past
+sessions that reads into the depth-wise residual stream of a pretrained
+transformer.
 
-| run | mode | output dir | killed at step | last EVAL | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ |
-|---|---|---|---:|---:|---:|---:|
-| A — head-to-head pool | soft `attention_parity` (`mem_bias=-4`, `recent_bias=+4`) | `output/chain_v2_phaseA_softparity_b4` | 2125 / 6000 | step 2000 | **+0.0107** | **+0.0272** |
-| B — head-to-head gate | `simple_gate` | `output/chain_v2_abl_residual_mode` | 5275 / 6000 | step 5200 | +0.0090 | +0.0249 |
+The architecture lives in [`memory_residuals.pdf`](memory_residuals.pdf)
+(position paper) and builds on
+[`atn_residuals.pdf`](atn_residuals.pdf) (the Block Attention Residuals
+routing primitive we modify).
 
-Run A was killed mid-curve, *still on the upward portion* (Δ_sh-m grew
-from +0.0107 at step 800 to +0.0272 at step 2000, with no sign of
-plateauing). Run B was killed deep into its plateau (Δ_sh-m has been
-oscillating in [+0.0234, +0.0249] since step 4000 and the gate parameters
-have stopped moving — `gate_max=0.0366` for ~600 steps).
+## Preliminary work
 
-**The headline.** At matched compute, soft `attention_parity` outpaced
-`simple_gate` by **1.6×–3.8×** on every checkpoint they overlap on (steps
-200–2000). And the run-A step-2000 numbers have **already surpassed
-run-B's terminal plateau** on every memory metric — which means soft
-`attention_parity` reached `simple_gate`'s asymptote in ~2/5 the steps
-and was still climbing when killed. This is the routing-pool-vs-scalar-gate
-sample-efficiency result the paper turns on.
+We have:
 
-Full trajectory and bottom-line table:
-[`paper_artifacts/eval/chain_v2_phaseA_trajectories.md`](paper_artifacts/eval/chain_v2_phaseA_trajectories.md).
+- **Architecture.** Three routing modes (`simple_gate`, `attention_base`,
+  `attention_parity`) on top of a Qwen3 backbone, all in
+  `modeling_memres.py`. The default `attention_parity` mode produces
+  *bit-identical* logits to bare Qwen3 at step 0 (verified in
+  `paper_artifacts/eval/init_parity_test.json`), so every "memory" gain
+  is additive on top of the pretrained behaviour.
+- **Trainer.** Recurrent chain TBPTT trainer (`train_chain.py`) that
+  unrolls $M_c$ across windows of $k$ consecutive sessions, plus an
+  optional negative-chain contrastive loss for chain-specificity.
+- **Eval pipeline.** `paper_tools/eval_chain.py` scores `mem` /
+  `nomem` / `shuffled-history` / `oracle-concatenation` / RAG variants
+  on the same checkpoint. Companion probes in `paper_tools/`:
+  `callback_probe.py` (NLL on named-entity callbacks),
+  `horizon_analysis.py` (Δ bucketed by chain length),
+  `init_parity_test.py`, RAG baselines (BM25, dense, fine-tuned dense).
+- **PG-19 ablation matrix (v2/v3).** Four 0.6B chain-trainer runs at
+  matched compute on PG-19 + TV chains:
 
-### Tomorrow — do these in order
+  | run | mode | steps reached | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ | status |
+  |---|---|---:|---:|---:|---|
+  | `chain_v2_abl_residual_mode` | `simple_gate` | 5275 / 6000 | +0.0090 | +0.0249 | terminal plateau |
+  | `chain_v2_phaseA_softparity_b4` | `attention_parity` (soft) | 2125 / 6000 | +0.0107 | +0.0272 | killed mid-climb |
+  | `chain_v3_softparity_full` (live) | `attention_parity` (soft) | in flight, ~step 2000 | +0.0078 | +0.0177 | extending the soft-parity curve to step 6000 |
+  | `chain_v3_attentionbase_full` (live) | `attention_base` | in flight, ~step 2000 | +0.0033 | +0.0080 | the missing third row of the ablation |
 
-#### 1. First 30 min: turn the in-trainer numbers into rigorous standalone eval
+  Headline so far: at matched compute, soft `attention_parity` reaches
+  `simple_gate`'s terminal plateau (+0.0249) in ~2/5 the steps and then
+  *exceeds* it (+0.0272 at step 2000, still climbing). `attention_base`
+  is currently tracking soft-parity's curve at a ~1000-step lag, which
+  isolates the parity-init contribution from the routing-pool
+  contribution.
 
-The `EVAL @ step N` lines were computed inside the trainer with n=92
-sessions and `eval_window=4`. Re-run on the same `best/` ckpts through
-`paper_tools/eval_chain.py` to get paper-grade numbers on PG-19 val +
-PG-19 test (held out) + LoCoMo. **This is the gating step before any
-result above can be quoted in writing**, so do it first:
+- **Init-parity diagnostic** (`paper_artifacts/eval/init_parity_test.json`,
+  Qwen3-0.6B, bf16):
 
-```bash
-cd ~/Desktop/fine-tune/memory_residuals
+  | mode | max\|Δ_logit\| vs bare Qwen3 |
+  |---|---:|
+  | `simple_gate` (gate $g_\ell{=}0$), no memory and with memory | **0.000** |
+  | `attention_base` (uniform softmax over delta sources) | 34.5 |
+  | `attention_parity` (cumulative pool, `mem_bias=-32`, `recent_bias=+32`) | **0.000** |
 
-for run in chain_v2_phaseA_softparity_b4 chain_v2_abl_residual_mode; do
-  python paper_tools/eval_chain.py \
-    --model_path output/$run/best \
-    --corpora paper_artifacts/chains/stage1_validation_s512.pt \
-              paper_artifacts/chains/stage1_test_s512.pt \
-              paper_artifacts/chains/locomo_s512.pt \
-    --names pg19_val pg19_test locomo \
-    --score_window 4 --oracle_window 4 \
-    --output paper_artifacts/eval/${run}_eval.json
-done
-```
+For the full historical record (every prior run, every failure mode,
+every architectural decision and ADR) see
+[`COMPREHENSIVE.md`](COMPREHENSIVE.md).
 
-Then `paper_tools/callback_probe.py` for the per-callback help ratio
-on each (target: > 1.5× on PG-19 and LoCoMo) and
-`paper_tools/horizon_analysis.py` to bucket help by chain length.
+## Papers we plan to extract
 
-#### 2. Then choose A, B, or C for the day's compute
+1. **"Residual memory wins in roleplay recall vs scalar-gate memory."**
+   Headline architectural claim. Soft-parity Block AttnRes routing pool
+   beats scalar-gate residual memory injection on multi-session
+   dialogue benchmarks (LoCoMo, MSC, NIAH-conversational, RULER).
+   **This is the paper we're shipping in 6 days — see "Paper 1 plan"
+   below.**
 
-**A — Extend the soft-parity run to step 6000** (deterministic).
-The trainer doesn't checkpoint optimizer/scheduler state, so a true
-"resume" isn't possible. With `--seed 42` the trajectory is reproducible
-from step 0, so re-running the exact same command will retrace
-steps 1–~1800 in ~3 h and then continue past where it died. Total
-~10 h on the H100.
+2. **"We eliminated the need to query at all — Memory Residuals beat
+   RAG without retrieval."** End-to-end differentiable memory replaces
+   top-k retrieval entirely. Same architecture as paper 1, different
+   framing: vs BM25, vs Contriever, vs fine-tuned dense retrieval, all
+   at matched inference compute, with latency / cost tables. The
+   systems-and-comparison paper that follows paper 1.
 
-```bash
-CUDA_VISIBLE_DEVICES=0 nohup python -u train_chain.py \
-  --preset qwen3-0.6b-large --memres_mode attention_parity \
-  --router_mem_bias_init -4.0 --router_recent_bias_init 4.0 \
-  --window_k 8 --session_len 512 \
-  --steps 6000 --batch_size 4 --grad_accum 4 \
-  --warmup 200 --lr 3e-4 --lr_backbone 3e-5 \
-  --memory_dropout 0.0 --context_dropout 0.0 \
-  --neg_chain_weight 0.0 --burn_in_max 0 \
-  --train_chains paper_artifacts/chains/stage1_train_s512_full.pt \
-  --eval_chains paper_artifacts/chains/stage1_validation_s512.pt \
-  --gradient_checkpointing --eval_every 200 --save_every 1000 --log_every 25 \
-  --eval_n_chains 24 --eval_window 4 --save_best_metric composite \
-  --out_dir output/chain_v2_phaseA_softparity_b4 --seed 42 \
-  > logs/chain_v2_phaseA_softparity_b4.log 2>&1 &
-```
+3. **"Create-recall: humanoid memory — rationalities, emotional shifts,
+   intimacy deltas."** Probes whether the learned memory tracks
+   character-level state (preferences, beliefs, emotional valence,
+   relationship distance) across sessions, not just topical or factual
+   recall. The longer-term, more speculative paper.
 
-(The simple_gate run is essentially plateaued — extending it is low
-value. If you want a clean step-6000 number for the table, run it
-the same way against `output/chain_v2_abl_residual_mode` on GPU 1.)
+## Paper 1 plan (6-day sprint)
 
-**B — Skip extension, start Phase B (contrastive curriculum) warm
-from soft-parity best.** Phase B layers `--neg_chain_weight 0.5
---neg_chain_margin 0.05 --memory_dropout 0.10 --context_dropout 0.30`
-on top, ramping the contrastive weight over the first 1000 steps.
-Cheaper headline number than A, harder to attribute the gain.
+### Reframed claim
 
-```bash
-CUDA_VISIBLE_DEVICES=0 nohup python -u train_chain.py \
-  --preset qwen3-0.6b-large --memres_mode attention_parity \
-  --router_mem_bias_init -4.0 --router_recent_bias_init 4.0 \
-  --init_from output/chain_v2_phaseA_softparity_b4/best \
-  --window_k 8 --session_len 512 \
-  --steps 12000 --batch_size 4 --grad_accum 4 \
-  --warmup 0 --lr 1e-4 --lr_backbone 1e-5 \
-  --memory_dropout 0.10 --context_dropout 0.30 \
-  --neg_chain_weight 0.5 --neg_chain_initial_weight 0.05 --neg_chain_warmup_steps 1000 \
-  --neg_chain_margin 0.05 --burn_in_max 0 \
-  --train_chains paper_artifacts/chains/stage1_train_s512_full.pt \
-  --eval_chains paper_artifacts/chains/stage1_validation_s512.pt \
-  --gradient_checkpointing --eval_every 200 --save_every 1000 --log_every 25 \
-  --eval_n_chains 24 --eval_window 4 --save_best_metric composite \
-  --out_dir output/chain_v2_phaseB_softparity --seed 42 \
-  > logs/chain_v2_phaseB_softparity.log 2>&1 &
-```
+> *On multi-session dialogue benchmarks (LoCoMo, MSC test, NIAH,
+> RULER), at matched compute, Memory Residuals with the soft-parity
+> Block AttnRes routing pool reach lower NLL and higher callback-EM
+> than (a) the no-memory baseline, (b) BM25 retrieval, (c) dense
+> MiniLM retrieval, and (d) a fine-tuned dense retriever.*
 
-**C — Add the missing third row of the ablation table:
-`attention_base`** (delta-pool, no init parity, the original AttnRes
-paper). The table needs all three modes for the paper. Same data and
-hyperparams as the two existing runs, on GPU 1 in parallel.
+### Experiments
 
-```bash
-CUDA_VISIBLE_DEVICES=1 nohup python -u train_chain.py \
-  --preset qwen3-0.6b-large --memres_mode attention_base \
-  --window_k 8 --session_len 512 \
-  --steps 6000 --batch_size 4 --grad_accum 4 \
-  --warmup 200 --lr 3e-4 --lr_backbone 3e-5 \
-  --memory_dropout 0.0 --context_dropout 0.0 \
-  --neg_chain_weight 0.0 --burn_in_max 0 \
-  --train_chains paper_artifacts/chains/stage1_train_s512_full.pt \
-  --eval_chains paper_artifacts/chains/stage1_validation_s512.pt \
-  --gradient_checkpointing --eval_every 200 --save_every 1000 --log_every 25 \
-  --eval_n_chains 24 --eval_window 4 --save_best_metric composite \
-  --out_dir output/chain_v2_phaseA_attentionbase --seed 42 \
-  > logs/chain_v2_phaseA_attentionbase.log 2>&1 &
-```
+| # | experiment | dataset | priority |
+|---:|---|---|---|
+| E1 | Mixed-corpus softparity training (PG-19 40% + TV 20% + MSC 40%) | mixed | MUST |
+| E2 | Mixed-corpus simple_gate baseline (same recipe) | mixed | MUST |
+| E3 | Mixed-corpus `attention_base` (no parity init) | mixed | SHOULD |
+| E4 | Hidden-state extraction ablation (compress layer-14 hidden states, not raw embeddings) | mixed | SHOULD |
 
-Recommendation: **run A on GPU 0 + C on GPU 1 in parallel.** That
-gives the paper a clean step-6000 number for soft `attention_parity`
-*and* fills in the missing `attention_base` row of the ablation
-table, in one ~10 h day. Phase B (option B) becomes the next day's
-work from A's step-6000 best ckpt.
+### Evaluation matrix
 
-**Why A specifically:** the killed run was *still climbing* at
-step 2000 (Δ_sh-m = +0.0272, still no sign of plateauing). The first
-65% of the planned curve has not yet been observed, and `simple_gate`'s
-plateau (+0.0244 at step 5000) gives a concrete reference point — if
-A's extension stays above that line through step 6000, the paper has
-a single trajectory chart that shows the routing pool not just
-*reaching* the scalar-gate asymptote earlier, but *exceeding* it.
+| # | metric / benchmark | what it tests | priority |
+|---:|---|---|---|
+| M1 | `eval_chain.py` Δ on LoCoMo + MSC + PG-19 + TV held-out | next-token NLL deltas | MUST |
+| M2 | NIAH at depths {1, 5, 10, 20, 30} sessions × {start, middle, end} positions | depth-of-recall | MUST |
+| M3 | Generation quality on LoCoMo callbacks (greedy + nucleus, EM / F1 / ROUGE-L) | quality, not just perplexity | MUST |
+| M4 | RAG baselines: BM25, Contriever, MiniLM-finetuned, all at matched FLOPs | the "no querying" claim | MUST |
+| M5 | RULER at S=4k and 8k (conversational subsets: niah-mk, niah-mv, vt, qa-1, qa-2) | standardized comparability | MUST |
+| M6 | Bootstrap CI (1k resamples) on every Δ in the main table | statistical rigour | MUST |
+| M7 | Counterfactual sensitivity probe (alter session-$t-k$, measure ΔNLL on $t$) | causal use of prefix | SHOULD |
+| M8 | Per-depth routing trace ($\alpha_{\text{mem}}$ averaged across LoCoMo, by sublayer) | mechanistic figure | SHOULD |
+| M9 | LongBench-en (NarrativeQA, MultiFieldQA, Qasper, GovReport) | published benchmarks | SHOULD |
+| M10 | Callback probe + horizon analysis on every checkpoint | already implemented | MUST |
 
-### Phone notifications while you're away
+### Datasets
 
-`paper_tools/notify_eval.sh` watches log files and pushes every
-`EVAL @ step …` and `Saved checkpoint …` line to ntfy.sh as a phone
-notification. One-time setup:
+| corpus | role | tokens | path |
+|---|---|---:|---|
+| PG-19 (5000-book sample) | training (40%) | ~470 M | `paper_artifacts/chains/stage1_train_s512_full.pt` |
+| TV continuity chains (30 shows) | training (20%) | ~15 M | `paper_artifacts/chains/tv_train_s512.pt` |
+| **MSC train (NEW for paper 1)** | training (40%) | ~18 M | `memory_residuals_data/hf_corpora/msc/data/train-*.parquet` (chain-format pending — see `paper_tools/build_msc_chains.py`) |
+| LoCoMo | eval only | ~250 k | `paper_artifacts/chains/locomo_s512.pt` |
+| MSC test | eval only | ~2.7 MB | `memory_residuals_data/hf_corpora/msc/data/test-*.parquet` |
+| TV held-out | eval only | small | shows outside the `CONTINUITY_SHOWS` allowlist |
+
+The MSC training-split inclusion is the change from prior practice:
+[`docs/STAGE_PLAN.md`](docs/STAGE_PLAN.md) (the original plan)
+explicitly excluded MSC train as "synthetic-templatey". A reviewer
+flagged that books don't structurally test cross-session conversational
+recall, and the deadline made the trade-off worth it. Synthetic
+benchmarks now reward synthetic training data; we're transparent about
+this in §7 (Limitations) of the paper.
+
+## Compute
+
+Our lab has **2× H100 NVL** (96 GB HBM each) at the local box, with
+**16 h/day** usable (residential power-down for ~8 h overnight). The
+trainer doesn't checkpoint optimizer state, so each training run must
+fit inside one ~14 h window — at current throughput (~10.8 k tok/s) a
+6 000-step run completes in ~10 h on a single H100.
+
+H100 SXM5 cloud quota was unavailable, so we rented **1× GH200 480GB**:
 
 ```bash
-TOPIC="memres-exx-$(openssl rand -hex 4)"
-echo "subscribe to https://ntfy.sh/$TOPIC on your phone (ntfy app)"
-
-cd ~/Desktop/fine-tune/memory_residuals
-nohup paper_tools/notify_eval.sh "$TOPIC" \
-    logs/chain_v2_phaseA_softparity_b4.log \
-    logs/chain_v2_abl_residual_mode.log \
-    logs/chain_v2_phaseA_attentionbase.log \
-    > logs/notify.log 2>&1 &
+ssh ubuntu@192.222.50.225
 ```
 
-### Caveats
+GH200 has 96 GB HBM3 (compute-equivalent to an H100 SXM5 for our
+workloads) plus 480 GB unified Grace memory — useful as a head-room
+buffer if we ever spill activations during long-context eval.
+Rented for ~$2.49/h × ~96 h ≈ $240, with $260 of the $500 budget held
+in reserve.
 
-- `train_chain.py` saves model + config but **not** optimiser /
-  scheduler / RNG state, so any "resume" loses Adam momentum and
-  cosine-decay phase. If you need an exact resume, that's a one-day
-  feature add (save `optim.state_dict()`, `lr_scheduler.state_dict()`,
-  `torch.get_rng_state()`, dataloader sampler position; load on init).
-  Until then, deterministic re-run from step 0 with the same `--seed`
-  is the cleanest "extend" path.
-- The on-disk config of in-flight checkpoints uses the **legacy**
-  field names (`memres_mode: "residual"` / `"block_attnres"`,
-  `block_attnres_parity_init: true/false`). The back-compat shim in
-  `modeling_memres._normalise_memres_mode` translates these on
-  reload, so eval scripts work unchanged.
+The cloud GPU runs **24 h / day** and is the canonical evaluation host
+plus job-queue runner — work continues there when the local box is
+asleep.
 
+### 6-day calendar
 
-Three routing modes exist, exposed via `--memres_mode`:
+| day | local GPU 0 | local GPU 1 | cloud GH200 | human |
+|---:|---|---|---|---|
+| 0 (today) | `chain_v3_softparity_full` finishing | `chain_v3_attentionbase_full` finishing | env up; sync repo + ckpts; queue NIAH harness | repo cleanup, README rewrite |
+| 1 | mixed-corpus softparity (E1), 10 h | mixed-corpus simple_gate (E2), 10 h | NIAH on v3 ckpts + bootstrap-CI util + gen-quality on LoCoMo | start §3 (data) |
+| 2 | eval E1 ckpt | eval E2 ckpt + NIAH | RAG baselines (BM25 + Contriever + MiniLM-FT) + RULER setup | start §5 (results) |
+| 3 | counterfactual + routing trace | mixed-corpus `attention_base` (E3), 10 h | RULER + LongBench-en | §5 + §6 drafts |
+| 4 | hidden-state extraction (E4), 10 h | spare / re-eval | callback EM eval, fill remaining cells | §1, §2, §6 |
+| 5 | eval E4 ckpt; ablation table fill | spare | release cloud GPU after final eval | §7, §8, full read |
+| 6 | submit | submit | (off, save remaining $260) | submit |
 
-| mode | what it is | step-0 parity vs bare Qwen3 |
-|---|---|---|
-| `simple_gate` | Toy / baseline. Standard pretrained residual flow, plus a per-sublayer ReZero-style scalar gate $g_\ell$ (init 0) that adds the memory readout $m^t$ at each sublayer input. | bit-exact (gate = 0) |
-| `attention_base` | Full AttnRes pool, *delta sources*: each slot is one sublayer's $\delta$. Closest to the original AttnRes paper. | broken (~34) — softmax cannot reconstruct $b_0 + \sum \delta$ |
-| `attention_parity` | Full AttnRes pool, *cumulative sources*: each slot is a hidden-state checkpoint $h_k$. Router init `mem_bias=-32`, `recent_bias=+32` makes the softmax one-hot on the most-recent slot at step 0. | bit-exact |
+The full task breakdown with priorities, decision triggers, and
+fall-backs lives in
+[`docs/paper1_calendar.md`](docs/paper1_calendar.md).
 
-Legacy strings `residual` (= `simple_gate`) and `block_attnres`
-(= `attention_parity` by default, or `attention_base` with
-`--no-block_attnres_parity_init`) are still accepted everywhere for
-back-compat with old shell scripts and saved checkpoints.
+## Watchdogs and remote-survivability
 
-The architecture is described in [`memory_residuals.pdf`](memory_residuals.pdf)
-(position paper) and [`atn_residuals.pdf`](atn_residuals.pdf) (the Block
-Attention Residuals routing primitive we build on).
+The cloud GH200 is the **canonical job runner** — anything queued there
+survives the local box being powered off. The system lives at
+[`paper_tools/cloud_watchdog/`](paper_tools/cloud_watchdog/):
 
-For everything else — full design rationale, every prior run and how it
-failed, compute-targeted next-step plans, paper-to-code map, eval
-methodology — see [`COMPREHENSIVE.md`](COMPREHENSIVE.md).
+```
+paper_tools/cloud_watchdog/
+├── watchdog.sh              # daemon: polls queue/, runs jobs, archives
+├── notify.sh                # ntfy.sh phone-notification helper
+├── enqueue.sh               # convenience wrapper: enqueue.sh <name> <cmd>
+├── queue/                   # pending jobs (one JSON per job)
+├── running/                 # in-flight jobs (with PID + tmux session id)
+├── done/                    # finished jobs + result manifests
+├── failed/                  # crashed jobs + stderr captures
+├── logs/                    # per-job stdout/stderr
+└── README.md                # operator manual
+```
 
-## Idea
+To queue a job from anywhere with SSH access:
 
-Maintain a fixed-size recurrent memory matrix
-$M_c \in \mathbb{R}^{K \times d}$ (one per chain, not per token).
-Update it once per session via two-stage QKV competition (extract a
-candidate $E_t$ from the new session, then judge it against the prior
-$M_c^{t-1}$ in a zero-sum softmax over a $2K$-row pool). At read
-time, every position in the next session cross-attends $M_c$ once to
-produce a per-position memory readout $m^t$, which is injected into
-the depth-wise residual stream via the Block AttnRes router as
-source $b_{-1}$. End-to-end differentiable; the persistent state
-$M_c$ is shaped by the language-modelling loss alone.
+```bash
+ssh ubuntu@192.222.50.225 \
+  '~/memory_residuals/paper_tools/cloud_watchdog/enqueue.sh niah_v3 \
+     "python paper_tools/niah_eval.py --model output/chain_v3_softparity_full/best ..."'
+```
 
-## Dataset
+The daemon picks the job up within 30 s, runs it inside a `tmux`
+session named `cwd-<job_name>` (so SSH drops never kill it), and pushes
+a phone notification when it completes or fails. See
+[`paper_tools/cloud_watchdog/README.md`](paper_tools/cloud_watchdog/README.md)
+for the operator manual.
 
-Pre-tokenized chain corpora live in `paper_artifacts/chains/`
-(produced from the sibling `memory_residuals_data/` folder; not
-re-built here):
-
-| split | file | source | sessions |
-|---|---|---|---|
-| train | `stage1_train_s512.pt` (gitignored, 176 MB) | PG-19 books + 30 TV transcripts | ~89K |
-| val | `stage1_validation_s512.pt` | PG-19 validation | small |
-| test | `stage1_test_s512.pt` | PG-19 test | small |
-| TV-only ablation | `tv_train_s512.pt` | 30 TV transcripts | small |
-| eval | `locomo_s512.pt` | LoCoMo (10 conversation chains) | eval-only |
-
-All tensors are packed to `session_len=512`. Pair-format windows for
-warm-up training are produced on the fly by
-`paper_tools/prepare_pairs.py`.
-
-## How to train
-
-Single-GPU recurrent chain TBPTT (the experiment that exercises $M_c$
-end-to-end across consecutive sessions):
+## How to train (chain TBPTT, single GPU)
 
 ```bash
 python -u train_chain.py \
-  --preset qwen3-0.6b-large \
+  --preset qwen3-0.6b-large --memres_mode attention_parity \
+  --router_mem_bias_init -4.0 --router_recent_bias_init 4.0 \
   --window_k 8 --session_len 512 \
-  --steps 5000 --batch_size 2 --grad_accum 2 \
-  --warmup 200 --lr 5e-4 --lr_backbone 1e-5 \
-  --memory_dropout 0.10 --context_dropout 0.30 \
-  --neg_chain_weight 0.5 --neg_chain_margin 0.05 \
-  --gradient_checkpointing \
-  --out_dir output/chain_neg_repro
+  --steps 6000 --batch_size 4 --grad_accum 4 \
+  --warmup 200 --lr 3e-4 --lr_backbone 3e-5 \
+  --train_chains paper_artifacts/chains/stage1_train_s512_full.pt \
+  --eval_chains paper_artifacts/chains/stage1_validation_s512.pt \
+  --gradient_checkpointing --eval_every 200 --save_every 1000 --log_every 25 \
+  --eval_n_chains 24 --eval_window 4 --save_best_metric composite \
+  --out_dir output/<run_name> --seed 42
 ```
 
-Eval (memory vs no-memory vs shuffled-memory vs oracle, on a held-out chain corpus):
+## How to evaluate
 
 ```bash
 python paper_tools/eval_chain.py \
-  --model_path output/chain_neg_repro/best \
+  --model_path output/<run_name>/best \
   --corpora paper_artifacts/chains/stage1_validation_s512.pt \
+            paper_artifacts/chains/stage1_test_s512.pt \
             paper_artifacts/chains/locomo_s512.pt \
-  --names pg19_validation locomo \
+  --names pg19_val pg19_test locomo \
   --score_window 4 --oracle_window 4 \
-  --output paper_artifacts/eval/chain_neg_repro_eval.json
+  --output paper_artifacts/eval/<run_name>_eval.json
 ```
 
-## Experiments — results so far
-
-The headline metrics are
-$\Delta_{nm-m} = \mathrm{CE}_{\text{nomem}} - \mathrm{CE}_{\text{mem}}$
-(memory help) and
-$\Delta_{sh-m} = \mathrm{CE}_{\text{shuffle}} - \mathrm{CE}_{\text{mem}}$
-(history specificity — positive means the model uses *this* chain's
-memory, not a generic style prior).
-
-| run | trainer | data | steps | $\Delta_{nm-m}$ | $\Delta_{sh-m}$ | verdict |
-|---|---|---|---:|---:|---:|---|
-| `run3_qwen3-0.6b-large` | `train_phase1.py` (pair) | PG-19 + TV pairs | 8 000 | +0.026 | +0.029 | works on pair eval; explodes on chain eval (CE 8.7) |
-| `chain2_qwen3-0.6b-large` | `train_chain.py`, warm-started from run3 | PG-19 + TV chains, k=4 | 3 000 | +0.063 (PG-19) | −0.014 (PG-19) | shortcut learning — memory became style-only |
-| `chain_fresh1` | fresh init | PG-19 + TV chains, k=8 | 5 000 | +0.008 | −0.036 (PG-19) | stable to 30+ sessions, still shortcut-learns |
-| `chain_tv1`, `chain_tv2` | TV-only | TV chains, k=8 | 6 000 | small + | +0.011, +0.002 (LoCoMo @ step 500) | brief positive then overfits |
-| `chain_neg1` | chain TBPTT + negative-chain contrastive ($\lambda=0.5$, m=0.05) | PG-19 + TV chains, k=8 | 5 000 (in progress) | −0.0003 | +0.014 (in-trainer step 1000) | currently the most promising recipe |
-
-Init-parity diagnostic (`paper_artifacts/eval/init_parity_test.json`,
-Qwen3-0.6B, bf16, 30 prompt + 27 history tokens):
-
-| mode | max\|Δ_logit\| vs bare Qwen3 |
-|---|---|
-| `simple_gate` (ReZero gate $g_\ell{=}0$), no memory | **0.000** |
-| `simple_gate` (ReZero gate $g_\ell{=}0$), memory | **0.000** |
-| `attention_base` (uniform softmax over deltas) | 34.5 |
-| `attention_parity` (cumulative pool + `recent_bias = +32`) | **0.000** |
-
-## Future TODO
-
-In rough priority order — see `COMPREHENSIVE.md` Part I §3–4 for the
-full compute-targeted plans (2× H100, 24 h plan and 20× A100, 168 GPU-h plan).
-
-- [ ] Land positive $\Delta_{sh-m}$ on the **rigorous standalone eval** for both PG-19 and LoCoMo. `chain_neg1` is the active attempt; in-trainer numbers are positive but standalone numbers are pending.
-- [ ] Run `paper_tools/callback_probe.py` on `chain_neg1/best` and verify the per-callback help ratio is > 1.5× on PG-19 and LoCoMo (we have it for `run3` only).
-- [ ] Long-horizon test at chain length ≥ 30 sessions (LoCoMo conv-41 has 32). Report whether memory benefit decays gracefully or collapses (the LRMT failure mode).
-- [ ] 8B-class run with `--preset qwen3-8b-large --shard_strategy fsdp_full --gradient_checkpointing`. Untried; ~1 GPU-day on 2× H100 expected.
-- [ ] Burn-in stability: the no-grad burn-in path produces $M_c$ states out-of-distribution for the readout (loss spikes at step 5). Either widen the gradient-tracked window or warm-start from a chain-trained checkpoint.
-- [ ] Ablate `attention_parity` vs `simple_gate` end-to-end (init-parity is matched in both; need to compare downstream training dynamics — the `attention_parity` mode trades off a saturated softmax at init, the `simple_gate` mode trades off being a strict simplification of the routing pool).
-- [ ] Decide on MSC v2 / Persona-Chat inclusion for *training* (currently eval-only) once the data licence question is settled.
-
-## Layout
+## Repository layout
 
 ```
-modeling_memres.py          model + Block AttnRes routing (simple_gate / attention_base / attention_parity)
-presets.py                  named (backbone, K, L_E, N) tuples
-train_phase1.py             pair-based warm-up trainer
-train_chain.py              recurrent chain TBPTT trainer
-paper_tools/                eval, probes, RAG baselines, audit, parity test
-paper_artifacts/            eval JSONs, plots, pre-tokenized chain caches
-output/                     training checkpoints  (gitignored)
-memory_residuals.{pdf,txt}  position paper
-atn_residuals.pdf           Block Attention Residuals reference paper
-COMPREHENSIVE.md            everything that used to be in BRIEFING + SUMMARY
+modeling_memres.py              model + Block AttnRes routing
+presets.py                      named (backbone, K, L_E, N) tuples
+train_chain.py                  recurrent chain TBPTT trainer
+train_phase1.py                 pair-based warm-up trainer (Stage 0)
+
+paper_tools/                    eval, probes, RAG baselines, parity test
+paper_tools/cloud_watchdog/     remote-survivable job queue + ntfy daemon
+
+paper_artifacts/eval/           eval JSONs, plots
+paper_artifacts/chains/         pre-tokenized chain corpora
+paper/                          NeurIPS-style draft (.tex / .pdf)
+docs/                           ADRs and per-paper decision logs
+
+output/                         training checkpoints (gitignored, ~30 GB)
+logs/                           training logs (gitignored)
+
+COMPREHENSIVE.md                full historical record + design rationale
+memory_residuals.{pdf,txt}      position paper
+atn_residuals.pdf               Block Attention Residuals reference paper
+```
+
+## Stop everything
+
+```bash
+# local
+pkill -f 'train_chain.py'
+pkill -f 'paper_tools/cloud_watchdog'
+
+# cloud
+ssh ubuntu@192.222.50.225 \
+  'pkill -f train_chain.py; pkill -f cloud_watchdog/watchdog.sh; tmux kill-server'
 ```

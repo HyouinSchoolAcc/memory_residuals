@@ -1,0 +1,83 @@
+\begin{thebibliography}{10}
+
+\bibitem{bachlechner2021rezero}
+Thomas Bachlechner, Bodhisattwa~Prasad Majumder, Henry Mao, Garrison Cottrell, and Julian McAuley.
+\newblock {ReZero} is all you need: Fast convergence at large depth.
+\newblock {\em Uncertainty in Artificial Intelligence}, 2021.
+
+\bibitem{bulatov2022rmt}
+Aydar Bulatov, Yury Kuratov, and Mikhail~S. Burtsev.
+\newblock Recurrent memory transformer.
+\newblock In {\em Advances in Neural Information Processing Systems}, 2022.
+
+\bibitem{daiTransformerXL2019}
+Zihang Dai, Zhilin Yang, Yiming Yang, Jaime Carbonell, Quoc~V. Le, and Ruslan Salakhutdinov.
+\newblock {Transformer-XL}: Attentive language models beyond a fixed-length context.
+\newblock In {\em Annual Meeting of the Association for Computational Linguistics}, 2019.
+
+\bibitem{du2025blockattnres}
+Anonymous Du.
+\newblock Block attention residuals: A depth-wise routing primitive for transformers.
+\newblock {\em arXiv preprint}, 2025.
+
+\bibitem{gu2023mamba}
+Albert Gu and Tri Dao.
+\newblock Mamba: Linear-time sequence modeling with selective state spaces.
+\newblock {\em arXiv preprint}, 2023.
+
+\bibitem{hutchins2022blockrecurrent}
+DeLesley Hutchins, Imanol Schlag, Yuhuai Wu, Ethan Dyer, and Behnam Neyshabur.
+\newblock Block-recurrent transformers.
+\newblock In {\em Advances in Neural Information Processing Systems}, 2022.
+
+\bibitem{jaegle2021perceiver}
+Andrew Jaegle, Felix Gimeno, Andrew Brock, Andrew Zisserman, Oriol Vinyals, and Joao Carreira.
+\newblock Perceiver: General perception with iterative attention.
+\newblock In {\em International Conference on Machine Learning}, 2021.
+
+\bibitem{lewis2020retrieval}
+Patrick Lewis, Ethan Perez, Aleksandara Piktus, et~al.
+\newblock Retrieval-augmented generation for knowledge-intensive {NLP} tasks.
+\newblock In {\em Advances in Neural Information Processing Systems}, 2020.
+
+\bibitem{liu2024lostmiddle}
+Nelson~F. Liu, Kevin Lin, John Hewitt, et~al.
+\newblock Lost in the middle: How language models use long contexts.
+\newblock {\em Transactions of the Association for Computational Linguistics}, 2024.
+
+\bibitem{liu2025memres}
+Yueze Liu.
+\newblock Memory residuals: Innate working memory for large language models, 2025.
+\newblock Position paper; see \texttt{memory\_residuals.pdf}.
+
+\bibitem{maharana2024locomo}
+Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, et~al.
+\newblock Evaluating very long-term conversational memory of {LLM} agents.
+\newblock {\em arXiv preprint}, 2024.
+
+\bibitem{qwen3}
+{Qwen Team}.
+\newblock {Qwen3}: A new generation of {Qwen} large language models.
+\newblock \url{https://huggingface.co/Qwen/Qwen3-0.6B}, 2025.
+
+\bibitem{rae2019compressive}
+Jack~W. Rae, Anna Potapenko, Siddhant~M. Jayakumar, Chloe Hillier, and Timothy~P. Lillicrap.
+\newblock Compressive transformers for long-range sequence modelling.
+\newblock In {\em International Conference on Learning Representations}, 2020.
+
+\bibitem{wu2022memorising}
+Yuhuai Wu, Markus~N. Rabe, DeLesley Hutchins, and Christian Szegedy.
+\newblock Memorizing transformers.
+\newblock In {\em International Conference on Learning Representations}, 2022.
+
+\bibitem{xie2024lrmt}
+Anonymous Xie.
+\newblock {LRMT}: Long recurrent memory transformers.
+\newblock {\em arXiv preprint}, 2024.
+
+\bibitem{xu2022msc}
+Jing Xu, Arthur Szlam, and Jason Weston.
+\newblock Beyond goldfish memory: Long-term open-domain conversation.
+\newblock In {\em Annual Meeting of the Association for Computational Linguistics}, 2022.
+
+\end{thebibliography}

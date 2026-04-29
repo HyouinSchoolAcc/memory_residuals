@@ -1,0 +1,1427 @@
+{
+  "pg19_val": {
+    "n_chains_scored": 47,
+    "n_score_positions": 188,
+    "ce_mem": 2.961198702137521,
+    "ce_nomem": 2.970952160814975,
+    "ce_shuffle": 2.9264174523402233,
+    "ce_oracle_concat": 2.8983165504450494,
+    "ce_rag": null,
+    "delta_nomem_minus_mem": 0.009753458677454141,
+    "delta_shuffle_minus_mem": -0.034781249797297686,
+    "delta_oracle_minus_mem": -0.06288215169247158,
+    "delta_rag_minus_mem": null,
+    "memory_capture_ratio": 0.13427929672210057,
+    "per_chain": [
+      {
+        "chain_id": "1022",
+        "length": 19,
+        "ce_mem": 3.405659019947052,
+        "ce_nomem": 3.4178786277770996,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.418503165245056,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "13089",
+        "length": 5,
+        "ce_mem": 2.752167046070099,
+        "ce_nomem": 2.7737810015678406,
+        "ce_shuffle": 2.7823328971862793,
+        "ce_oracle": 2.739794075489044,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "16959",
+        "length": 18,
+        "ce_mem": 3.1239495873451233,
+        "ce_nomem": 3.127606511116028,
+        "ce_shuffle": 3.1547717452049255,
+        "ce_oracle": 3.0584256052970886,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "1925",
+        "length": 91,
+        "ce_mem": 3.355079174041748,
+        "ce_nomem": 3.359873950481415,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.2513617873191833,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "2383",
+        "length": 6,
+        "ce_mem": 2.8237201869487762,
+        "ce_nomem": 2.8274662494659424,
+        "ce_shuffle": 2.8486185371875763,
+        "ce_oracle": 2.6453564018011093,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "23956",
+        "length": 47,
+        "ce_mem": 3.2542200088500977,
+        "ce_nomem": 3.2732030153274536,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.2197177410125732,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "24360",
+        "length": 34,
+        "ce_mem": 3.189938008785248,
+        "ce_nomem": 3.1987500190734863,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.0894010066986084,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "25066",
+        "length": 10,
+        "ce_mem": 1.8068757206201553,
+        "ce_nomem": 1.8123907893896103,
+        "ce_shuffle": 1.8226627260446548,
+        "ce_oracle": 1.8247117698192596,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "27688",
+        "length": 40,
+        "ce_mem": 2.9862298369407654,
+        "ce_nomem": 2.9894461631774902,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.001568913459778,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "28213",
+        "length": 15,
+        "ce_mem": 2.5658789575099945,
+        "ce_nomem": 2.5667213201522827,
+        "ce_shuffle": 2.8928935527801514,
+        "ce_oracle": 2.5702094733715057,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "28776",
+        "length": 11,
+        "ce_mem": 2.404384672641754,
+        "ce_nomem": 2.411850154399872,
+        "ce_shuffle": 2.43270742893219,
+        "ce_oracle": 2.295604646205902,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "29981",
+        "length": 11,
+        "ce_mem": 3.076102137565613,
+        "ce_nomem": 3.0816330313682556,
+        "ce_shuffle": 3.090122699737549,
+        "ce_oracle": 3.0504485964775085,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "32629",
+        "length": 15,
+        "ce_mem": 3.4193339347839355,
+        "ce_nomem": 3.4267919957637787,
+        "ce_shuffle": 3.4264739751815796,
+        "ce_oracle": 3.4142942428588867,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "34016",
+        "length": 17,
+        "ce_mem": 3.6474069952964783,
+        "ce_nomem": 3.6595705151557922,
+        "ce_shuffle": 3.701698064804077,
+        "ce_oracle": 3.325876295566559,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "34056",
+        "length": 17,
+        "ce_mem": 2.846628963947296,
+        "ce_nomem": 2.861600935459137,
+        "ce_shuffle": 2.9036824703216553,
+        "ce_oracle": 2.6566277146339417,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "34100",
+        "length": 37,
+        "ce_mem": 3.08663147687912,
+        "ce_nomem": 3.1017907857894897,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.0167441368103027,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "356",
+        "length": 17,
+        "ce_mem": 3.0999337434768677,
+        "ce_nomem": 3.1086525917053223,
+        "ce_shuffle": 3.1445682644844055,
+        "ce_oracle": 3.10119092464447,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "35816",
+        "length": 43,
+        "ce_mem": 3.009768009185791,
+        "ce_nomem": 3.017617344856262,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.9375513195991516,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "36402",
+        "length": 16,
+        "ce_mem": 2.9602920413017273,
+        "ce_nomem": 2.979856312274933,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.952714502811432,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37833",
+        "length": 9,
+        "ce_mem": 2.9676356315612793,
+        "ce_nomem": 2.973520040512085,
+        "ce_shuffle": 2.9914087653160095,
+        "ce_oracle": 2.8912023305892944,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "38214",
+        "length": 159,
+        "ce_mem": 2.296963334083557,
+        "ce_nomem": 2.3020697832107544,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.0532436668872833,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "38403",
+        "length": 77,
+        "ce_mem": 2.7539696097373962,
+        "ce_nomem": 2.7562183141708374,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.787929117679596,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "4024",
+        "length": 25,
+        "ce_mem": 2.7643573880195618,
+        "ce_nomem": 2.766070008277893,
+        "ce_shuffle": 2.781108319759369,
+        "ce_oracle": 2.7042858004570007,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "41074",
+        "length": 98,
+        "ce_mem": 3.1260751485824585,
+        "ce_nomem": 3.1436761021614075,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.1168628334999084,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "42067",
+        "length": 15,
+        "ce_mem": 2.262890547513962,
+        "ce_nomem": 2.269621968269348,
+        "ce_shuffle": 2.2955342233181,
+        "ce_oracle": 2.0761131942272186,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "42142",
+        "length": 28,
+        "ce_mem": 2.8946743607521057,
+        "ce_nomem": 2.913200795650482,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.798274278640747,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "42306",
+        "length": 8,
+        "ce_mem": 1.6111827492713928,
+        "ce_nomem": 1.6197913736104965,
+        "ce_shuffle": 1.6370616853237152,
+        "ce_oracle": 1.567447617650032,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "43423",
+        "length": 139,
+        "ce_mem": 3.449990689754486,
+        "ce_nomem": 3.4590132236480713,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.4213831424713135,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "44896",
+        "length": 63,
+        "ce_mem": 3.050428092479706,
+        "ce_nomem": 3.059028148651123,
+        "ce_shuffle": 3.0706971883773804,
+        "ce_oracle": 2.9982756972312927,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "44912",
+        "length": 106,
+        "ce_mem": 2.53109073638916,
+        "ce_nomem": 2.533212125301361,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.5112549662590027,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "4533",
+        "length": 98,
+        "ce_mem": 2.4074573665857315,
+        "ce_nomem": 2.4145516604185104,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.2684169858694077,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "48089",
+        "length": 44,
+        "ce_mem": 3.5131534337997437,
+        "ce_nomem": 3.53677499294281,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.3984501361846924,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "48461",
+        "length": 20,
+        "ce_mem": 3.309820830821991,
+        "ce_nomem": 3.311928927898407,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.3346517086029053,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "48677",
+        "length": 13,
+        "ce_mem": 2.9992529153823853,
+        "ce_nomem": 3.0118844509124756,
+        "ce_shuffle": 3.02028626203537,
+        "ce_oracle": 2.9444445371627808,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "49091",
+        "length": 17,
+        "ce_mem": 3.0654059052467346,
+        "ce_nomem": 3.0717594027519226,
+        "ce_shuffle": 3.07794851064682,
+        "ce_oracle": 3.0608072876930237,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "50355",
+        "length": 21,
+        "ce_mem": 3.069501519203186,
+        "ce_nomem": 3.091293454170227,
+        "ce_shuffle": 3.0935779213905334,
+        "ce_oracle": 2.9897404313087463,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "51859",
+        "length": 58,
+        "ce_mem": 2.4721344113349915,
+        "ce_nomem": 2.4858908653259277,
+        "ce_shuffle": 2.508964717388153,
+        "ce_oracle": 2.4487993121147156,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5195",
+        "length": 80,
+        "ce_mem": 3.306370735168457,
+        "ce_nomem": 3.3259161710739136,
+        "ce_shuffle": 3.6973915100097656,
+        "ce_oracle": 3.1857107877731323,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "53682",
+        "length": 76,
+        "ce_mem": 3.0633747577667236,
+        "ce_nomem": 3.0599220991134644,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.9877907037734985,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "54098",
+        "length": 5,
+        "ce_mem": 3.077258288860321,
+        "ce_nomem": 3.087304949760437,
+        "ce_shuffle": 3.088004469871521,
+        "ce_oracle": 3.070625901222229,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "555",
+        "length": 17,
+        "ce_mem": 3.4527564644813538,
+        "ce_nomem": 3.472613513469696,
+        "ce_shuffle": 3.4787705540657043,
+        "ce_oracle": 3.4162665605545044,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "55658",
+        "length": 30,
+        "ce_mem": 3.0318819880485535,
+        "ce_nomem": 3.040799915790558,
+        "ce_shuffle": 3.0570912957191467,
+        "ce_oracle": 2.9602913856506348,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "56719",
+        "length": 71,
+        "ce_mem": 3.255481481552124,
+        "ce_nomem": 3.26417338848114,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.100881516933441,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "58093",
+        "length": 10,
+        "ce_mem": 3.1926556825637817,
+        "ce_nomem": 3.1959333419799805,
+        "ce_shuffle": 3.2003937363624573,
+        "ce_oracle": 3.2077419757843018,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "6404",
+        "length": 92,
+        "ce_mem": 3.4046005606651306,
+        "ce_nomem": 3.411726713180542,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.4014121294021606,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "7510",
+        "length": 37,
+        "ce_mem": 3.3846978545188904,
+        "ce_nomem": 3.4050824642181396,
+        "ce_shuffle": 3.441169857978821,
+        "ce_oracle": 3.3281182646751404,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "8545",
+        "length": 256,
+        "ce_mem": 2.6470769941806793,
+        "ce_nomem": 2.655292049050331,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.6203532814979553,
+        "ce_rag": null
+      }
+    ]
+  },
+  "pg19_test": {
+    "n_chains_scored": 96,
+    "n_score_positions": 384,
+    "ce_mem": 2.9600520425010473,
+    "ce_nomem": 2.970092087130373,
+    "ce_shuffle": 2.9633812439833447,
+    "ce_oracle_concat": 2.8923676014722637,
+    "ce_rag": null,
+    "delta_nomem_minus_mem": 0.010040044629325617,
+    "delta_shuffle_minus_mem": 0.003329201482297428,
+    "delta_oracle_minus_mem": -0.06768444102878357,
+    "delta_rag_minus_mem": null,
+    "memory_capture_ratio": 0.12917479664631418,
+    "per_chain": [
+      {
+        "chain_id": "10146",
+        "length": 72,
+        "ce_mem": 2.9390401244163513,
+        "ce_nomem": 2.9456242322921753,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.9269508719444275,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "10321",
+        "length": 21,
+        "ce_mem": 3.6378430128097534,
+        "ce_nomem": 3.6571383476257324,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.566433608531952,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "10356",
+        "length": 16,
+        "ce_mem": 3.400545120239258,
+        "ce_nomem": 3.4044589400291443,
+        "ce_shuffle": 3.423256814479828,
+        "ce_oracle": 3.418412446975708,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "10762",
+        "length": 18,
+        "ce_mem": 3.512444496154785,
+        "ce_nomem": 3.519150495529175,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.535270392894745,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "12204",
+        "length": 6,
+        "ce_mem": 2.8986578583717346,
+        "ce_nomem": 2.912881076335907,
+        "ce_shuffle": 2.9187301993370056,
+        "ce_oracle": 2.753716766834259,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "15562",
+        "length": 10,
+        "ce_mem": 3.3700543642044067,
+        "ce_nomem": 3.383729040622711,
+        "ce_shuffle": 3.3878241181373596,
+        "ce_oracle": 3.2934513688087463,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "22424",
+        "length": 46,
+        "ce_mem": 3.28376704454422,
+        "ce_nomem": 3.3036916851997375,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.1056211590766907,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "25646",
+        "length": 19,
+        "ce_mem": 2.5001975893974304,
+        "ce_nomem": 2.517798900604248,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.4187673926353455,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "25773",
+        "length": 5,
+        "ce_mem": 2.100170820951462,
+        "ce_nomem": 2.1035813093185425,
+        "ce_shuffle": 2.1036827862262726,
+        "ce_oracle": 1.91347935795784,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "25830",
+        "length": 37,
+        "ce_mem": 2.7432161569595337,
+        "ce_nomem": 2.755674332380295,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.6896803081035614,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "26183",
+        "length": 6,
+        "ce_mem": 2.2405953407287598,
+        "ce_nomem": 2.2534947395324707,
+        "ce_shuffle": 2.2610872983932495,
+        "ce_oracle": 2.0784332156181335,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "26239",
+        "length": 91,
+        "ce_mem": 2.996082842350006,
+        "ce_nomem": 3.00529807806015,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.9232094287872314,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "26493",
+        "length": 5,
+        "ce_mem": 2.9021241068840027,
+        "ce_nomem": 2.916321277618408,
+        "ce_shuffle": 2.945050358772278,
+        "ce_oracle": 2.8974607586860657,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "26618",
+        "length": 7,
+        "ce_mem": 2.871467709541321,
+        "ce_nomem": 2.8810641765594482,
+        "ce_shuffle": 2.8895692825317383,
+        "ce_oracle": 2.8263944387435913,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "27454",
+        "length": 103,
+        "ce_mem": 3.0006821751594543,
+        "ce_nomem": 3.0101131796836853,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.927167057991028,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "28444",
+        "length": 25,
+        "ce_mem": 3.0950560569763184,
+        "ce_nomem": 3.1059823632240295,
+        "ce_shuffle": 3.098122715950012,
+        "ce_oracle": 3.082497715950012,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "28988",
+        "length": 62,
+        "ce_mem": 3.1615511775016785,
+        "ce_nomem": 3.1755723357200623,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.1279650926589966,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "29594",
+        "length": 5,
+        "ce_mem": 3.2988491654396057,
+        "ce_nomem": 3.311750829219818,
+        "ce_shuffle": 3.3440831303596497,
+        "ce_oracle": 3.255997121334076,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "29973",
+        "length": 12,
+        "ce_mem": 2.727758824825287,
+        "ce_nomem": 2.7456937432289124,
+        "ce_shuffle": 2.754388928413391,
+        "ce_oracle": 2.6973859071731567,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "30312",
+        "length": 97,
+        "ce_mem": 3.4375004172325134,
+        "ce_nomem": 3.446206271648407,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.4055296778678894,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "30752",
+        "length": 50,
+        "ce_mem": 2.9188982248306274,
+        "ce_nomem": 2.9249731302261353,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.826027750968933,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "30754",
+        "length": 31,
+        "ce_mem": 3.0943263173103333,
+        "ce_nomem": 3.1075104475021362,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.0052457451820374,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "30909",
+        "length": 12,
+        "ce_mem": 2.394295632839203,
+        "ce_nomem": 2.408401668071747,
+        "ce_shuffle": 2.4414398670196533,
+        "ce_oracle": 2.3339346051216125,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "30981",
+        "length": 10,
+        "ce_mem": 3.388647735118866,
+        "ce_nomem": 3.3972741961479187,
+        "ce_shuffle": 3.406041145324707,
+        "ce_oracle": 3.311380088329315,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "31065",
+        "length": 21,
+        "ce_mem": 2.6716012954711914,
+        "ce_nomem": 2.6832695603370667,
+        "ce_shuffle": 2.7068302035331726,
+        "ce_oracle": 2.6159905791282654,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3129",
+        "length": 23,
+        "ce_mem": 3.492255747318268,
+        "ce_nomem": 3.4937665462493896,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.473270535469055,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "31974",
+        "length": 5,
+        "ce_mem": 2.8422183990478516,
+        "ce_nomem": 2.853453516960144,
+        "ce_shuffle": 2.8580769300460815,
+        "ce_oracle": 2.7955486178398132,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3247",
+        "length": 22,
+        "ce_mem": 3.242835223674774,
+        "ce_nomem": 3.2424632906913757,
+        "ce_shuffle": 3.257243037223816,
+        "ce_oracle": 3.185425281524658,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "32761",
+        "length": 27,
+        "ce_mem": 3.0056228637695312,
+        "ce_nomem": 3.007719337940216,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.041721999645233,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3340",
+        "length": 19,
+        "ce_mem": 3.2225416898727417,
+        "ce_nomem": 3.235115647315979,
+        "ce_shuffle": 3.1726850271224976,
+        "ce_oracle": 3.2004624605178833,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "33426",
+        "length": 16,
+        "ce_mem": 3.054790496826172,
+        "ce_nomem": 3.066244423389435,
+        "ce_shuffle": 3.0805949568748474,
+        "ce_oracle": 2.9347615838050842,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "33756",
+        "length": 91,
+        "ce_mem": 3.0224832892417908,
+        "ce_nomem": 3.023818790912628,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.977890133857727,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "34467",
+        "length": 14,
+        "ce_mem": 2.8037367463111877,
+        "ce_nomem": 2.8044865131378174,
+        "ce_shuffle": 2.8173166513442993,
+        "ce_oracle": 2.676410138607025,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "35205",
+        "length": 22,
+        "ce_mem": 2.829101026058197,
+        "ce_nomem": 2.843070924282074,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.7864362001419067,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "35246",
+        "length": 16,
+        "ce_mem": 2.994818866252899,
+        "ce_nomem": 3.00628525018692,
+        "ce_shuffle": 3.0158368945121765,
+        "ce_oracle": 2.934419274330139,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3608",
+        "length": 54,
+        "ce_mem": 2.8263916969299316,
+        "ce_nomem": 2.837123215198517,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.7883352041244507,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "36256",
+        "length": 26,
+        "ce_mem": 3.7130134105682373,
+        "ce_nomem": 3.7323966026306152,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.6092737913131714,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37006",
+        "length": 18,
+        "ce_mem": 2.7989187836647034,
+        "ce_nomem": 2.809687376022339,
+        "ce_shuffle": 2.820219576358795,
+        "ce_oracle": 2.7274391651153564,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37328",
+        "length": 41,
+        "ce_mem": 3.1450199484825134,
+        "ce_nomem": 3.1545411944389343,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.11938214302063,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37403",
+        "length": 27,
+        "ce_mem": 1.17976962774992,
+        "ce_nomem": 1.1829493269324303,
+        "ce_shuffle": NaN,
+        "ce_oracle": 1.1285111829638481,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37443",
+        "length": 7,
+        "ce_mem": 2.4844643473625183,
+        "ce_nomem": 2.490716576576233,
+        "ce_shuffle": 2.4916516840457916,
+        "ce_oracle": 2.356207549571991,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3754",
+        "length": 15,
+        "ce_mem": 3.4289709329605103,
+        "ce_nomem": 3.4415364861488342,
+        "ce_shuffle": 3.4495688676834106,
+        "ce_oracle": 3.4437906742095947,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "37702",
+        "length": 20,
+        "ce_mem": 3.180388391017914,
+        "ce_nomem": 3.190121352672577,
+        "ce_shuffle": 3.1975253224372864,
+        "ce_oracle": 3.1558995246887207,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "38106",
+        "length": 107,
+        "ce_mem": 3.3605753779411316,
+        "ce_nomem": 3.3679490089416504,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.381730079650879,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "3890",
+        "length": 47,
+        "ce_mem": 2.726535677909851,
+        "ce_nomem": 2.732803225517273,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.7108137607574463,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "38929",
+        "length": 19,
+        "ce_mem": 3.351224184036255,
+        "ce_nomem": 3.3665480613708496,
+        "ce_shuffle": 3.362485110759735,
+        "ce_oracle": 3.3053616881370544,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "38955",
+        "length": 75,
+        "ce_mem": 2.8981776237487793,
+        "ce_nomem": 2.9029749631881714,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.9192200303077698,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "40579",
+        "length": 102,
+        "ce_mem": 2.9523540139198303,
+        "ce_nomem": 2.970040261745453,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.776040196418762,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "40700",
+        "length": 37,
+        "ce_mem": 2.4508863538503647,
+        "ce_nomem": 2.457712084054947,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.2782136499881744,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "4128",
+        "length": 29,
+        "ce_mem": 3.3445451855659485,
+        "ce_nomem": 3.37144273519516,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.2125574946403503,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "41603",
+        "length": 15,
+        "ce_mem": 2.919390380382538,
+        "ce_nomem": 2.9276148080825806,
+        "ce_shuffle": 3.006990909576416,
+        "ce_oracle": 2.9769821166992188,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "41607",
+        "length": 13,
+        "ce_mem": 2.9781386256217957,
+        "ce_nomem": 2.9792094230651855,
+        "ce_shuffle": 2.9971150159835815,
+        "ce_oracle": 2.976121485233307,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "42081",
+        "length": 231,
+        "ce_mem": 2.5824121832847595,
+        "ce_nomem": 2.5917252600193024,
+        "ce_shuffle": 2.624277800321579,
+        "ce_oracle": 2.5264181196689606,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "42655",
+        "length": 245,
+        "ce_mem": 2.9024543166160583,
+        "ce_nomem": 2.9154359698295593,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.8345667719841003,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "43536",
+        "length": 14,
+        "ce_mem": 2.295801877975464,
+        "ce_nomem": 2.2992627024650574,
+        "ce_shuffle": 2.295738637447357,
+        "ce_oracle": 2.2596328258514404,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "43845",
+        "length": 15,
+        "ce_mem": 3.6079189777374268,
+        "ce_nomem": 3.6218637824058533,
+        "ce_shuffle": 3.6456217169761658,
+        "ce_oracle": 3.6047624945640564,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "44099",
+        "length": 37,
+        "ce_mem": 2.28036367893219,
+        "ce_nomem": 2.288584679365158,
+        "ce_shuffle": 2.301612079143524,
+        "ce_oracle": 2.1830833554267883,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "44557",
+        "length": 65,
+        "ce_mem": 3.2161254286766052,
+        "ce_nomem": 3.2251423001289368,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.181215763092041,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "45313",
+        "length": 7,
+        "ce_mem": 1.9528819024562836,
+        "ce_nomem": 1.9489083886146545,
+        "ce_shuffle": 1.970578819513321,
+        "ce_oracle": 1.4893438518047333,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "45881",
+        "length": 11,
+        "ce_mem": 2.7410855889320374,
+        "ce_nomem": 2.7469706535339355,
+        "ce_shuffle": 2.7719438076019287,
+        "ce_oracle": 2.733079195022583,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "45888",
+        "length": 196,
+        "ce_mem": 2.9515191316604614,
+        "ce_nomem": 2.9616833925247192,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.878753125667572,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "46915",
+        "length": 6,
+        "ce_mem": 1.7585688531398773,
+        "ce_nomem": 1.7633941173553467,
+        "ce_shuffle": 1.7751759886741638,
+        "ce_oracle": 1.6469826996326447,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "47068",
+        "length": 9,
+        "ce_mem": 3.092386305332184,
+        "ce_nomem": 3.0973531007766724,
+        "ce_shuffle": 3.1302284002304077,
+        "ce_oracle": 3.048462927341461,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "47558",
+        "length": 39,
+        "ce_mem": 3.3115034103393555,
+        "ce_nomem": 3.3181684613227844,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.012507677078247,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "47581",
+        "length": 21,
+        "ce_mem": 2.7578109353780746,
+        "ce_nomem": 2.756009504199028,
+        "ce_shuffle": 2.7925283908843994,
+        "ce_oracle": 2.7245837599039078,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "47676",
+        "length": 83,
+        "ce_mem": 2.3364681899547577,
+        "ce_nomem": 2.3376125395298004,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.1946100890636444,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "48693",
+        "length": 23,
+        "ce_mem": 2.690803587436676,
+        "ce_nomem": 2.694024384021759,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.6706658005714417,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "49078",
+        "length": 16,
+        "ce_mem": 3.044714570045471,
+        "ce_nomem": 3.055563747882843,
+        "ce_shuffle": 3.070429027080536,
+        "ce_oracle": 2.948907256126404,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "49529",
+        "length": 20,
+        "ce_mem": 2.78934782743454,
+        "ce_nomem": 2.7940314412117004,
+        "ce_shuffle": 2.799446940422058,
+        "ce_oracle": 2.8101657032966614,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "49596",
+        "length": 24,
+        "ce_mem": 2.829101085662842,
+        "ce_nomem": 2.8537824749946594,
+        "ce_shuffle": 2.8678898215293884,
+        "ce_oracle": 2.687616527080536,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "50287",
+        "length": 24,
+        "ce_mem": 2.838082253932953,
+        "ce_nomem": 2.863508880138397,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.7258375883102417,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "51410",
+        "length": 11,
+        "ce_mem": 3.354176878929138,
+        "ce_nomem": 3.3645642399787903,
+        "ce_shuffle": 3.3980570435523987,
+        "ce_oracle": 3.300940990447998,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "53345",
+        "length": 42,
+        "ce_mem": 2.6365668773651123,
+        "ce_nomem": 2.6461334824562073,
+        "ce_shuffle": 2.640944480895996,
+        "ce_oracle": 2.6113346815109253,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5396",
+        "length": 50,
+        "ce_mem": 3.207850754261017,
+        "ce_nomem": 3.209727466106415,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.223591387271881,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "54537",
+        "length": 10,
+        "ce_mem": 2.684140980243683,
+        "ce_nomem": 2.695325255393982,
+        "ce_shuffle": 2.710586428642273,
+        "ce_oracle": 2.641326069831848,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "54624",
+        "length": 20,
+        "ce_mem": 3.1614867448806763,
+        "ce_nomem": 3.17300546169281,
+        "ce_shuffle": 3.18271666765213,
+        "ce_oracle": 3.14287006855011,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "55339",
+        "length": 36,
+        "ce_mem": 3.220686972141266,
+        "ce_nomem": 3.2308031916618347,
+        "ce_shuffle": 3.2309356530507407,
+        "ce_oracle": 3.255484402179718,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "55871",
+        "length": 34,
+        "ce_mem": 2.6925246715545654,
+        "ce_nomem": 2.7025012969970703,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.5504260659217834,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "56410",
+        "length": 10,
+        "ce_mem": 3.173380136489868,
+        "ce_nomem": 3.1819461584091187,
+        "ce_shuffle": 3.21000212430954,
+        "ce_oracle": 3.1126580834388733,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5734",
+        "length": 26,
+        "ce_mem": 2.7300732135772705,
+        "ce_nomem": 2.741202175617218,
+        "ce_shuffle": 2.7582759261131287,
+        "ce_oracle": 2.723622739315033,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5770",
+        "length": 31,
+        "ce_mem": 2.989661455154419,
+        "ce_nomem": 3.006515324115753,
+        "ce_shuffle": 3.0956220626831055,
+        "ce_oracle": 2.8422693610191345,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "57791",
+        "length": 28,
+        "ce_mem": 2.76785945892334,
+        "ce_nomem": 2.7854304909706116,
+        "ce_shuffle": 2.8095788955688477,
+        "ce_oracle": 2.602947950363159,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "58473",
+        "length": 39,
+        "ce_mem": 3.082343101501465,
+        "ce_nomem": 3.0949286222457886,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.78658390045166,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "58553",
+        "length": 18,
+        "ce_mem": 3.12591153383255,
+        "ce_nomem": 3.134819209575653,
+        "ce_shuffle": 3.1356700658798218,
+        "ce_oracle": 3.0655640959739685,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "58598",
+        "length": 33,
+        "ce_mem": 3.021178513765335,
+        "ce_nomem": 3.030993700027466,
+        "ce_shuffle": 3.0412525832653046,
+        "ce_oracle": 2.9421182572841644,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5956",
+        "length": 71,
+        "ce_mem": 2.906848132610321,
+        "ce_nomem": 2.9171453714370728,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.875785708427429,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "5962",
+        "length": 26,
+        "ce_mem": 2.766443967819214,
+        "ce_nomem": 2.7802154421806335,
+        "ce_shuffle": 2.7804206013679504,
+        "ce_oracle": 2.7101962566375732,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "6412",
+        "length": 60,
+        "ce_mem": 3.147575259208679,
+        "ce_nomem": 3.1534228920936584,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.0675622820854187,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "6941",
+        "length": 45,
+        "ce_mem": 3.424690902233124,
+        "ce_nomem": 3.4331666231155396,
+        "ce_shuffle": 3.4329534769058228,
+        "ce_oracle": 3.424358904361725,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "7412",
+        "length": 77,
+        "ce_mem": 3.22460800409317,
+        "ce_nomem": 3.230996072292328,
+        "ce_shuffle": NaN,
+        "ce_oracle": 3.188232958316803,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "7987",
+        "length": 36,
+        "ce_mem": 3.3749905228614807,
+        "ce_nomem": 3.3889521956443787,
+        "ce_shuffle": 3.409332513809204,
+        "ce_oracle": 3.3407662510871887,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "8197",
+        "length": 35,
+        "ce_mem": 3.531636357307434,
+        "ce_nomem": 3.5507845282554626,
+        "ce_shuffle": 3.588848888874054,
+        "ce_oracle": 3.516045570373535,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "8559",
+        "length": 67,
+        "ce_mem": 2.8738973736763,
+        "ce_nomem": 2.8780882358551025,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.8483158946037292,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "860",
+        "length": 30,
+        "ce_mem": 2.9092795848846436,
+        "ce_nomem": 2.9289904832839966,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.8202003240585327,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "9315",
+        "length": 6,
+        "ce_mem": 4.032480418682098,
+        "ce_nomem": 4.040307283401489,
+        "ce_shuffle": 4.063462555408478,
+        "ce_oracle": 3.8348100781440735,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "9931",
+        "length": 30,
+        "ce_mem": 3.3108116388320923,
+        "ce_nomem": 3.3274040818214417,
+        "ce_shuffle": 3.362498164176941,
+        "ce_oracle": 3.2694531083106995,
+        "ce_rag": null
+      }
+    ]
+  },
+  "locomo": {
+    "n_chains_scored": 10,
+    "n_score_positions": 40,
+    "ce_mem": 2.5670563161373137,
+    "ce_nomem": 2.565061408281326,
+    "ce_shuffle": 2.553383481502533,
+    "ce_oracle_concat": 2.3739468157291412,
+    "ce_rag": null,
+    "delta_nomem_minus_mem": -0.001994907855987549,
+    "delta_shuffle_minus_mem": -0.013672834634780529,
+    "delta_oracle_minus_mem": -0.19310950040817243,
+    "delta_rag_minus_mem": null,
+    "memory_capture_ratio": -0.010438281186941957,
+    "per_chain": [
+      {
+        "chain_id": "conv-26",
+        "length": 19,
+        "ce_mem": 2.595030426979065,
+        "ce_nomem": 2.5924386382102966,
+        "ce_shuffle": 2.595763862133026,
+        "ce_oracle": 2.4250322580337524,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-30",
+        "length": 19,
+        "ce_mem": 2.4181732535362244,
+        "ce_nomem": 2.4101839661598206,
+        "ce_shuffle": 2.4259414076805115,
+        "ce_oracle": 2.195194274187088,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-41",
+        "length": 32,
+        "ce_mem": 2.5406402945518494,
+        "ce_nomem": 2.5379210114479065,
+        "ce_shuffle": 2.5627609491348267,
+        "ce_oracle": 2.3401308059692383,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-42",
+        "length": 29,
+        "ce_mem": 2.700597405433655,
+        "ce_nomem": 2.696403443813324,
+        "ce_shuffle": 2.6998897790908813,
+        "ce_oracle": 2.4577486515045166,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-43",
+        "length": 29,
+        "ce_mem": 2.3582264184951782,
+        "ce_nomem": 2.3486647605895996,
+        "ce_shuffle": 2.3547336757183075,
+        "ce_oracle": 2.1940784752368927,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-44",
+        "length": 28,
+        "ce_mem": 2.6759268641471863,
+        "ce_nomem": 2.6735905408859253,
+        "ce_shuffle": 2.6751356720924377,
+        "ce_oracle": 2.473229169845581,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-47",
+        "length": 31,
+        "ce_mem": 2.496497392654419,
+        "ce_nomem": 2.5105751752853394,
+        "ce_shuffle": 2.5025740265846252,
+        "ce_oracle": 2.3277013301849365,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-48",
+        "length": 30,
+        "ce_mem": 2.623628318309784,
+        "ce_nomem": 2.625558912754059,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.4668749570846558,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-49",
+        "length": 25,
+        "ce_mem": 2.6148552298545837,
+        "ce_nomem": 2.6050735116004944,
+        "ce_shuffle": 2.6149572134017944,
+        "ce_oracle": 2.4472712874412537,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-50",
+        "length": 30,
+        "ce_mem": 2.646987557411194,
+        "ce_nomem": 2.650204122066498,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.4122069478034973,
+        "ce_rag": null
+      }
+    ]
+  }
+}

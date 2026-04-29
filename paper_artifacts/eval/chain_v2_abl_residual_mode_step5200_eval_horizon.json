@@ -1,0 +1,249 @@
+{
+  "pg19_val": {
+    "n_chains_total": 47,
+    "buckets": [
+      {
+        "lo": 0,
+        "hi": 7,
+        "label": "0-7",
+        "n_chains": 3,
+        "mean_chain_length": 5.333333333333333,
+        "ce_mem": 2.8843818406263986,
+        "ce_nomem": 2.8961840669314065,
+        "ce_shuffle": 2.906318634748459,
+        "ce_oracle": 2.818592126170794,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.011802226305007935,
+        "delta_shuffle_minus_mem": 0.021936794122060288,
+        "delta_oracle_minus_mem": -0.06578971445560455
+      },
+      {
+        "lo": 8,
+        "hi": 15,
+        "label": "8-15",
+        "n_chains": 10,
+        "mean_chain_length": 11.7,
+        "ce_mem": 2.6306192949414253,
+        "ce_nomem": 2.6370138466358184,
+        "ce_shuffle": 2.680954505503178,
+        "ce_oracle": 2.584221838414669,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.006394551694393069,
+        "delta_shuffle_minus_mem": 0.0503352105617525,
+        "delta_oracle_minus_mem": -0.0463974565267562
+      },
+      {
+        "lo": 16,
+        "hi": 31,
+        "label": "16-31",
+        "n_chains": 13,
+        "mean_chain_length": 20.153846153846153,
+        "ce_mem": 3.128636062145233,
+        "ce_nomem": 3.1402178085767307,
+        "ce_shuffle": 3.154801905155182,
+        "ce_oracle": 3.0598196662389316,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.011581746431497564,
+        "delta_shuffle_minus_mem": 0.02616584300994873,
+        "delta_oracle_minus_mem": -0.06881639590630151
+      },
+      {
+        "lo": 32,
+        "hi": 63,
+        "label": "32-63",
+        "n_chains": 9,
+        "mean_chain_length": 44.77777777777778,
+        "ce_mem": 3.1052445703082614,
+        "ce_nomem": 3.118620422151354,
+        "ce_shuffle": 3.006943921248118,
+        "ce_oracle": 3.0487362808651395,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.013375851843092423,
+        "delta_shuffle_minus_mem": -0.09830064906014346,
+        "delta_oracle_minus_mem": -0.05650828944312192
+      },
+      {
+        "lo": 64,
+        "hi": 127,
+        "label": "64-127",
+        "n_chains": 9,
+        "mean_chain_length": 87.66666666666667,
+        "ce_mem": 3.022611063387659,
+        "ce_nomem": 3.029918947153621,
+        "ce_shuffle": 3.6973915100097656,
+        "ce_oracle": 2.956846758723259,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.007307883765962142,
+        "delta_shuffle_minus_mem": 0.6747804466221066,
+        "delta_oracle_minus_mem": -0.06576430466440009
+      },
+      {
+        "lo": 128,
+        "hi": 1000000000,
+        "label": "128+",
+        "n_chains": 3,
+        "mean_chain_length": 184.66666666666666,
+        "ce_mem": 2.7980103393395743,
+        "ce_nomem": 2.805458351969719,
+        "ce_shuffle": null,
+        "ce_oracle": 2.698326696952184,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.007448012630144607,
+        "delta_oracle_minus_mem": -0.09968364238739014
+      }
+    ]
+  },
+  "pg19_test": {
+    "n_chains_total": 96,
+    "buckets": [
+      {
+        "lo": 0,
+        "hi": 7,
+        "label": "0-7",
+        "n_chains": 11,
+        "mean_chain_length": 5.909090909090909,
+        "ce_mem": 2.6711344475095924,
+        "ce_nomem": 2.679624844681133,
+        "ce_shuffle": 2.69283173030073,
+        "ce_oracle": 2.531670405106111,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.008490397171540653,
+        "delta_shuffle_minus_mem": 0.021697282791137695,
+        "delta_oracle_minus_mem": -0.13946404240348143
+      },
+      {
+        "lo": 8,
+        "hi": 15,
+        "label": "8-15",
+        "n_chains": 15,
+        "mean_chain_length": 12.066666666666666,
+        "ce_mem": 2.997325599193573,
+        "ce_nomem": 3.0063487847646075,
+        "ce_shuffle": 3.0281909108161926,
+        "ce_oracle": 2.9606879313786822,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.009023185571034542,
+        "delta_shuffle_minus_mem": 0.03086531162261963,
+        "delta_oracle_minus_mem": -0.03663766781489075
+      },
+      {
+        "lo": 16,
+        "hi": 31,
+        "label": "16-31",
+        "n_chains": 34,
+        "mean_chain_length": 22.705882352941178,
+        "ce_mem": 3.0009772718391,
+        "ce_nomem": 3.012871265630512,
+        "ce_shuffle": 3.0376131534576416,
+        "ce_oracle": 2.943619370679645,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.011893993791411983,
+        "delta_shuffle_minus_mem": 0.0366358816185417,
+        "delta_oracle_minus_mem": -0.057357901159454716
+      },
+      {
+        "lo": 32,
+        "hi": 63,
+        "label": "32-63",
+        "n_chains": 20,
+        "mean_chain_length": 43.0,
+        "ce_mem": 3.009408865123987,
+        "ce_nomem": 3.019512917101383,
+        "ce_shuffle": 3.09226852513495,
+        "ce_oracle": 2.927995090186596,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.010104051977395834,
+        "delta_shuffle_minus_mem": 0.08285966001096279,
+        "delta_oracle_minus_mem": -0.0814137749373911
+      },
+      {
+        "lo": 64,
+        "hi": 127,
+        "label": "64-127",
+        "n_chains": 13,
+        "mean_chain_length": 84.6923076923077,
+        "ce_mem": 3.0126802302323856,
+        "ce_nomem": 3.020077638901197,
+        "ce_shuffle": null,
+        "ce_oracle": 2.9635306069484124,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.007397408668811334,
+        "delta_oracle_minus_mem": -0.04914962328397321
+      },
+      {
+        "lo": 128,
+        "hi": 1000000000,
+        "label": "128+",
+        "n_chains": 3,
+        "mean_chain_length": 224.0,
+        "ce_mem": 2.8121285438537598,
+        "ce_nomem": 2.8229482074578605,
+        "ce_shuffle": 2.624277800321579,
+        "ce_oracle": 2.746579339106878,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": 0.010819663604100693,
+        "delta_shuffle_minus_mem": -0.1878507435321808,
+        "delta_oracle_minus_mem": -0.06554920474688197
+      }
+    ]
+  },
+  "locomo": {
+    "n_chains_total": 10,
+    "buckets": [
+      {
+        "lo": 0,
+        "hi": 7,
+        "label": "0-7",
+        "n_chains": 0
+      },
+      {
+        "lo": 8,
+        "hi": 15,
+        "label": "8-15",
+        "n_chains": 0
+      },
+      {
+        "lo": 16,
+        "hi": 31,
+        "label": "16-31",
+        "n_chains": 9,
+        "mean_chain_length": 26.666666666666668,
+        "ce_mem": 2.56999142964681,
+        "ce_nomem": 2.568077007929484,
+        "ce_shuffle": 2.5527136623859406,
+        "ce_oracle": 2.3777041501469083,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": -0.0019144217173261424,
+        "delta_shuffle_minus_mem": -0.017277767260869492,
+        "delta_oracle_minus_mem": -0.19228727949990176
+      },
+      {
+        "lo": 32,
+        "hi": 63,
+        "label": "32-63",
+        "n_chains": 1,
+        "mean_chain_length": 32.0,
+        "ce_mem": 2.5406402945518494,
+        "ce_nomem": 2.5379210114479065,
+        "ce_shuffle": 2.5627609491348267,
+        "ce_oracle": 2.3401308059692383,
+        "ce_rag": null,
+        "delta_nomem_minus_mem": -0.002719283103942871,
+        "delta_shuffle_minus_mem": 0.022120654582977295,
+        "delta_oracle_minus_mem": -0.20050948858261108
+      },
+      {
+        "lo": 64,
+        "hi": 127,
+        "label": "64-127",
+        "n_chains": 0
+      },
+      {
+        "lo": 128,
+        "hi": 1000000000,
+        "label": "128+",
+        "n_chains": 0
+      }
+    ]
+  }
+}

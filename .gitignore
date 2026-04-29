@@ -13,3 +13,8 @@ paper_artifacts/chains/stage1_train_s512.pt
 paper_artifacts/chains/stage1_train_s512_full.pt
 paper_artifacts/pairs/
 logs/
+paper_tools/cloud_watchdog/queue/
+paper_tools/cloud_watchdog/running/
+paper_tools/cloud_watchdog/done/
+paper_tools/cloud_watchdog/failed/
+paper_tools/cloud_watchdog/.ntfy_topic
