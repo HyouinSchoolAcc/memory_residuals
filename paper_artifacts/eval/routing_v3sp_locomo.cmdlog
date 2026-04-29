@@ -1,0 +1,22 @@
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 8177.49it/s]
+model loaded; memres_mode=attention_parity
+routing chains:   0%|          | 0/10 [00:00<?, ?it/s]routing chains:  10%|█         | 1/10 [00:00<00:08,  1.05it/s]routing chains:  20%|██        | 2/10 [00:01<00:07,  1.11it/s]routing chains:  30%|███       | 3/10 [00:02<00:05,  1.23it/s]routing chains:  40%|████      | 4/10 [00:03<00:04,  1.21it/s]routing chains:  50%|█████     | 5/10 [00:04<00:04,  1.17it/s]routing chains:  60%|██████    | 6/10 [00:05<00:03,  1.21it/s]routing chains:  70%|███████   | 7/10 [00:05<00:02,  1.19it/s]routing chains:  80%|████████  | 8/10 [00:06<00:01,  1.34it/s]routing chains:  90%|█████████ | 9/10 [00:07<00:00,  1.30it/s]routing chains: 100%|██████████| 10/10 [00:07<00:00,  1.50it/s]routing chains: 100%|██████████| 10/10 [00:07<00:00,  1.30it/s]
+saved -> /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_locomo.json
+{
+  "n_sublayers": 55,
+  "n_score_positions": 40,
+  "alpha_mem_by_sublayer.mem.mean": 0.0003087323836454041,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.0003111478874706958,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00030992510333044886,
+    0.00031148111190878184,
+    0.0003007638852283149,
+    0.0003127594341140713
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.0003054572816540846,
+    0.0003099554778454307,
+    0.00030919168398485226,
+    0.00032097039431868275
+  ]
+}

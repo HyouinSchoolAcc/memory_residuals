@@ -1,0 +1,423 @@
+=== overnight traces ===
+started:   2026-04-29T03:07:37+00:00
+host:      192-222-50-225
+repo:      /home/ubuntu/memory_residuals
+ntfy:      memres-e6ebdc70
+---
+
+[start] routing_v3sp_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_softparity_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_val.json
+[ok]    routing_v3sp_val  (31s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 156,
+  "alpha_mem_by_sublayer.mem.mean": 0.0004732169810754073,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.0004505694159154026,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00047467752518392625,
+    0.00047337636721649947,
+    0.00046478190204077676,
+    0.00048003212986042696
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00044651245644543915,
+    0.00045348155633069797,
+    0.00045510217374723625,
+    0.00044760852550349673
+  ]
+}
+---
+
+[start] cf_v3sp_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3sp_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_softparity_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3sp_val.json
+[ok]    cf_v3sp_val  (30s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 30,
+    "ce_normal": 2.768567458788554,
+    "ce_perturbed": 2.7779799977938335,
+    "delta_mean": 0.009412539005279542,
+    "delta_std": 0.013661786406767846
+  },
+  "depth_2": {
+    "n": 30,
+    "ce_normal": 2.768567458788554,
+    "ce_perturbed": 2.7693988660971325,
+    "delta_mean": 0.0008314073085784913,
+    "delta_std": 0.0050356054997137585
+  },
+  "depth_4": {
+    "n": 30,
+    "ce_normal": 2.768567458788554,
+    "ce_perturbed": 2.7688284873962403,
+    "delta_mean": 0.00026102860768636066,
+    "delta_std": 0.0024734468538556336
+  },
+  "depth_8": {
+    "n": 30,
+    "ce_normal": 2.768567458788554,
+    "ce_perturbed": 2.768605798482895,
+    "delta_mean": 3.8339694341023764e-05,
+    "delta_std": 0.0017008951282189828
+  },
+  "depth_ALL": {
+    "n": 30,
+    "ce_normal": 2.768567458788554,
+    "ce_perturbed": 2.78123703400294,
+    "delta_mean": 0.012669575214385987,
+    "delta_std": 0.009977835217941301
+  }
+}
+---
+
+[start] routing_v3sp_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_softparity_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_locomo.json
+[ok]    routing_v3sp_locomo  (12s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 40,
+  "alpha_mem_by_sublayer.mem.mean": 0.0003087323836454041,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.0003111478874706958,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00030992510333044886,
+    0.00031148111190878184,
+    0.0003007638852283149,
+    0.0003127594341140713
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.0003054572816540846,
+    0.0003099554778454307,
+    0.00030919168398485226,
+    0.00032097039431868275
+  ]
+}
+---
+
+[start] cf_v3sp_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3sp_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_softparity_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3sp_locomo.json
+[ok]    cf_v3sp_locomo  (11s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 10,
+    "ce_normal": 2.5250496864318848,
+    "ce_perturbed": 2.5266075849533083,
+    "delta_mean": 0.0015578985214233399,
+    "delta_std": 0.00880024792302064
+  },
+  "depth_2": {
+    "n": 10,
+    "ce_normal": 2.5250496864318848,
+    "ce_perturbed": 2.525668406486511,
+    "delta_mean": 0.0006187200546264648,
+    "delta_std": 0.002388271054263331
+  },
+  "depth_4": {
+    "n": 10,
+    "ce_normal": 2.5250496864318848,
+    "ce_perturbed": 2.5263091325759888,
+    "delta_mean": 0.001259446144104004,
+    "delta_std": 0.0019273032311615318
+  },
+  "depth_8": {
+    "n": 10,
+    "ce_normal": 2.5250496864318848,
+    "ce_perturbed": 2.526128554344177,
+    "delta_mean": 0.0010788679122924806,
+    "delta_std": 0.0017675199322133633
+  },
+  "depth_ALL": {
+    "n": 10,
+    "ce_normal": 2.5250496864318848,
+    "ce_perturbed": 2.5181639909744264,
+    "delta_mean": -0.006885695457458496,
+    "delta_std": 0.010306866966137201
+  }
+}
+---
+
+[start] routing_v3ab_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3ab_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_attentionbase_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3ab_val.json
+[ok]    routing_v3ab_val  (28s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 156,
+  "alpha_mem_by_sublayer.mem.mean": 0.00014544157076428138,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.00014602349141504587,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00014591538687874135,
+    0.0001460055644247492,
+    0.00014473927860694091,
+    0.00014510605314669428
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00014748201065169474,
+    0.00014552314689614157,
+    0.00014657650153825953,
+    0.00014435877823338748
+  ]
+}
+---
+
+[start] cf_v3ab_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3ab_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_attentionbase_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3ab_val.json
+[ok]    cf_v3ab_val  (33s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7857613523801166,
+    "delta_mean": 0.0030576129754384357,
+    "delta_std": 0.005735968506746997
+  },
+  "depth_2": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7829057733217875,
+    "delta_mean": 0.00020203391710917155,
+    "delta_std": 0.002586278293912486
+  },
+  "depth_4": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7828439831733705,
+    "delta_mean": 0.0001402437686920166,
+    "delta_std": 0.0022106506431260535
+  },
+  "depth_8": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.782647595802943,
+    "delta_mean": -5.614360173543294e-05,
+    "delta_std": 0.001951743671889572
+  },
+  "depth_ALL": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.787722980976105,
+    "delta_mean": 0.005019241571426391,
+    "delta_std": 0.006139447399190628
+  }
+}
+---
+
+[start] routing_v3ab_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3ab_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_attentionbase_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3ab_locomo.json
+[ok]    routing_v3ab_locomo  (11s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 40,
+  "alpha_mem_by_sublayer.mem.mean": 0.00017553447441706095,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.00017574525194745513,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00017427328451102663,
+    0.00017739789762905833,
+    0.00017497420501844715,
+    0.00017549251050971146
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00017623320510857813,
+    0.0001763896158720925,
+    0.0001763796386420143,
+    0.00017381678858345538
+  ]
+}
+---
+
+[start] cf_v3ab_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3ab_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v3_attentionbase_full/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3ab_locomo.json
+[ok]    cf_v3ab_locomo  (11s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 10,
+    "ce_normal": 2.5378379583358766,
+    "ce_perturbed": 2.537137269973755,
+    "delta_mean": -0.000700688362121582,
+    "delta_std": 0.0032689735761870353
+  },
+  "depth_2": {
+    "n": 10,
+    "ce_normal": 2.5378379583358766,
+    "ce_perturbed": 2.539436149597168,
+    "delta_mean": 0.001598191261291504,
+    "delta_std": 0.0016150307211387413
+  },
+  "depth_4": {
+    "n": 10,
+    "ce_normal": 2.5378379583358766,
+    "ce_perturbed": 2.5381894588470457,
+    "delta_mean": 0.0003515005111694336,
+    "delta_std": 0.0018419337616019378
+  },
+  "depth_8": {
+    "n": 10,
+    "ce_normal": 2.5378379583358766,
+    "ce_perturbed": 2.538733696937561,
+    "delta_mean": 0.0008957386016845703,
+    "delta_std": 0.0021121459236216234
+  },
+  "depth_ALL": {
+    "n": 10,
+    "ce_normal": 2.5378379583358766,
+    "ce_perturbed": 2.532961201667786,
+    "delta_mean": -0.00487675666809082,
+    "delta_std": 0.007472332118601365
+  }
+}
+---
+
+[start] routing_v2sp_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v2sp_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v2_phaseA_softparity_b4/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v2sp_val.json
+[ok]    routing_v2sp_val  (29s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 156,
+  "alpha_mem_by_sublayer.mem.mean": 0.0003546283008966314,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.0003481627791992132,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00035953083350872856,
+    0.00035239684783624933,
+    0.00034993017585076904,
+    0.0003566553463907789
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00034146484096504585,
+    0.0003457086589378882,
+    0.00035529193859158627,
+    0.0003508907244322437
+  ]
+}
+---
+
+[start] cf_v2sp_val
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v2sp_val.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v2_phaseA_softparity_b4/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/stage1_validation_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v2sp_val.json
+[ok]    cf_v2sp_val  (32s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 30,
+    "ce_normal": 2.7863528549671175,
+    "ce_perturbed": 2.7948746581872306,
+    "delta_mean": 0.008521803220113118,
+    "delta_std": 0.01137734694889385
+  },
+  "depth_2": {
+    "n": 30,
+    "ce_normal": 2.7863528549671175,
+    "ce_perturbed": 2.7869240403175355,
+    "delta_mean": 0.0005711853504180908,
+    "delta_std": 0.005222253641651425
+  },
+  "depth_4": {
+    "n": 30,
+    "ce_normal": 2.7863528549671175,
+    "ce_perturbed": 2.786050883928935,
+    "delta_mean": -0.0003019710381825765,
+    "delta_std": 0.0022387667183448264
+  },
+  "depth_8": {
+    "n": 30,
+    "ce_normal": 2.7863528549671175,
+    "ce_perturbed": 2.7863930225372315,
+    "delta_mean": 4.016757011413574e-05,
+    "delta_std": 0.0014783118838241163
+  },
+  "depth_ALL": {
+    "n": 30,
+    "ce_normal": 2.7863528549671175,
+    "ce_perturbed": 2.7949138740698496,
+    "delta_mean": 0.008561019102732341,
+    "delta_std": 0.008300592705126808
+  }
+}
+---
+
+[start] routing_v2sp_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v2sp_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/routing_trace.py --model_path /home/ubuntu/memory_residuals/output/chain_v2_phaseA_softparity_b4/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --score_window 4 --max_chains 40 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v2sp_locomo.json
+[ok]    routing_v2sp_locomo  (11s)
+--- summary ---
+{
+  "n_sublayers": 55,
+  "n_score_positions": 40,
+  "alpha_mem_by_sublayer.mem.mean": 0.0002523879987681263,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.00025649372481853733,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00025758096188428754,
+    0.00025342024751425087,
+    0.000247110016571099,
+    0.0002514407691028678
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00025558862357163916,
+    0.0002534273256320924,
+    0.00025430885980175417,
+    0.00026321744747342675
+  ]
+}
+---
+
+[start] cf_v2sp_locomo
+  out:  /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v2sp_locomo.json
+  cmd:  python /home/ubuntu/memory_residuals/paper_tools/counterfactual_eval.py --model_path /home/ubuntu/memory_residuals/output/chain_v2_phaseA_softparity_b4/best --corpus /home/ubuntu/memory_residuals/paper_artifacts/chains/locomo_s512.pt --depths 1 2 4 8 --max_chains 30 --output /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v2sp_locomo.json
+[ok]    cf_v2sp_locomo  (11s)
+--- summary ---
+{
+  "depth_1": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.506199049949646,
+    "delta_mean": 0.0013951778411865235,
+    "delta_std": 0.003780337934146456
+  },
+  "depth_2": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.50475013256073,
+    "delta_mean": -5.373954772949219e-05,
+    "delta_std": 0.002308648118417225
+  },
+  "depth_4": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.5054770946502685,
+    "delta_mean": 0.000673222541809082,
+    "delta_std": 0.0019406873540155033
+  },
+  "depth_8": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.5044983863830566,
+    "delta_mean": -0.000305485725402832,
+    "delta_std": 0.001873010591348147
+  },
+  "depth_ALL": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.507885527610779,
+    "delta_mean": 0.003081655502319336,
+    "delta_std": 0.007678378683292941
+  }
+}
+---
+
+finished: 2026-04-29T03:11:47+00:00
+=== end overnight traces ===

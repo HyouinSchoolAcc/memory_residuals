@@ -1,0 +1,22 @@
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 7859.00it/s]
+model loaded; memres_mode=attention_parity
+routing chains:   0%|          | 0/40 [00:00<?, ?it/s]routing chains:   2%|▎         | 1/40 [00:00<00:23,  1.64it/s]routing chains:   8%|▊         | 3/40 [00:01<00:15,  2.42it/s]routing chains:  10%|█         | 4/40 [00:02<00:18,  1.91it/s]routing chains:  12%|█▎        | 5/40 [00:02<00:19,  1.78it/s]routing chains:  15%|█▌        | 6/40 [00:03<00:20,  1.63it/s]routing chains:  18%|█▊        | 7/40 [00:03<00:19,  1.72it/s]routing chains:  20%|██        | 8/40 [00:04<00:17,  1.88it/s]routing chains:  22%|██▎       | 9/40 [00:05<00:19,  1.63it/s]routing chains:  25%|██▌       | 10/40 [00:05<00:17,  1.75it/s]routing chains:  28%|██▊       | 11/40 [00:06<00:15,  1.82it/s]routing chains:  30%|███       | 12/40 [00:06<00:16,  1.69it/s]routing chains:  32%|███▎      | 13/40 [00:07<00:17,  1.51it/s]routing chains:  35%|███▌      | 14/40 [00:08<00:18,  1.42it/s]routing chains:  38%|███▊      | 15/40 [00:09<00:17,  1.41it/s]routing chains:  40%|████      | 16/40 [00:09<00:17,  1.36it/s]routing chains:  42%|████▎     | 17/40 [00:10<00:15,  1.49it/s]routing chains:  45%|████▌     | 18/40 [00:11<00:15,  1.44it/s]routing chains:  48%|████▊     | 19/40 [00:11<00:13,  1.59it/s]routing chains:  50%|█████     | 20/40 [00:12<00:11,  1.73it/s]routing chains:  52%|█████▎    | 21/40 [00:12<00:12,  1.56it/s]routing chains:  55%|█████▌    | 22/40 [00:13<00:13,  1.36it/s]routing chains:  57%|█████▊    | 23/40 [00:14<00:11,  1.42it/s]routing chains:  60%|██████    | 24/40 [00:15<00:11,  1.39it/s]routing chains:  62%|██████▎   | 25/40 [00:15<00:10,  1.48it/s]routing chains:  65%|██████▌   | 26/40 [00:16<00:10,  1.37it/s]routing chains:  68%|██████▊   | 27/40 [00:17<00:08,  1.55it/s]routing chains:  70%|███████   | 28/40 [00:17<00:07,  1.51it/s]routing chains:  72%|███████▎  | 29/40 [00:18<00:07,  1.38it/s]routing chains:  75%|███████▌  | 30/40 [00:19<00:08,  1.24it/s]routing chains:  78%|███████▊  | 31/40 [00:20<00:07,  1.23it/s]routing chains:  80%|████████  | 32/40 [00:21<00:06,  1.25it/s]routing chains:  82%|████████▎ | 33/40 [00:21<00:04,  1.43it/s]routing chains:  85%|████████▌ | 34/40 [00:22<00:03,  1.64it/s]routing chains:  88%|████████▊ | 35/40 [00:22<00:03,  1.54it/s]routing chains:  90%|█████████ | 36/40 [00:23<00:02,  1.40it/s]routing chains:  92%|█████████▎| 37/40 [00:24<00:02,  1.35it/s]routing chains:  95%|█████████▌| 38/40 [00:25<00:01,  1.21it/s]routing chains:  98%|█████████▊| 39/40 [00:26<00:00,  1.22it/s]routing chains: 100%|██████████| 40/40 [00:26<00:00,  1.38it/s]routing chains: 100%|██████████| 40/40 [00:26<00:00,  1.49it/s]
+saved -> /home/ubuntu/memory_residuals/paper_artifacts/eval/routing_v3sp_val.json
+{
+  "n_sublayers": 55,
+  "n_score_positions": 156,
+  "alpha_mem_by_sublayer.mem.mean": 0.0004732169810754073,
+  "alpha_mem_by_sublayer.shuffle.mean": 0.0004505694159154026,
+  "alpha_mem_by_chain_depth.mem": [
+    0.00047467752518392625,
+    0.00047337636721649947,
+    0.00046478190204077676,
+    0.00048003212986042696
+  ],
+  "alpha_mem_by_chain_depth.shuffle": [
+    0.00044651245644543915,
+    0.00045348155633069797,
+    0.00045510217374723625,
+    0.00044760852550349673
+  ]
+}

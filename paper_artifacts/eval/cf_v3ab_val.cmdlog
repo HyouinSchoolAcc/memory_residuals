@@ -1,0 +1,41 @@
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 7850.84it/s]
+model loaded; memres_mode=attention_base
+counterfactual chains:   0%|          | 0/30 [00:00<?, ?it/s]counterfactual chains:   3%|▎         | 1/30 [00:01<00:38,  1.33s/it]counterfactual chains:   7%|▋         | 2/30 [00:01<00:24,  1.14it/s]counterfactual chains:  10%|█         | 3/30 [00:02<00:18,  1.44it/s]counterfactual chains:  13%|█▎        | 4/30 [00:04<00:33,  1.27s/it]counterfactual chains:  17%|█▋        | 5/30 [00:05<00:25,  1.03s/it]counterfactual chains:  20%|██        | 6/30 [00:05<00:20,  1.16it/s]counterfactual chains:  23%|██▎       | 7/30 [00:06<00:16,  1.35it/s]counterfactual chains:  27%|██▋       | 8/30 [00:06<00:14,  1.52it/s]counterfactual chains:  30%|███       | 9/30 [00:08<00:22,  1.08s/it]counterfactual chains:  33%|███▎      | 10/30 [00:09<00:19,  1.02it/s]counterfactual chains:  37%|███▋      | 11/30 [00:10<00:20,  1.06s/it]counterfactual chains:  40%|████      | 12/30 [00:11<00:16,  1.10it/s]counterfactual chains:  43%|████▎     | 13/30 [00:11<00:13,  1.26it/s]counterfactual chains:  47%|████▋     | 14/30 [00:12<00:12,  1.30it/s]counterfactual chains:  50%|█████     | 15/30 [00:12<00:10,  1.43it/s]counterfactual chains:  53%|█████▎    | 16/30 [00:14<00:12,  1.08it/s]counterfactual chains:  57%|█████▋    | 17/30 [00:14<00:10,  1.25it/s]counterfactual chains:  60%|██████    | 18/30 [00:16<00:11,  1.06it/s]counterfactual chains:  63%|██████▎   | 19/30 [00:16<00:09,  1.21it/s]counterfactual chains:  67%|██████▋   | 20/30 [00:17<00:08,  1.12it/s]counterfactual chains:  70%|███████   | 21/30 [00:18<00:07,  1.26it/s]counterfactual chains:  73%|███████▎  | 22/30 [00:19<00:06,  1.22it/s]counterfactual chains:  77%|███████▋  | 23/30 [00:20<00:06,  1.01it/s]counterfactual chains:  80%|████████  | 24/30 [00:21<00:06,  1.09s/it]counterfactual chains:  83%|████████▎ | 25/30 [00:22<00:04,  1.04it/s]counterfactual chains:  87%|████████▋ | 26/30 [00:23<00:03,  1.19it/s]counterfactual chains:  90%|█████████ | 27/30 [00:26<00:04,  1.59s/it]counterfactual chains:  93%|█████████▎| 28/30 [00:27<00:03,  1.52s/it]counterfactual chains:  97%|█████████▋| 29/30 [00:28<00:01,  1.25s/it]counterfactual chains: 100%|██████████| 30/30 [00:29<00:00,  1.03s/it]counterfactual chains: 100%|██████████| 30/30 [00:29<00:00,  1.03it/s]
+saved -> /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v3ab_val.json
+{
+  "depth_1": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7857613523801166,
+    "delta_mean": 0.0030576129754384357,
+    "delta_std": 0.005735968506746997
+  },
+  "depth_2": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7829057733217875,
+    "delta_mean": 0.00020203391710917155,
+    "delta_std": 0.002586278293912486
+  },
+  "depth_4": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.7828439831733705,
+    "delta_mean": 0.0001402437686920166,
+    "delta_std": 0.0022106506431260535
+  },
+  "depth_8": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.782647595802943,
+    "delta_mean": -5.614360173543294e-05,
+    "delta_std": 0.001951743671889572
+  },
+  "depth_ALL": {
+    "n": 30,
+    "ce_normal": 2.7827037394046785,
+    "ce_perturbed": 2.787722980976105,
+    "delta_mean": 0.005019241571426391,
+    "delta_std": 0.006139447399190628
+  }
+}

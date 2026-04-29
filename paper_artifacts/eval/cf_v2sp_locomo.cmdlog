@@ -1,0 +1,41 @@
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 8183.70it/s]
+model loaded; memres_mode=attention_parity
+counterfactual chains:   0%|          | 0/10 [00:00<?, ?it/s]counterfactual chains:  10%|█         | 1/10 [00:00<00:08,  1.12it/s]counterfactual chains:  20%|██        | 2/10 [00:01<00:06,  1.24it/s]counterfactual chains:  30%|███       | 3/10 [00:02<00:05,  1.28it/s]counterfactual chains:  40%|████      | 4/10 [00:03<00:04,  1.32it/s]counterfactual chains:  50%|█████     | 5/10 [00:03<00:03,  1.36it/s]counterfactual chains:  60%|██████    | 6/10 [00:04<00:02,  1.36it/s]counterfactual chains:  70%|███████   | 7/10 [00:05<00:02,  1.45it/s]counterfactual chains:  80%|████████  | 8/10 [00:05<00:01,  1.48it/s]counterfactual chains:  90%|█████████ | 9/10 [00:06<00:00,  1.44it/s]counterfactual chains: 100%|██████████| 10/10 [00:07<00:00,  1.50it/s]counterfactual chains: 100%|██████████| 10/10 [00:07<00:00,  1.40it/s]
+saved -> /home/ubuntu/memory_residuals/paper_artifacts/eval/cf_v2sp_locomo.json
+{
+  "depth_1": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.506199049949646,
+    "delta_mean": 0.0013951778411865235,
+    "delta_std": 0.003780337934146456
+  },
+  "depth_2": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.50475013256073,
+    "delta_mean": -5.373954772949219e-05,
+    "delta_std": 0.002308648118417225
+  },
+  "depth_4": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.5054770946502685,
+    "delta_mean": 0.000673222541809082,
+    "delta_std": 0.0019406873540155033
+  },
+  "depth_8": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.5044983863830566,
+    "delta_mean": -0.000305485725402832,
+    "delta_std": 0.001873010591348147
+  },
+  "depth_ALL": {
+    "n": 10,
+    "ce_normal": 2.5048038721084596,
+    "ce_perturbed": 2.507885527610779,
+    "delta_mean": 0.003081655502319336,
+    "delta_std": 0.007678378683292941
+  }
+}
