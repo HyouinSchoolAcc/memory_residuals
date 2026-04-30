@@ -87,6 +87,41 @@ PRESETS: dict[str, Preset] = {
             "~1.83x of one transformer layer)."
         ),
     ),
+    # v10 presets: L_E=10 deep extraction stack, for the mega-corpus 8B run.
+    # Rationale: v9c showed data diversity is the load-bearing signal axis
+    # (LME-only and PG-19-only always had signal; MSC-heavy mixes dilute).
+    # A deeper extraction stack lets the writer compact the richer
+    # input distribution into K=128 slots without losing salient structure.
+    "qwen3-4b-xlarge": Preset(
+        pretrained="Qwen/Qwen3-4B",
+        memres_num_vectors=128,
+        memres_extraction_depth=10,
+        memres_num_blocks=8,
+        description=(
+            "Qwen3-4B (d=2560, 36 layers) with an XL MemoryBlock "
+            "(L_E=10, eleven-layer Perceiver-style refinement stack). "
+            "Primary v10 preset for the GH200 3-day mega-corpus run: "
+            "~4.3B total, ~52 GB HBM under full AdamW, fits comfortably "
+            "on the 96 GB GH200 with room for activations + grad "
+            "checkpointing. Upgrade to qwen3-8b-xlarge only if/when "
+            "bitsandbytes is installed (required to fit 8B+L_E=10 full "
+            "training on a single 96 GB GPU)."
+        ),
+    ),
+    "qwen3-8b-xlarge": Preset(
+        pretrained="Qwen/Qwen3-8B",
+        memres_num_vectors=128,
+        memres_extraction_depth=10,
+        memres_num_blocks=8,
+        description=(
+            "Qwen3-8B (d=4096, 36 layers) with an XL MemoryBlock "
+            "(L_E=10, eleven-layer Perceiver-style refinement stack). "
+            "~8.8B total. Does NOT fit single 96 GB GPU under full "
+            "AdamW (~106 GB peak); use qwen3-4b-xlarge on GH200 unless "
+            "bitsandbytes AdamW8bit is installed (then pass "
+            "--use_adam8bit)."
+        ),
+    ),
 }
 
 

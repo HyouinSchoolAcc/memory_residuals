@@ -14,6 +14,180 @@ and the v6 → v7 transition narrative, see
 
 ---
 
+## v10 campaign — data diversity is the load-bearing axis (2026-04-30 ~19:00 UTC)
+
+User directive 2026-04-30 ~19:00 UTC after reviewing the v9 results:
+> "something tells me it has a lot to do with the LME dataset being
+> bad; notice how out of all the v9's, only the v9c diverse dataset
+> had a really good survivability. We saw this earlier with the PG-19
+> dataset where no matter what setup we had, it always had some
+> signals of using the memory. This tells me that constructing a
+> SUPER diverse dataset with MANY MANY memory-using data is useful."
+
+### Hypothesis under test
+
+The v3–v9 failure modes (router collapse, readout drift, peak-then-
+decay) were not primarily architectural — they were manifestations of
+training on a narrow, callback-only distribution (LongMemEval-S alone,
+or LME + MSC = 93% callback-free fillers that dilute the memory
+gradient). v9c matched v9 baseline peak performance on a diverse
+corpus despite having the same competition-curriculum recipe; earlier
+PG-19-only cells also had consistent memory signal regardless of
+setup. The v10 campaign reframes: *diversity of memory-requiring
+training distributions is the axis that makes the recipe robust*.
+
+### Campaign design (three cells across all three devices)
+
+| cell | machine | backbone | L_E | routing | corpus | test |
+|---|---|---|---:|---|---|---|
+| **v10a composed_diverse** | local H100 GPU 0 | Qwen3-0.6B-large | 4 | simple_gate | v6_lme_msc (6378 chains) | control: composed curriculum (comp=0.6, evid=0.3, k=8, carry_state) + simple_gate + diverse corpus closes standard-eval gap |
+| **v10b attnparity_pm4_diverse** | local H100 GPU 1 | Qwen3-0.6B-large | 4 | attention_parity (+4/-4) | v6_lme_msc | 0.6B proxy for the 8B routing choice: does attention_parity with softer biases survive on diverse data where simple_gate already did? |
+| **v10 4b_mega_attnparity** | GH200 | **Qwen3-4B-xlarge (L_E=10)** | **10** | **attention_parity (+4/-4)** | **mega (v6_lme_msc + ultrachat + pippa + soda + oasst1 + no_robots + narrativeqa + writingprompts, ~150-300k chains)** | **THE HEADLINE**: deep extraction + block AttnRes parity + 100x data diversity, 3-day budget, 30k steps |
+
+**Why 4B and not 8B.** qwen3-8b-xlarge (8.8B total w/ L_E=10 memres)
+peaks ~106 GB HBM under full AdamW, exceeding the 96 GB GH200. User
+directive was "if it can't fit, make the model smaller" (no frozen-
+backbone hack, no bitsandbytes dependency). qwen3-4b-xlarge (~4.3B
+total, ~52 GB peak) fits with ample headroom for activations and
+gradient checkpointing; preserves full-training semantics (both
+backbone and memres update) that produced every v9 signal.
+
+**Why attention_parity on the 4B run.** User directive: "I
+definitively want the 8B training run to have blocked attention
+parity at +4 -4". attention_parity is the paper's preferred routing
+(block AttnRes depth pool); v9d showed it stays architecturally
+collapsed (α_mem=0) on LME-only even with the competition curriculum
+and RMSNorm-on-readout fix, but the v9d signal is confounded with
+the LME-only data axis. v10b (0.6B, attention_parity +4/-4, diverse
+corpus) is the cheaper 0.6B proxy that tells us in ~6 h whether
+attention_parity can work at all on diverse data; v10 4b_mega pursues
+the full headline recipe independently on GH200.
+
+**Mega corpus** (target ~200-300k chains). Build pipeline:
+[`scripts/build_mega_corpus_gh200.sh`](../../scripts/build_mega_corpus_gh200.sh)
+and
+[`paper_tools/build_synthetic_dialogue_chains.py`](../../paper_tools/build_synthetic_dialogue_chains.py).
+Sources:
+
+- **v6_lme_msc_train** (existing, 6378 chains) — preserved base
+- **ultrachat** (HuggingFaceH4/ultrachat_200k, ~25k chains capped)
+- **pippa** (PygmalionAI/PIPPA, CharacterAI-style persona chats)
+- **soda** (allenai/soda, ~25k synthetic social dialogues)
+- **oasst1** (OpenAssistant/oasst1, tree-flattened assistant chats)
+- **no_robots** (HuggingFaceH4/no_robots, high-quality multi-turn)
+- **narrativeqa** (deepmind/narrativeqa, doc-grounded Q/A —
+  memory-critical because later Qs reference earlier doc content)
+- **writingprompts** (euclaise/writingprompts, long narrative
+  continuation — PG-19-like memory-requiring data)
+
+Optional sources gated behind `EXTRA_SOURCES=hh_rlhf lmsys` env var
+(lmsys requires HF auth token; hh_rlhf is sometimes noisy).
+
+All new synthetic-dialogue chains are tokenised with the Qwen3
+tokenizer (identical across 0.6B/4B/8B; verified) and emitted without
+`session_callback_mask` — the competition/evidence curriculum
+branches still only fire on the 450 LongMemEval chains in the base
+corpus, so the added chains contribute contiguous-window LM gradient
+that regularises the readout against over-injection on callback-less
+distributions. Source-bucket weights
+(`--source_weights '{"longmemeval":4.0, "msc":3.0, "ultrachat":2.0,
+"pippa":2.5, "soda":1.5, "synthdlg":1.5, "pg19":1.0, "tv":3.0,
+"realtalk":2.0, "lmsys":1.5}'`) preserve the v9c LME-heavy mix while
+giving dialogue / narrative sources non-trivial weight.
+
+### v10a — `chain_v10a_composed_diverse_local` (simple_gate, composed curriculum, local GPU 0)
+
+- **Status:** NOT STARTED → launching in tmux `local-v10a` on local H100 GPU 0.
+- **Script:** [`scripts/train_v10a_composed_diverse_local.sh`](../../scripts/train_v10a_composed_diverse_local.sh)
+- **Diff vs v9c:**
+  - `window_k` 3 → 8 (match eval distribution)
+  - `carry_state` OFF → ON (persist M_c across windows)
+  - `curriculum_competition_bias` 1.0 → 0.6
+  - `curriculum_evidence_bias` 0.0 → 0.3 (composed)
+  - `callback_window_bias` 0.0 → 0.2
+  - `callback_loss_weight` 3.0 → 2.5 (softer; v9 peak-then-decay)
+  - `steps` 4000 → 8000, `batch_size` 4 → 2 `grad_accum` 2 → 4
+- **Decision triggers:**
+  - step 500:  `pa_cb_dsh > +0.005` AND `std_dsh > -0.003` (alive)
+  - step 1500: `pa_cb_dsh > +0.015` AND `std_dsh > 0`
+  - step 4000: `std_dsh > +0.005` — closes the eval-distribution gap
+- **Log:** `logs/chain_v10a_composed_diverse_local.log`
+
+### v10b — `chain_v10b_attnparity_pm4_diverse_local` (attention_parity +4/-4, local GPU 1)
+
+- **Status:** NOT STARTED → launching in tmux `local-v10b` on local H100 GPU 1.
+- **Script:** [`scripts/train_v10b_attnparity_pm4_diverse_local.sh`](../../scripts/train_v10b_attnparity_pm4_diverse_local.sh)
+- **Diff vs v9c:** single-knob on routing — `memres_mode` simple_gate
+  → attention_parity, `router_recent_bias_init 4`,
+  `router_mem_bias_init -4`. Every other axis (corpus, curriculum,
+  callback weight, window_k, grad schedule) held fixed.
+- **What it tests:** with diverse data and the v9c curriculum, does
+  attention_parity open α_mem > 0 within 500 steps? If yes, the 8B
+  routing choice is validated and we expect the 4B GH200 cell to
+  follow a similar trajectory. If no, attention_parity is
+  architecturally dead independent of data and the 4B run will also
+  need simple_gate — at which point we kill the 4B run early and
+  relaunch.
+- **Decision triggers:**
+  - step 200:  `α_mem_max > 0` (any non-zero)
+  - step 500:  `α_mem_max > 5e-3` AND `pa_cb_dsh > 0`
+  - step 1500: `pa_cb_dsh > +0.010` — attention_parity is viable
+  - **kill trigger:** step 1000 with `α_mem_max < 1e-3` — collapse
+- **Log:** `logs/chain_v10b_attnparity_pm4_diverse_local.log`
+
+### v10 4B MEGA — `chain_v10_4b_mega_attnparity_gh200` (headline, GH200, 3 days)
+
+- **Status:** ENQUEUED on GH200 cloud_watchdog → auto-starts after
+  `scripts/build_mega_corpus_gh200.sh` produces
+  `paper_artifacts/chains/mega_train_s512.pt` (first invocation
+  builds + tokenises + merges; ~2 h preflight).
+- **Machine:** GH200 (192.222.50.225), GPU 0.
+- **Script:** [`scripts/train_v10_4b_mega_attnparity_gh200.sh`](../../scripts/train_v10_4b_mega_attnparity_gh200.sh)
+- **Architecture:** `qwen3-4b-xlarge` preset —
+  Qwen3-4B (d=2560, 36 layers) backbone + **L_E=10**
+  eleven-layer Perceiver extraction stack + K=128 slots + N=8
+  AttnRes blocks. ~4.3B total params, ~52 GB peak HBM under full
+  AdamW (bf16 params/grads, fp32 m/v).
+- **Routing:** `memres_mode attention_parity` with
+  `--router_recent_bias_init 4 --router_mem_bias_init -4`. This is
+  the v3-default bias (700× softmax advantage to recent at init, but
+  relaxed enough for gradient to flow to memory). Paper-spec
+  depth-wise routing pool over [m^t, h_1, b_1, …, b_{N-1}].
+- **Extract source:** `hidden_18` (middle of 36-layer backbone,
+  consistent with hidden_14 for the 28-layer 0.6B).
+- **Training schedule:** window_k=4, carry_state=True, bs=2 ga=4
+  (effective 8), lr_memres=3e-5, lr_backbone=5e-6, steps=30000,
+  warmup=500, cosine decay. 3-day budget: ~25-40 k steps depending
+  on 4B+memres throughput (~1.5-2.5k tok/s expected on GH200 with
+  gradient checkpointing).
+- **Curriculum:** `curriculum_competition_bias=0.5,
+  curriculum_evidence_bias=0.3, callback_window_bias=0.3,
+  callback_loss_weight=3.0`. Composed: pure-competition still gets
+  50% of windows (keeps judge learning), evidence-callback 30%, and
+  callback-aligned contiguous 20% — with 80% of chains lacking any
+  callback annotation the remaining windows are contiguous uniform
+  samples from the mega corpus, supplying generic-LM regularisation.
+- **Save_best:** `phase_aligned` (same as v9).
+- **Decision triggers:**
+  - step 500 (≈2 h): `α_mem_max > 0` and training loss ∈ [0.8, 2.5]
+  - step 2000 (~8 h): `pa_cb_dsh > +0.010` AND `α_mem_max > 5e-3` AND
+    `standard Δ_sh-m > -0.002` — means attention_parity is opening
+    under diversity pressure; continue unconditionally.
+  - step 8000 (~24 h, end of day 1): `pa_cb_dsh > +0.020` — matches
+    or beats v9c peak; on track.
+  - step 20000 (~48-60 h, end of day 2): `standard Δ_sh-m > +0.005`
+    — the eval-distribution generalisation gap is finally closing.
+  - **kill trigger:** step 2000 with `α_mem_max < 1e-3` or
+    `||m^t||/||embed|| > 200` (collapse or explosion; fall back to
+    simple_gate variant).
+- **Log (remote):** `logs/chain_v10_4b_mega_attnparity_gh200.log`.
+  Watchdog-mirror at
+  `paper_tools/cloud_watchdog/logs/chain_v10_4b_mega_attnparity_gh200.log`.
+- **Notifications:** ntfy topic `memres-e6ebdc70` (phone push on
+  watchdog events).
+
+---
+
 ## v9 first results + v9 ablation queue + v8b/v8c verdict (2026-04-30 ~01:35 UTC)
 
 ### v9 first results — competition curriculum is the breakthrough

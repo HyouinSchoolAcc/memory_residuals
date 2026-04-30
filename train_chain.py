@@ -163,10 +163,10 @@ def parse_args() -> argparse.Namespace:
         "--curriculum_competition_bias", type=float, default=0.0,
         help="When > 0, with this probability build a JUDGE-COMPETITION "
              "window: a 3-session window structured as either "
-             "[evidence, distractor, callback] (50%, 'keep-prev' sample: "
+             "[evidence, distractor, callback] (50%%, 'keep-prev' sample: "
              "M_c after evidence is the relevant memory; the judge step at "
              "the distractor must keep prev memory and reject new content) "
-             "OR [noise, evidence, callback] (50%, 'write-new' sample: M_c "
+             "OR [noise, evidence, callback] (50%%, 'write-new' sample: M_c "
              "after noise is irrelevant; the judge step at evidence must "
              "write the new content and discard prev memory). Both samples "
              "score the same callback session, so the gradient signal "
@@ -389,6 +389,25 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--wandb_entity", default=None)
     p.add_argument("--run_name", default=None)
     p.add_argument("--gradient_checkpointing", action="store_true")
+    p.add_argument(
+        "--freeze_backbone", action="store_true",
+        help="If set, every non-memres backbone parameter has requires_grad=False "
+             "so the optimiser only sees memres params (memory_block, "
+             "memory_readout, memory_gate, depth_router). Cuts optimiser-state "
+             "memory by ~(backbone/total)x -- REQUIRED for qwen3-8b-xlarge "
+             "(L_E=10) on a single 96 GB GPU under default PyTorch AdamW "
+             "without bitsandbytes. Forward/backward still run through the "
+             "backbone; only the optimiser update is suppressed.",
+    )
+    p.add_argument(
+        "--use_adam8bit", action="store_true",
+        help="Use bitsandbytes.optim.AdamW8bit instead of torch.optim.AdamW. "
+             "Cuts optimiser state by ~4x (1 byte/param for m and v in "
+             "block-wise quantisation). Allows full backbone+memres training "
+             "on single 96 GB GPU for 8B models. Requires `pip install "
+             "bitsandbytes`; silently falls through to standard AdamW if the "
+             "import fails.",
+    )
 
     a = p.parse_args()
     if a.preset is not None:
@@ -499,11 +518,16 @@ class ChainCorpus:
 def _detect_source(name: str) -> str:
     """Detect the corpus source of a chain from its name.
 
-    'msc_<id>'         -> 'msc'         (multi-session chat dialogues)
-    'longmemeval_<id>' -> 'longmemeval' (LongMemEval-S, callback-supervised)
-    'realtalk_<id>'    -> 'realtalk'    (REALTALK 21-day messaging)
-    leading digit      -> 'pg19'        (PG-19 books are named '<book_id>')
-    anything else      -> 'tv'          (TV episode chains have show-name prefixes)
+    'msc_<id>'          -> 'msc'         (multi-session chat dialogues)
+    'longmemeval_<id>'  -> 'longmemeval' (LongMemEval-S, callback-supervised)
+    'realtalk_<id>'     -> 'realtalk'    (REALTALK 21-day messaging)
+    'ultrachat_<id>'    -> 'ultrachat'   (v10 mega corpus: HF ultrachat_200k)
+    'pippa_<id>'        -> 'pippa'       (v10 mega corpus: PygmalionAI/PIPPA character chats)
+    'soda_<id>'         -> 'soda'        (v10 mega corpus: allenai/soda synthetic social)
+    'lmsys_<id>'        -> 'lmsys'       (v10 mega corpus: lmsys-chat-1m real user-assistant)
+    'synthdlg_<id>'     -> 'synthdlg'    (v10 mega corpus: generic synthetic dialogue fallback)
+    leading digit       -> 'pg19'        (PG-19 books are named '<book_id>')
+    anything else       -> 'tv'          (TV episode chains have show-name prefixes)
     """
     if name.startswith("msc_"):
         return "msc"
@@ -511,6 +535,16 @@ def _detect_source(name: str) -> str:
         return "longmemeval"
     if name.startswith("realtalk_"):
         return "realtalk"
+    if name.startswith("ultrachat_"):
+        return "ultrachat"
+    if name.startswith("pippa_"):
+        return "pippa"
+    if name.startswith("soda_"):
+        return "soda"
+    if name.startswith("lmsys_"):
+        return "lmsys"
+    if name.startswith("synthdlg_"):
+        return "synthdlg"
     if name[:1].isdigit():
         return "pg19"
     return "tv"
@@ -565,6 +599,8 @@ class ChainSampler:
         default_w = {
             "pg19": 1.0, "tv": 4.0, "msc": 3.0,
             "longmemeval": 4.0, "realtalk": 1.0,
+            "ultrachat": 2.0, "pippa": 2.0, "soda": 1.5,
+            "lmsys": 2.0, "synthdlg": 1.5,
         }
         if source_weights:
             default_w.update(source_weights)
@@ -964,6 +1000,31 @@ class Trainer:
                 if "depth_router" in name:
                     p.requires_grad = False
 
+        # v10: --freeze_backbone zeroes grad on every non-memres param so
+        # the optimiser only tracks the MemoryBlock / MemoryReadout /
+        # MemoryGate / DepthRouter stack. Forward and backward still run
+        # through the backbone (we still need gradient to flow *through*
+        # it to reach the memres params), but the backbone's own params
+        # don't update. This is the single-GPU-fit recipe for
+        # qwen3-8b-xlarge (~700M memres vs ~8B frozen backbone).
+        if getattr(self.args, "freeze_backbone", False):
+            markers = ("memory_block", "memory_readout",
+                       "memory_gate", "depth_router")
+            frozen = 0
+            trained = 0
+            for name, p in self.model.named_parameters():
+                if any(m in name for m in markers):
+                    trained += p.numel()
+                    continue
+                p.requires_grad = False
+                frozen += p.numel()
+            if self.is_main:
+                print(
+                    f"  freeze_backbone : frozen {frozen/1e6:.1f}M params, "
+                    f"training {trained/1e6:.1f}M memres params",
+                    flush=True,
+                )
+
     def _wrap_model(self):
         if self.world_size <= 1:
             return self.model
@@ -1007,7 +1068,25 @@ class Trainer:
                 f"@ {a.lr}, backbone={sum(p.numel() for p in backbone_params)/1e6:.1f}M "
                 f"@ {a.lr_backbone}"
             )
-        opt = AdamW(groups, betas=(0.9, 0.95), eps=1e-8, weight_decay=a.weight_decay)
+        opt_cls = AdamW
+        if getattr(a, "use_adam8bit", False):
+            try:
+                import bitsandbytes as bnb
+                opt_cls = bnb.optim.AdamW8bit
+                if self.is_main:
+                    print(
+                        f"  optimizer       : bitsandbytes AdamW8bit "
+                        f"(v{bnb.__version__})",
+                        flush=True,
+                    )
+            except Exception as e:
+                if self.is_main:
+                    print(
+                        f"  [warn] --use_adam8bit set but bitsandbytes "
+                        f"unavailable ({e}); falling back to torch AdamW",
+                        flush=True,
+                    )
+        opt = opt_cls(groups, betas=(0.9, 0.95), eps=1e-8, weight_decay=a.weight_decay)
         sched = LambdaLR(
             opt,
             lr_lambda=lambda s: cosine_with_warmup(s, a.warmup, a.steps, a.lr_min_ratio),
