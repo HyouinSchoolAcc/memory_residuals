@@ -39,7 +39,7 @@ from transformers import logging as hf_logging
 
 hf_logging.set_verbosity_error()
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from modeling_memres import Qwen3MemResConfig, Qwen3MemResForCausalLM  # noqa: E402
 
 PROMPT = (

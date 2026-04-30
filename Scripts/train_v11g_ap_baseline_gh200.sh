@@ -31,7 +31,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p output logs
-exec python -u train_chain.py \
+exec python -u src/train_chain.py \
     --preset qwen3-0.6b-large \
     --memres_mode attention_parity \
     --router_recent_bias_init 4 \

@@ -87,7 +87,7 @@ set -eu
 cd "$(dirname "$0")/.."
 mkdir -p output logs
 export CUDA_VISIBLE_DEVICES=0
-exec python -u train_chain.py \
+exec python -u src/train_chain.py \
     --preset qwen3-0.6b-large \
     --memres_mode simple_gate \
     --memres_update_mode gated \

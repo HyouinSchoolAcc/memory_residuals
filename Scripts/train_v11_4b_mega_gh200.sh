@@ -112,7 +112,7 @@ if [ ! -f "$CORPUS" ]; then
     exit 2
 fi
 
-exec python -u train_chain.py \
+exec python -u src/train_chain.py \
     --preset qwen3-4b-xlarge \
     --memres_mode attention_parity \
     --router_recent_bias_init 4 \

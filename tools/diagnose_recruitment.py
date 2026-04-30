@@ -31,7 +31,7 @@ from pathlib import Path
 import torch
 from transformers import AutoTokenizer
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from modeling_memres import (  # noqa: E402
     Qwen3MemResForCausalLM,
     _normalise_memres_mode,

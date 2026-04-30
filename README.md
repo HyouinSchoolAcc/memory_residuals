@@ -111,10 +111,12 @@ results/                      eval JSONs + paper drafts.
   exp2_chain_recipe/          Paper 2 (long-horizon recipe) draft +
                               the active runs.md ledger.
 
-modeling_memres.py            architecture (config, model, init).
-train_chain.py                recurrent chain TBPTT trainer (active).
-train_phase1.py               pair-based warm-up trainer (Paper 1 recipe).
-presets.py                    named (backbone, K, L_E, N) tuples.
+src/                          all the architecture + trainer code.
+  modeling_memres.py          architecture (config, model, init).
+  train_chain.py              recurrent chain TBPTT trainer (active).
+  train_phase1.py             pair-based warm-up trainer (Paper 1 recipe).
+  presets.py                  named (backbone, K, L_E, N) tuples.
+
 requirements.txt
 
 memory_residuals.pdf          position paper (architectural spec).

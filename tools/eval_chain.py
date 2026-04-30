@@ -33,7 +33,7 @@ import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from modeling_memres import Qwen3MemResForCausalLM  # noqa: E402
 
 
