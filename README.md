@@ -14,6 +14,384 @@ broke, why it broke, and what the surviving recipe actually is.
 
 ---
 
+## ⚠ Stop everything and read this first — what is actually broken (2026-04-30, post-v10 audit)
+
+> All v10 cells (`chain_v10a_composed_diverse_local`,
+> `chain_v10b_attnparity_pm4_diverse_local`,
+> `chain_v10_4b_mega_attnparity_gh200`) were killed mid-training on
+> 2026-04-30 ~20:50 UTC. No v10 checkpoint should be promoted. The
+> sections after this one (TL;DR, "Walls 1-6", surviving recipe) describe
+> the PRIOR mental model that drove v9 → v10 — which was wrong about
+> *what* was broken. They are kept for the historical record and
+> because the architectural-primitive observations are still correct,
+> but the "data diversity is the load-bearing axis" headline of v10 is
+> a partial truth that masked the real root cause described below. The
+> v10b 0.6B proxy at step 200 (CB Δ_sh-m = +0.011, α_mem = 4e-4)
+> looked like a win for ~6 hours; by step 2000 it had decayed to
+> noise. v10a (simple_gate, composed) never opened gate_max above
+> 0.0042 and CB Δ_nm-m went *negative* (memory hurts callback
+> prediction) by step 400. Neither cell escaped the fundamental
+> failure mode below.
+
+The right framing is: **the system is converging to "ignore memory" as the
+LM-loss-optimal policy, because the training distribution actively
+*rewards* ignoring it.** Six interacting failures, ranked by leverage
+(highest first). Each is independently sufficient to kill training
+even if all the others were fixed.
+
+### P0. The corpus builder throws away the only ground-truth evidence labels we have, and the curriculum sampler then picks "evidence" sessions uniformly at random from the haystack
+
+**Verified empirically on `lme_train_s512.pt`** (`paper_tools/build_conversational_callback_chains.py`):
+
+- LongMemEval-S `longmemeval_s_cleaned.json` ships per-turn `has_answer:
+  bool` annotations *and* a chain-level `answer_session_ids` list
+  identifying which sessions actually contain the answer the callback
+  asks about.
+- Mean haystack length per chain: **47.7 sessions**.
+- Mean fraction of haystack sessions that contain the answer: **3.6%**
+  (median ≈ 1 evidence session per ~50-session chain).
+- `build_conversational_callback_chains.load_longmemeval` reads each
+  turn's `content` and `role` but **never reads `has_answer`** and
+  **never reads `answer_session_ids`**. The pretokenized blob's
+  `chain_meta[i]` keys are `{question, answer, question_type}` —
+  `answer_session_ids` is *gone by construction*.
+- Confirmed empirically: of the 450 LongMemEval chains in
+  `lme_train_s512.pt`, exactly **0** have any `session_callback_mask` bit
+  set on a non-callback session. Only the synthesised callback session
+  (the one we appended) has any cb-marked tokens, and those are the
+  *answer text*, not pointers back to where the answer was *learned*
+  during the haystack.
+
+The downstream consequence in `train_chain.ChainSampler.sample_window`
+(curriculum_competition branch, the *primary* training distribution
+for v9 / v9c / v10b / v10):
+
+```python
+# Sample A (KEEP-PREV):  [evidence, distractor, callback]
+evidence_pos   = self.rng.randint(0, cb_pos - 2)        # uniform!
+distractor_pos = self.rng.randint(evidence_pos + 1, cb_pos - 1)
+# Sample B (WRITE-NEW):  [noise, evidence, callback]
+evidence_pos = self.rng.randint(1, cb_pos - 1)          # uniform!
+noise_pos    = self.rng.randint(0, evidence_pos - 1)
+```
+
+With ~3.6% prior on any given session being the actual evidence:
+
+- Sample A: **P(evidence-slot session actually contains the answer) ≈ 3.6%**.
+  The other 96.4% of the time the writer is given an irrelevant session
+  and the judge is asked to defend it as "keep" through the distractor —
+  i.e. the gradient says *protect noise*.
+- Sample B: same prior on the "evidence" slot. The "noise" slot is
+  almost always also irrelevant (no evidence labels exist anywhere
+  earlier in the chain to bias it). The judge is asked to "write" a
+  random session over a different random session. The gradient says
+  *replace noise with noise*.
+- The callback is then scored under an M_c built from those two
+  random sessions. **For 96%+ of training samples, M_c demonstrably
+  cannot contain the answer** because neither of the source sessions
+  did.
+
+The trainer comment block actively defends this:
+
+> "We do NOT special-case the 'evidence is the actual referent'
+> subset because doing so would teach the judge to rely on an oracle
+> signal (ground-truth evidence labels) that won't exist at inference."
+> *(`train_chain.py` line ≈700-730)*
+
+This argument is **wrong in two ways**:
+
+1. At inference, M_c is built sequentially over **all** ~50 haystack
+   sessions, so it contains the answer with probability ≈ 1. At
+   training, M_c is built over **2** random sessions, so it contains
+   the answer with probability ≈ 0.072 (1 - 0.964²). These are not
+   the same distribution — the inference distribution is *easier*.
+   We are training on a strict superset of "harder than deployment"
+   samples and rewarding the model for marginalising memory away.
+2. Using `answer_session_ids` at training time is *not* an oracle
+   leak — at inference you would use the M_c that has actually
+   accumulated all the haystack content; the training-time signal
+   should match. The right curriculum is "build M_c from a window
+   that *actually contains* the answer, then ask the callback".
+
+The user's hypothesis (2026-04-30 19:51 UTC) — *"the system is
+simply not able to initialize the entire memory compression branch"* —
+is half right: the architecture cannot bootstrap because, on the
+distribution it is being shown, the LM-loss-optimal answer **is** to
+ignore memory. The branch is not failing to initialise; it is being
+correctly trained to its target, and the target is "produce nothing
+useful". The 96% irrelevant-evidence supervision pushes
+$g \to 0$ / $\alpha_{\text{mem}} \to 0$ at every step; the 4% relevant
+supervision is averaged away. The prior PG-19-on-v2/v3 "always had
+some signal" observation reads the same way: PG-19 has no evidence
+labels at all, so the curriculum_competition branch never fires on
+PG-19 chains — they fall through to *contiguous* uniform windows,
+where local stylistic continuity weakly rewards memory and the
+gradient at least points the right way. That's why every "diverse"
+campaign with a substantial PG-19 share (v2/v3/v9c/v10) shows mild
+positive signals, while every LME-only campaign collapses.
+
+### P1. The bootstrap chicken-and-egg: gate, readout, and writer must all become useful in lockstep, and our training signal will not let any of them go first
+
+The four learned MemRes components form a directed cycle of dependencies:
+
+- `MemoryGate` (`g`) and `BlockAttnResRouter.mem_bias` (the per-sublayer
+  routing mass on b_{-1}) only receive non-trivial gradient signal
+  when `m^t` is actually doing something useful downstream — i.e.
+  only after the readout has learned to project `M_c` into something
+  the LM head can consume.
+- `MemoryReadout` (`W_Q^read`, `W_K^read`, `W_V^read`, RMSNorm scale)
+  only receives gradient signal when `g * m^t` (or
+  `α_mem * m^t`) measurably moves logits — i.e. only after the gate /
+  router has opened.
+- `MemoryBlock` (`M_in`, `M_judge`, the L_E extraction stack, the
+  judge attention) only receives gradient signal when `M_c` is
+  consumed by the readout in a way that affects loss — i.e. only
+  after both of the above have opened.
+
+At init: $g \equiv 0$, $\alpha_{\text{mem}} \approx 3 \cdot 10^{-4}$
+(parity case at -4/+4) or $\approx 1/N$ (base case), and the readout's
+$W_V$ is freshly random. The augmented model is *behaviourally* the
+bare backbone, but the LM gradient cannot see the memory branch at
+all because every gradient component flowing to a MemRes parameter is
+multiplied by either $g$ or $\alpha_{\text{mem}}$, both of which are
+~0.
+
+Concretely, in `attention_parity` mode at $-4/+4$:
+
+$$\frac{\partial L}{\partial \texttt{mem\_bias}} \propto
+  \alpha_{\text{mem}}(1 - \alpha_{\text{mem}}) \cdot
+  \frac{\partial L}{\partial h_{n,i}} \cdot m^t \approx
+  3 \cdot 10^{-4} \cdot (\text{normal-magnitude term}).$$
+
+The gradient on `mem_bias` is attenuated by ~3000× at every step.
+With `weight_decay = 0.1` on top, the bias drifts toward 0 (which
+*would* open the router) but at a rate of $\text{lr} \cdot \text{wd}
+\cdot 4 = 5 \cdot 10^{-5} \cdot 0.1 \cdot 4 = 2 \cdot 10^{-5}$ per step
+— so 2000 steps to move it from -4 to -3.96. Empirically (`v10b`
+log): `α_mem_max` started at 0.0004 at step 200 and was 0.0001 at
+step 2200 — *decreasing*, because the (rare) useful gradient pushed it
+the wrong way more often than the right way under the misaligned
+P0 distribution.
+
+The `simple_gate` route is supposed to side-step this by putting the
+gate directly on the gradient path (not behind a softmax). But the
+v8 readout RMSNorm (added to defend against v7's
+$\|\text{W}_V^{\text{read}}\| \to \infty$ explosion) overshoots in
+the other direction: the readout output magnitude is now pinned at
+$\|m^t\|/\|\text{embed}\| \approx 73$ (verified across every v8/v9/v10
+log). So the per-sublayer gate cannot operate in a normal `[0, 1]`
+range — useful gates are in $[0, \approx 0.014]$. v10a gate_max moved
+from 0 to **+0.0042 by step 540 then back down to +0.0034 by step
+880** — exactly the bouncing-off-noise pattern P1 + P0 predict.
+
+There is no warm-up phase that lets the writer + readout learn
+to produce useful `m^t` *before* the gate sees gradient. Pair training
+(`train_phase1.py`) was supposed to do this, but the only positive
+chain transfer (v2 phaseA on PG-19+TV) needed both the warm-start
+*and* a corpus where the contiguous-window LM signal alone provides
+weakly correct memory gradient. That doesn't exist for callback-style
+LongMemEval, which is precisely the corpus we need for the recipe
+paper.
+
+### P2. The readout RMSNorm is mis-calibrated: it solved v7's explosion but created a 73× injection that cannot be gated cleanly
+
+In `MemoryReadout.forward`:
+
+```python
+return self.out_norm(attn @ V)   # Qwen3RMSNorm, weight init 1.0
+```
+
+For $d=1024$, `out_norm` produces token vectors with $\|m^t\| \approx
+\sqrt{d} \cdot \|\text{weight}\| \approx 32$. Embedding norms are
+$\|\text{embed}\| \approx 0.5$. The reported ratio $\|m^t\| /
+\|\text{embed}\| \approx 73$ holds across every v8/v9/v10 cell *with no
+training-induced drift* (max-min over 2000 steps in v10b is
+73.45–73.55). RMSNorm is doing exactly what RMSNorm does — it pins
+the magnitude.
+
+That magnitude is wrong by ~30-70× for the residual stream the gate /
+router is supposed to schedule. Concretely:
+
+- A scalar gate `g` sees `h <- h + g * m^t`. With $\|h\| \sim 1$
+  and $\|m^t\| \sim 30$, the "useful" range of `g` is $[0, \approx
+  0.03]$. The gradient $\partial L/\partial g \propto m^t \cdot
+  \partial L / \partial h$ has magnitude ~30 per token, but the SCALAR
+  reduction sums over all tokens in the batch. Mixed signs across
+  tokens cancel, leaving very small absolute gradients on `g` — and
+  those gradients live in a parameter space where the *useful answer
+  is in $[0, 0.014]$*. The optimizer's natural step size is too coarse
+  to find that window stably.
+- For the depth-pool router, the scale is mediated by the softmax, so
+  the magnitude is not the direct problem; but the same "memory
+  source dwarfs every other source" property means the router learns
+  early that the memory source is "loud" and attenuates it via
+  `mem_bias` — exactly opposite to what we want.
+
+**RMSNorm-on-readout is a defence against v7-style explosion that
+overshot.** A more principled fix is initial parity at the readout
+output (re-introduce $W_V^{\text{read}} = 0$ at init, then *later*
+add a small no-op-at-init regulariser if explosion comes back), so
+that $m^t \approx 0$ at step 0 and $\|m^t\|$ ramps as the
+writer / readout learn — keeping injection magnitude commensurate
+with the gradient signal that's learning it.
+
+### P3. The phase-aligned eval inherits P0: it picks evidence uniformly at random and reports the noise floor
+
+`Trainer._phase_aligned_eval`:
+
+```python
+e = rng.randint(0, cb_pos - 1)        # uniform — same bug as training
+evidence = ev.chain_session_at(ci, e)
+M_c      = compress_session(extract_source(evidence), None)
+# ...score callback under M_c, M_c=None, M_c=shuffled
+```
+
+So the eval is asking: "if I build M_c from one random session of the
+haystack (3.6% chance it's the actual evidence), how well does it
+help predict the callback?" The answer in expectation is "barely",
+because 96% of the time M_c does not contain the answer. The 4%
+that do produce a real signal are buried in the noise. Per
+`COMPREHENSIVE.md`, CB Δ_sh-m std at n=48 is ≈ 0.014 nats and the
+peak-then-decay we kept treating as "the model overfitting and
+collapsing" is mostly max-of-K-noise with a slow drift, not a
+mechanistic signal.
+
+The standard sequential eval (`Trainer.evaluate`, `eval_window=8` at
+the tail of each ~50-session chain) is the *correct* eval for what
+this architecture is supposed to do at inference, and it has been
+sitting at $\Delta_{\text{sh-m}} \approx 0.000$ across every cell of
+v9 / v10. We were dismissing this as "the train-eval distribution
+gap" and chasing the phase-aligned metric instead. The phase-aligned
+metric is measuring the same broken distribution as the training
+loss, so of course it correlates with progress; but progress on what
+the trainer can see is not the same as progress on the metric we want
+to claim.
+
+### P4. The composite "competition + diverse + cbw=3" recipe trains < 8% of gradient on memory-relevant tokens
+
+For a typical v10b step:
+
+- v6_lme_msc corpus weights (from log):
+  pg19 ≈ 380k weighted units, msc ≈ 72k, **lme ≈ 36k**, tv ≈ 6k.
+  → P(LME chain sampled) ≈ **7.3 %**.
+- For the 92.7% non-LME share, `cb_pos = -1` so the
+  curriculum_competition branch can't fire and the sampler falls
+  through to a contiguous uniform window. The LM loss is plain
+  next-token prediction with no callback mask, no memory supervision.
+  Gradient on memory params from these samples points at "do not
+  inject noise into the residual stream" — i.e., **deflate the gate**.
+- For the 7.3% LME share, even within a 3-session
+  competition window where 1 session is the synthesised callback (~30
+  content tokens, ~20 callback-marked):
+  - Total weighted token count ≈ 3 × 200 + 20 × 3 (cbw bonus) = 660
+  - Callback-marked share ≈ 80 / 660 ≈ 12 %
+  - → callback-token gradient share of total ≈ 7.3% × 12% ≈ **0.9 %**
+  - Of which ~3.6% (P0) is on a *correctly* aligned evidence-callback
+    pair → useful-signal share ≈ **0.03 %**.
+
+The remaining 99.97% of gradient is "ignore memory because either it
+isn't supervised, or the supervision is misaligned, or the supervision
+is on tokens that don't actually need memory". The model converges
+to its training distribution. The training distribution is not the
+benchmark.
+
+### P5. We never trained M_c at the recurrent depths the eval uses
+
+`Trainer.evaluate` builds M_c sequentially across **all preceding
+sessions** of each held-out chain — typically 40+ judge updates.
+Training never sees this depth:
+
+- `--burn_in_max 0` in v9 / v10b: zero burn-in, M_c is *literally*
+  reset to zeros every step, recurrent depth ≤ window_k - 1 = 2.
+- `--burn_in_max 12` in earlier cells: M_c sees up to 12 detached
+  judge updates, but gradient does not flow through them.
+- `--carry_state` in v10a: M_c carries between TBPTT windows but
+  detached, so the optimizer cannot update the writer / judge to make
+  M_c well-conditioned at depth.
+
+The judge's `judge_norm` (Qwen3RMSNorm in `MemoryBlock.judge`) was
+added in v8 specifically as a band-aid for unbounded $\|M_c\|_F$
+growth across long chains. With it, $\|M_c\|$ does stay bounded —
+but the *direction* of $M_c$ in slot space at depth 40 is in a
+region the readout has never seen during training. That's the
+"standard Δ_sh-m ≈ 0 even at v9 peak" we keep observing.
+
+### Cross-cutting: the symptoms we kept treating as architectural failures were data + signal failures
+
+| Symptom we observed | Diagnosis we wrote | What it actually was |
+|---|---|---|
+| α_mem ≡ 0 in attention_parity (v3-v9d) | router collapse, paper-spec routing is dead | gradient on `mem_bias` is α_mem-multiplied; with α_mem ≈ 3e-4 and 96% misaligned data, no escape velocity |
+| `‖m^t‖ → 0` under attention_parity + WD (v7) | readout decay, need RMSNorm | same — α_mem ≈ 3e-4 attenuates W_V grad, WD then dominates |
+| `‖m^t‖ → 165` under simple_gate (v7) | scale explosion, need RMSNorm | gate got a small useful gradient on a few PG-19 samples and overshot, then the LM head couldn't recover |
+| Standard Δ_sh-m ≈ 0 at all v9 peaks | "eval-distribution gap, need carry_state + window_k=8" | the *training* signal contains ~0.03% useful-memory gradient; the model converges to ignore memory; the standard eval reports this faithfully |
+| Phase-aligned CB Δ_sh-m peaks then decays | "noise + max-selection bias" | partly true (eval noise dominates) AND the training distribution is not actually pushing the model toward content-discriminative memory |
+| v9c (diverse) outperforms v9 (LME-only) | "data diversity is load-bearing" | partly true: PG-19's contiguous-window LM signal weakly rewards style-prior memory, and that's *better than* the actively-misaligned LME competition supervision. v9c is "less wrong", not "right" |
+| v10b α_mem opens to 4e-4 in 200 steps | "diverse data validates attention_parity" | bare-init artifact: pretrained-backbone activations + zero pseudo-queries gives a tiny non-zero score that decays to noise within 1k steps |
+
+### What this implies for the next campaign (v11 design constraints)
+
+These are *constraints*, not a recipe. The recipe needs to be
+designed against them.
+
+1. **Use `answer_session_ids` and per-turn `has_answer`**.
+   Re-tokenise the corpus to (a) preserve the evidence-session
+   indices in chain_meta, and (b) extend `session_callback_mask` to
+   *also* mark the answer-bearing tokens *inside* the haystack
+   evidence sessions (not just the appended callback span). The
+   curriculum sampler must build windows that *actually* contain
+   the answer in M_c by the time the callback is scored — every
+   single training sample, no exceptions.
+
+2. **Build a real warm-up phase that does not rely on the LM gradient
+   to bootstrap the memory branch**. Candidates:
+   (a) A dedicated retrieval-objective phase: ask the model to
+       reconstruct answer tokens from M_c alone (no prior context),
+       gradient flows into writer + readout directly with no gate
+       in the way.
+   (b) A masked-callback regime: the callback's answer span is
+       *masked from in-context attention* but visible to the
+       readout via M_c, so the model is forced to use the memory
+       channel or fail.
+   (c) A targeted gate-warmup schedule: start with `g` initialised
+       to a small *positive* value (e.g. 0.01 in simple_gate) so
+       the readout has nonzero forward influence and the LM
+       gradient can actually flow back; anneal toward "useful"
+       rather than starting from zero.
+
+3. **Re-calibrate readout magnitude to the gate's operating range**.
+   Either drop the readout RMSNorm and zero-init `W_V^read` (so
+   $m^t \approx 0$ at step 0 and grows commensurately), or keep
+   the RMSNorm but scale its weight init way down (e.g. 0.01) so
+   $\|m^t\| \sim 0.3$ rather than 30. Without this, the gate
+   cannot cleanly schedule injection.
+
+4. **Make the eval honest**. The phase-aligned eval should *also*
+   pick evidence from `answer_session_ids` and report the
+   "evidence available" upper-bound separately from the
+   "evidence absent" floor. The standard sequential eval should
+   become the primary metric again — the phase-aligned variant has
+   too much noise and bakes in the same data bug.
+
+5. **Guarantee gradient through deep M_c**. Either a longer
+   undetached TBPTT (window_k ≥ 16 with gradient checkpointing,
+   8B-class memory budget) or an explicit "synthetic deep M_c"
+   loss where we periodically backprop a callback-NLL through a
+   30-step recurrent build.
+
+6. **Stop combining recipes that haven't each individually been
+   shown to move the standard eval**. v10 layered competition +
+   evidence + callback_window + carry_state + diverse corpus + 4B
+   backbone simultaneously. None of those axes individually closed
+   the standard-eval gap; combining them did not either. Single-axis
+   ablations on a 0.6B proxy with the P0 fix in place are the next
+   step.
+
+A `train_phase1.py` Phase-0 warm-up *with* the P0 evidence labels
+preserved is the minimum-viable next experiment. Until P0 is fixed,
+no architectural change can be properly tested.
+
+---
+
 ## What we learned (v1 → v10)
 
 ### TL;DR
