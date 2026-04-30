@@ -1,7 +1,5 @@
 __pycache__/
 *.pyc
-output/
-wandb/
 *.egg-info/
 dist/
 build/
@@ -9,24 +7,35 @@ build/
 *.safetensors
 data_pipeline/
 tea_debug.log
+wandb/
 
-# Large pre-tokenised corpora (active v6)
-paper_artifacts/chains/lme_train_s512.pt
-paper_artifacts/chains/lme_val_s512.pt
-paper_artifacts/chains/v6_lme_msc_train_s512.pt
-paper_artifacts/chains/realtalk_eval_s512.pt
+# Training runs (heavy checkpoints + logs). Each promoted run is
+# referenced by name in results/exp2_chain_recipe/runs.md; the
+# artifacts live outside git.
+Runs/
+output
+# ^ `output` is a backwards-compat symlink to `Runs/` kept while the
+#   currently-running v11 cell still has the literal `output/...`
+#   path baked into its launch command.
 
-# Training & sync logs
+# Training & sync logs. Kept on disk; never committed.
 logs/
 
-# Cloud watchdog state directories
-paper_tools/cloud_watchdog/queue/
-paper_tools/cloud_watchdog/running/
-paper_tools/cloud_watchdog/done/
-paper_tools/cloud_watchdog/failed/
-paper_tools/cloud_watchdog/.ntfy_topic
+# Large pre-tokenised corpora. Built by tools/build_*; cited in
+# runs.md by filename. Too big for git; regenerable from source.
+# Stored under paper_artifacts/chains/ (also reachable via the `data/`
+# symlink) so that any historical script that hard-codes the old path
+# still works.
+paper_artifacts/chains/*.pt
+data/*.pt
 
-# Archive: heavy artifacts only.
-# Keep archived scripts / docs / eval JSONs so the paper trail is reproducible
-# in git, but don't carry the multi-hundred-MB corpora.
-archive/datasets/
+# Cloud watchdog state directories.
+tools/cloud_watchdog/queue/
+tools/cloud_watchdog/running/
+tools/cloud_watchdog/done/
+tools/cloud_watchdog/failed/
+tools/cloud_watchdog/.ntfy_topic
+
+# archive/ holds the historical paper trail (scripts, docs, eval JSONs,
+# figures, the COMPREHENSIVE.md ledger). It's small (~1 MB) and
+# committed so the v1-v10 narrative is reproducible.

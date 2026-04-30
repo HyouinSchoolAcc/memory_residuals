@@ -5,7 +5,7 @@ This is the trainer that actually exercises the recurrent state $M_c$.  Each
 training step:
 
     1.  Sample a chain (a PG-19 book or a TV show) from the pre-tokenised
-        chain corpus produced by ``paper_tools/pretokenize_chains.py``.
+        chain corpus produced by ``tools/pretokenize_chains.py``.
     2.  Sample a window of $k$ consecutive sessions inside that chain.
     3.  Initialise $M_c \\leftarrow 0$ (or carry the detached $M_c$ from the
         previous window if --carry_state is set).
@@ -136,6 +136,29 @@ def parse_args() -> argparse.Namespace:
              "through sessions 2..N without being clobbered by intervening "
              "session content. Init bias -1.0 -> g ~ 0.27 (modest writes).",
     )
+    # v11 bootstrap-fix knobs (README "Stop everything" P1 + P2).
+    p.add_argument(
+        "--memres_gate_init", type=float, default=0.0,
+        help="Initial value for ``MemoryGate.gate`` (per-sublayer scalar "
+             "gate used in simple_gate routing). Default 0.0 (historical: "
+             "augmented model behaviourally identical to bare backbone at "
+             "step 0). v11 fix: a small positive value (e.g. 0.005) gives "
+             "the readout nonzero forward influence at step 0, so the LM "
+             "gradient can flow back to W_V^read / writer / judge from "
+             "step 1 -- breaks the gate/readout/writer chicken-and-egg.",
+    )
+    p.add_argument(
+        "--memres_readout_norm_init", type=float, default=1.0,
+        help="Initial value for ``MemoryReadout.out_norm.weight`` (the "
+             "RMSNorm scale on the readout output m^t). Default 1.0 "
+             "produces ||m^t||/||embed|| ~ 73 at d=1024, which forces the "
+             "gate to operate in [0, ~0.014] -- too narrow for AdamW's "
+             "natural step size. v11 fix: 0.05 produces "
+             "||m^t||/||embed|| ~ 3.6 and gate operating range [0, ~0.3], "
+             "well within AdamW step. The parameter remains learnable, "
+             "so the model can still grow the readout magnitude during "
+             "training as needed.",
+    )
 
     # Callback supervision (v6+ long-horizon recipe)
     p.add_argument(
@@ -180,7 +203,7 @@ def parse_args() -> argparse.Namespace:
              "branches. Composes with --curriculum_evidence_bias and "
              "--callback_window_bias: competition is tried first, then "
              "evidence-callback curriculum, then callback alignment, then "
-             "uniform. See experiments/exp2_long_horizon_recipe/runs.md "
+             "uniform. See results/exp2_chain_recipe/runs.md "
              "v9 section for the curriculum-decomposition rationale.",
     )
     p.add_argument(
@@ -482,6 +505,34 @@ class ChainCorpus:
             self.chain_callback_position = torch.full(
                 (len(self.chain_starts),), -1, dtype=torch.long
             )
+        # v11 (2026-04-30): per-chain list of session indices that
+        # actually contain the answer text (LongMemEval ships these as
+        # ``answer_session_ids``; the v11 corpus builder preserves
+        # them). Empty list per chain = "no ground-truth labels"
+        # (non-LME sources, or pre-v11 LME corpora). The training
+        # curriculum_competition branch and the phase-aligned eval
+        # use this to sample meaningful evidence sessions instead of
+        # picking uniformly over the haystack (which has ~3.6%
+        # evidence prior on a 48-session chain -- the v9/v10 root
+        # cause documented in README "Stop everything").
+        ev_raw = blob.get("chain_evidence_positions")
+        n_chains = len(self.chain_starts)
+        if ev_raw is None:
+            self.chain_evidence_positions: list[list[int]] = [[] for _ in range(n_chains)]
+        else:
+            # Defensive copy & normalisation: cast to ints, drop any
+            # out-of-range positions (cb_pos >= length, or negative).
+            normalised: list[list[int]] = []
+            for ci in range(n_chains):
+                raw = ev_raw[ci] if ci < len(ev_raw) else []
+                cb = int(self.chain_callback_position[ci])
+                length = int(self.chain_lengths[ci])
+                cleaned = [
+                    int(p) for p in raw
+                    if 0 <= int(p) < length and (cb < 0 or int(p) < cb)
+                ]
+                normalised.append(cleaned)
+            self.chain_evidence_positions = normalised
 
     def __len__(self) -> int:
         return len(self.chain_starts)
@@ -720,33 +771,88 @@ class ChainSampler:
         # could be referenced later" -- which is exactly the
         # generalisable inductive bias we want.
         #
-        # We do NOT special-case the "evidence is the actual referent"
-        # subset because doing so would teach the judge to rely on
-        # an oracle signal (ground-truth evidence labels) that won't
-        # exist at inference. Sample A's "evidence" is whatever
-        # session happens to be picked; Sample B's "evidence" is
-        # likewise. Over many windows the writer + judge are forced
-        # to compact + decide using only content cues, which is
-        # exactly the inference-time regime.
+        # ---------------------------------------------------------------
+        # v11 (2026-04-30) UPDATE -- evidence-aware sampling.
+        # ---------------------------------------------------------------
+        # The pre-v11 trainer sampled "evidence" and "noise" uniformly
+        # from [0, cb_pos). LongMemEval-S has mean ~48 haystack
+        # sessions and mean ~1.9 ground-truth evidence sessions per
+        # chain, so the prior on any random session being evidence is
+        # ~3.97%. That meant 96%+ of training samples built M_c from
+        # sessions that demonstrably did not contain the answer, the
+        # gradient said "ignore memory" because that's the LM-loss-
+        # optimal policy on the sampled distribution, and the writer/
+        # judge/readout converged to "do nothing useful". See
+        # README "Stop everything" P0 for the full diagnosis.
+        #
+        # The v11 corpus preserves ``answer_session_ids`` as
+        # ``ChainCorpus.chain_evidence_positions[ci]``. When
+        # evidence_positions is non-empty we sample the "evidence"
+        # slot only from that list; the "distractor" / "noise" slot
+        # is sampled from the *complement* (non-evidence positions in
+        # the appropriate range) so the judge's keep-vs-write decision
+        # is grounded in real content asymmetry. When evidence_positions
+        # is empty (non-LME chains) we fall back to the original
+        # uniform behaviour. This is NOT an oracle leak at inference:
+        # at deployment M_c is built sequentially over all haystack
+        # sessions, so it always contains the answer; we simply align
+        # training-time distribution with that property.
         if (
             self.curriculum_competition_bias > 0.0
             and self.window_k >= 3
             and cb_pos >= 2
             and self.rng.random() < self.curriculum_competition_bias
         ):
+            ev_positions = self.corpus.chain_evidence_positions[chain_idx]
+            # Filter to the legal range (defensive; ChainCorpus already
+            # normalises but cb_pos >= 2 guard means we further want
+            # ev positions in [0, cb_pos-1]).
+            ev_in_range = [p for p in ev_positions if 0 <= p < cb_pos]
+
             keep_prev = self.rng.random() < 0.5
             if keep_prev:
                 # Sample A: [evidence, distractor, callback]
-                # evidence_pos in [0, cb_pos - 2], distractor in (evidence, cb_pos)
-                evidence_pos = self.rng.randint(0, cb_pos - 2)
-                distractor_pos = self.rng.randint(evidence_pos + 1, cb_pos - 1)
+                # Evidence: prefer a *true* evidence position (v11). Need
+                # evidence_pos <= cb_pos - 2 so that a distractor slot fits.
+                ev_kp = [p for p in ev_in_range if p <= cb_pos - 2]
+                if ev_kp:
+                    evidence_pos = self.rng.choice(ev_kp)
+                else:
+                    # Fallback: uniform (legacy v9/v10 behaviour).
+                    evidence_pos = self.rng.randint(0, cb_pos - 2)
+                # Distractor: uniform from the *non-evidence* gap
+                # (evidence_pos, cb_pos). Falls back to uniform if all
+                # candidate slots happen to be evidence (rare).
+                gap = list(range(evidence_pos + 1, cb_pos))
+                non_ev_gap = [p for p in gap if p not in ev_in_range]
+                if non_ev_gap:
+                    distractor_pos = self.rng.choice(non_ev_gap)
+                elif gap:
+                    distractor_pos = self.rng.choice(gap)
+                else:
+                    distractor_pos = evidence_pos + 1  # safety fallback
                 positions = [evidence_pos, distractor_pos, cb_pos]
                 anchor = evidence_pos
             else:
                 # Sample B: [noise, evidence, callback]
-                # cb_pos >= 2 (outer guard) ensures evidence_pos >= 1 is safe
-                evidence_pos = self.rng.randint(1, cb_pos - 1)
-                noise_pos = self.rng.randint(0, evidence_pos - 1)
+                # Evidence: prefer a *true* evidence position with
+                # evidence_pos >= 1 so a noise slot fits before it.
+                ev_wn = [p for p in ev_in_range if p >= 1]
+                if ev_wn:
+                    evidence_pos = self.rng.choice(ev_wn)
+                else:
+                    evidence_pos = self.rng.randint(1, cb_pos - 1)
+                # Noise: uniform from the *non-evidence* prefix
+                # [0, evidence_pos). Fallback to uniform if no non-
+                # evidence option exists.
+                pre = list(range(0, evidence_pos))
+                non_ev_pre = [p for p in pre if p not in ev_in_range]
+                if non_ev_pre:
+                    noise_pos = self.rng.choice(non_ev_pre)
+                elif pre:
+                    noise_pos = self.rng.choice(pre)
+                else:
+                    noise_pos = 0  # safety fallback (shouldn't trigger)
                 positions = [noise_pos, evidence_pos, cb_pos]
                 anchor = noise_pos
             if positions:
@@ -975,6 +1081,8 @@ class Trainer:
             router_recent_bias_init=a.router_recent_bias_init,
             memres_extract_source=a.memres_extract_source,
             memres_update_mode=a.memres_update_mode,
+            memres_gate_init=a.memres_gate_init,
+            memres_readout_norm_init=a.memres_readout_norm_init,
         )
         if a.pretrained:
             # A memres checkpoint saves model_type="qwen3_memres", which
@@ -1000,6 +1108,16 @@ class Trainer:
                     "router_mem_bias_init",
                     "router_recent_bias_init",
                     "block_attnres_parity_init",
+                    # v11 (2026-04-30): the bootstrap-fix init knobs
+                    # are *training* knobs (they affect parameter
+                    # init values, not architecture shape), so we
+                    # allow CLI override even when warm-starting from
+                    # a memres checkpoint. Without this the trainer
+                    # silently uses the *config*'s default (0.0 / 1.0)
+                    # and the v11 fix becomes a no-op -- root cause
+                    # of the v11 first-launch smoke-test failure.
+                    "memres_gate_init",
+                    "memres_readout_norm_init",
                 }
                 merged = dict(base_cfg.to_dict())
                 for k, v in memres_kwargs.items():
@@ -1617,9 +1735,30 @@ class Trainer:
 
         ws_mem, ws_no, ws_sh = [], [], []
         cb_mem, cb_no, cb_sh = [], [], []
+        # v11: parallel accumulators for the "no-evidence" floor.
+        # When the eval chain has annotated evidence positions, we run a
+        # SECOND scoring pass with M_c built from a non-evidence haystack
+        # session; we should expect this M_c to NOT help on callback
+        # tokens (it doesn't contain the answer). The gap between the
+        # two passes ("evidence-aware" minus "evidence-absent") is the
+        # honest signal that memory is doing something content-specific
+        # rather than learning a generic style prior. Pre-v11 reports
+        # mixed both passes together because evidence was sampled
+        # uniformly, so a chain with 3.6% evidence prior produced 96%
+        # noise + 4% signal averaged into one number. See README P3.
+        cb_mem_floor, cb_no_floor = [], []
+        n_with_ev_label = 0
         for ci in eligible_for_score:
             cb_pos = int(ev.chain_callback_position[ci])
-            e = rng.randint(0, cb_pos - 1)
+            ev_positions = ev.chain_evidence_positions[ci]
+            ev_in_range = [p for p in ev_positions if 0 <= p < cb_pos]
+            if ev_in_range:
+                e = rng.choice(ev_in_range)
+                n_with_ev_label += 1
+            else:
+                # No annotated evidence -> uniform fallback (legacy
+                # behaviour for non-LME chains).
+                e = rng.randint(0, cb_pos - 1)
             evidence = ev.chain_session_at(ci, e).to(self.device).unsqueeze(0)
             callback = ev.chain_session_at(ci, cb_pos).to(self.device).unsqueeze(0)
             cb_mask = ev.session_callback_mask[
@@ -1673,6 +1812,37 @@ class Trainer:
                 if nll_sh is not None:
                     cb_sh.append(float((nll_sh * cb_mask_sh).sum().item()) / cb_sum)
 
+            # v11: Evidence-absent floor. For chains that have annotated
+            # evidence positions, ALSO score the callback under M_c built
+            # from a haystack session that is *not* in evidence_positions.
+            # If the readout is content-specific the gap (cb_no_floor -
+            # cb_mem_floor) should be ~0 (memory built from irrelevant
+            # context shouldn't help), while (cb_no - cb_mem) > 0 means
+            # memory built from real evidence does help. The DIFFERENCE
+            # of differences -- pa_cb_evidence_lift = (cb_no - cb_mem) -
+            # (cb_no_floor - cb_mem_floor) -- is the strongest single
+            # diagnostic that the channel is episodic and not generic.
+            if ev_in_range and cb_sum > 0:
+                non_ev_pre = [
+                    p for p in range(0, cb_pos)
+                    if p not in ev_in_range
+                ]
+                if non_ev_pre:
+                    e_floor = rng.choice(non_ev_pre)
+                    floor_evidence = (
+                        ev.chain_session_at(ci, e_floor)
+                        .to(self.device).unsqueeze(0)
+                    )
+                    C_f = model.model.extract_source(floor_evidence[:, :-1])
+                    M_floor = model.model.compress_session(C_f, None)
+                    nll_floor = self._per_position_nll(model, input_ids, M_floor)
+                    cb_mem_floor.append(
+                        float((nll_floor * cb_mask_sh).sum().item()) / cb_sum
+                    )
+                    cb_no_floor.append(
+                        float((nll_no * cb_mask_sh).sum().item()) / cb_sum
+                    )
+
         def m(xs):
             return float(sum(xs) / len(xs)) if xs else float("nan")
 
@@ -1702,6 +1872,22 @@ class Trainer:
             out["pa_cb_ce_shuffle"] - out["pa_cb_ce_mem"]
             if cb_sh and cb_mem else float("nan")
         )
+        # v11 evidence-aware diagnostics (only meaningful when the eval
+        # corpus carries chain_evidence_positions, e.g. the v11 LME
+        # corpus). On pre-v11 corpora these are NaN.
+        out["n_pa_cb_evidence_labelled"] = n_with_ev_label
+        out["pa_cb_ce_mem_floor"] = m(cb_mem_floor)
+        out["pa_cb_ce_nomem_floor"] = m(cb_no_floor)
+        if cb_mem_floor and cb_no_floor:
+            floor_dnm = out["pa_cb_ce_nomem_floor"] - out["pa_cb_ce_mem_floor"]
+            out["pa_cb_dnm_floor"] = floor_dnm
+            # Lift = (memory benefit when evidence is present) MINUS
+            # (memory benefit when evidence is absent). > 0 means the
+            # readout is content-specific to evidence-bearing M_c.
+            out["pa_cb_evidence_lift"] = out["pa_cb_dnm"] - floor_dnm
+        else:
+            out["pa_cb_dnm_floor"] = float("nan")
+            out["pa_cb_evidence_lift"] = float("nan")
         return out
 
     @torch.no_grad()
@@ -2047,6 +2233,25 @@ class Trainer:
                             f"CB Δnm-m={pa_cb_dnm:+.4f} Δsh-m={pa_cb_dsh:+.4f}",
                             flush=True,
                         )
+                        # NEW (v11): evidence-aware decomposition. Only fires
+                        # when the corpus has chain_evidence_positions populated
+                        # (i.e., LME with answer_session_ids, not v6 legacy).
+                        # pa_cb_evidence_lift = pa_cb_dnm - pa_cb_dnm_floor;
+                        # > 0 iff memory helps MORE on evidence-labelled
+                        # callback than on uniform-pick callback (i.e., the
+                        # readout learned something content-specific, not just
+                        # an unconditional pull).
+                        n_ev = metrics.get("n_pa_cb_evidence_labelled", 0)
+                        if n_ev and n_ev > 0:
+                            print(
+                                f"  EVID-EVAL @ step {self.global_step}: "
+                                f"n_ev={n_ev} "
+                                f"pa_cb_ce_mem={metrics.get('pa_cb_ce_mem', float('nan')):.4f} "
+                                f"pa_cb_ce_mem_floor={metrics.get('pa_cb_ce_mem_floor', float('nan')):.4f} "
+                                f"Δnm-m_floor={metrics.get('pa_cb_dnm_floor', float('nan')):+.4f} "
+                                f"evidence_lift={metrics.get('pa_cb_evidence_lift', float('nan')):+.4f}",
+                                flush=True,
+                            )
                     # NEW: routing recruitment + readout magnitude.
                     if "rec_mode" in metrics:
                         rec_mode = metrics["rec_mode"]

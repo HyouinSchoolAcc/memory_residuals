@@ -14,10 +14,10 @@ paper.  Compared to the legacy ``train_memres.py``:
   state for continuation.
 
 The data format is the JSONL produced by
-``archive/paper_tools/prepare_pairs.py`` (``history``, ``current`` keys per
+``archive/tools/prepare_pairs.py`` (``history``, ``current`` keys per
 line). History compresses into ``M_c`` once per step and the loss is taken
 on the current session. (The pair-trainer pipeline is dormant; v6 work
-uses ``train_chain.py`` and ``paper_tools/build_conversational_callback_chains.py``.)
+uses ``train_chain.py`` and ``tools/build_conversational_callback_chains.py``.)
 """
 
 from __future__ import annotations
@@ -122,7 +122,7 @@ def parse_args() -> argparse.Namespace:
         "--train_data",
         default="archive/datasets/pairs/stage1_train_h1024_c512.pt",
         help="Path to a pre-tokenized .pt file produced by "
-        "archive/paper_tools/pretokenize_pairs.py (history_ids, current_ids).",
+        "archive/tools/pretokenize_pairs.py (history_ids, current_ids).",
     )
     p.add_argument(
         "--eval_data",
@@ -226,7 +226,7 @@ class PairBatch:
 class TensorPairLoader:
     """Loads a pre-tokenized .pt file and iterates rank-sharded batches.
 
-    Expected file layout (produced by ``paper_tools/pretokenize_pairs.py``):
+    Expected file layout (produced by ``tools/pretokenize_pairs.py``):
         {"history_ids": LongTensor(N, H), "current_ids": LongTensor(N, C+1),
          "history_len": H, "current_len": C, "tokenizer": str}
     """

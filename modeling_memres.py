@@ -235,6 +235,26 @@ class Qwen3MemResConfig(Qwen3Config):
         #                    long-horizon information rather than being
         #                    forced into a zero-sum overwrite every step.
         memres_update_mode: str = "competitive",
+        # v11 (2026-04-30): bootstrap-fix knobs to unstuck the
+        # gate/readout/writer chicken-and-egg (README Stop everything
+        # P1 + P2). Defaults preserve pre-v11 init exactly so saved
+        # checkpoints still load.
+        # ``memres_gate_init``: scalar init for ``MemoryGate.gate``
+        # (used in simple_gate routing). 0.0 is the historical default
+        # but produces zero forward influence and zero gradient on
+        # gate at step 0; a small positive value (e.g. 0.005) breaks
+        # the chicken-and-egg by letting the LM gradient flow back
+        # to the readout from step 1.
+        # ``memres_readout_norm_init``: scalar init for
+        # ``MemoryReadout.out_norm.weight``. 1.0 is the HF
+        # Qwen3RMSNorm default and produces ||m^t||/||embed|| ~ 73,
+        # which puts the gate's useful operating range at
+        # [0, ~0.014] -- too narrow for AdamW's natural step. A
+        # smaller value (e.g. 0.05) downscales the readout output
+        # by 20x so the gate operates in [0, ~0.3], a healthier
+        # regime for the optimizer.
+        memres_gate_init: float = 0.0,
+        memres_readout_norm_init: float = 1.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -276,6 +296,9 @@ class Qwen3MemResConfig(Qwen3Config):
                 f"got {memres_update_mode!r}"
             )
         self.memres_update_mode = memres_update_mode
+        # v11 bootstrap-fix knobs (see __init__ docstring above).
+        self.memres_gate_init = float(memres_gate_init)
+        self.memres_readout_norm_init = float(memres_readout_norm_init)
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +367,16 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
         # MemoryGate is zero-initialised, so  h + gate * m^t == h .  This
         # gives a non-zero gradient signal back into the gate from step 1
         # (the saturating-sigmoid alternative collapses gate gradients).
-        pass
+        # v11 (2026-04-30): apply ``out_norm_init`` to the RMSNorm
+        # weight so the readout output magnitude is calibrated to
+        # the gate's natural operating range. Init=1.0 reproduces
+        # the v8/v9/v10 default; init=0.05 produces ||m^t||/||embed||
+        # ~ 3.6 instead of ~73, so a gate of ~0.3 (vs ~0.014) is the
+        # "useful" operating point -- well within AdamW's natural
+        # step size.
+        scale = float(getattr(module, "_out_norm_init", 1.0))
+        with torch.no_grad():
+            module.out_norm.weight.fill_(scale)
     elif isinstance(module, BlockAttnResRouter):
         for w in module.w:
             nn.init.zeros_(w)
@@ -538,7 +570,7 @@ class MemoryReadout(nn.Module):
         m^t = RMSNorm( Softmax(X W_Q (M_c W_K)^T / sqrt(d)) M_c W_V )
 
     Why the RMSNorm on the output (added in v8, see
-    ``paper_artifacts/eval/diag_v7_*.json`` for the diagnostic data
+    ``results/eval/diag_v7_*.json`` for the diagnostic data
     that motivated it):
 
       The paper's spec assumes the foundational sources of the depth
@@ -577,15 +609,27 @@ class MemoryReadout(nn.Module):
     softmax weight regardless of m^t magnitude.
     """
 
-    def __init__(self, hidden_size: int, eps: float = 1e-6):
+    def __init__(
+        self,
+        hidden_size: int,
+        eps: float = 1e-6,
+        out_norm_init: float = 1.0,
+    ):
         super().__init__()
         self.scale = hidden_size**-0.5
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
         # See class docstring above for the empirical justification.
-        # weight init is 1.0 (HF _init_weights for Qwen3RMSNorm).
+        # weight init defaults to 1.0 (HF _init_weights for
+        # Qwen3RMSNorm). v11 (2026-04-30) accepts a smaller init
+        # (e.g. 0.05) to scale the readout output down by 20x so the
+        # gate's useful operating range moves from [0, ~0.014] to
+        # [0, ~0.3] -- a far healthier regime for AdamW. The
+        # parameter remains learnable, so the model can still grow
+        # the readout magnitude over training as needed.
         self.out_norm = Qwen3RMSNorm(hidden_size, eps=eps)
+        self._out_norm_init = float(out_norm_init)
 
     def forward(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
         """X: (B, S, d) queries;  M_c: (B, K, d) memory slots  ->  (B, S, d)"""
@@ -823,7 +867,9 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             update_mode=getattr(config, "memres_update_mode", "competitive"),
         )
         self.memory_readout = MemoryReadout(
-            config.hidden_size, eps=config.rms_norm_eps,
+            config.hidden_size,
+            eps=config.rms_norm_eps,
+            out_norm_init=getattr(config, "memres_readout_norm_init", 1.0),
         )
         assert self.memory_block.hidden_size == config.hidden_size
         assert self.memory_readout.W_V.out_features == config.hidden_size
@@ -840,7 +886,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         # attention pool forward-identical to the bare backbone.  The
         # +/- 32 magnitude is chosen so that alpha_other ~ exp(-32)/N is
         # well below bf16 precision (~1e-14) for every off-recent source.
-        # Empirically (paper_artifacts/eval/init_parity_test.json) this
+        # Empirically (results/eval/init_parity_test.json) this
         # is what's needed to keep the depth-compounded perturbation
         # under the 1e-3 logit tolerance across 2L = 56 routed sublayers
         # of Qwen3-0.6B; +/- 16 leaves ~3e-7 mass per off-source which
@@ -873,6 +919,7 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
         # mirroring the depth profile used by the routing diagnostic.
         self.memory_gate = MemoryGate(
             num_routing_steps=max(2 * config.num_hidden_layers, 1),
+            init=float(getattr(config, "memres_gate_init", 0.0)),
         )
 
         # Block partition over AttnRes sublayers, not decoder blocks.  Boundaries
