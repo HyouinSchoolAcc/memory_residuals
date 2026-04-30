@@ -352,6 +352,20 @@ def parse_args() -> argparse.Namespace:
                         "trace in attention_parity mode; gate snapshot "
                         "in simple_gate mode -- the latter doesn't need "
                         "data forwards). Cheap, default 8.")
+    p.add_argument("--eval_only", action="store_true",
+                   help="If set, skip training and run the phase-aligned "
+                        "eval (plus routing + readout diagnostics) N "
+                        "times on the loaded checkpoint, then exit. "
+                        "Intended for reading the signal off a saved "
+                        "best with a bigger eval sample and multiple "
+                        "seeds. N is controlled by --eval_seeds.")
+    p.add_argument("--eval_seeds", type=int, default=5,
+                   help="Number of independent PA-eval seeds to run in "
+                        "--eval_only mode. Mean + std + 95%% CI are "
+                        "reported for all PA metrics.")
+    p.add_argument("--eval_out", default=None,
+                   help="If set in --eval_only mode, write the eval "
+                        "JSON to this path (default stdout only).")
 
     # Conversational-pipeline knobs
     p.add_argument("--mask_padding_loss", action="store_true",
@@ -963,8 +977,39 @@ class Trainer:
             memres_update_mode=a.memres_update_mode,
         )
         if a.pretrained:
-            base_cfg = AutoConfig.from_pretrained(a.pretrained)
-            cfg = Qwen3MemResConfig(**{**base_cfg.to_dict(), **memres_kwargs})
+            # A memres checkpoint saves model_type="qwen3_memres", which
+            # AutoConfig does not know about; try loading it directly
+            # before falling back to AutoConfig (which handles the base
+            # Qwen3 / HF preset path).
+            from_memres_ckpt = False
+            try:
+                base_cfg = Qwen3MemResConfig.from_pretrained(a.pretrained)
+                from_memres_ckpt = True
+            except Exception:
+                base_cfg = AutoConfig.from_pretrained(a.pretrained)
+            # When loading from a memres checkpoint, preserve the
+            # architecture fields that were baked into the ckpt (K,
+            # L_E, N, routing mode, extract source, update mode) --
+            # otherwise CLI defaults (L_E=0 when no preset is given)
+            # silently reshape the model and leave 4/5 of the
+            # extraction stack randomly initialised.  Only allow CLI
+            # override of router *init* biases (those are training
+            # knobs, not architecture shape).
+            if from_memres_ckpt:
+                overridable = {
+                    "router_mem_bias_init",
+                    "router_recent_bias_init",
+                    "block_attnres_parity_init",
+                }
+                merged = dict(base_cfg.to_dict())
+                for k, v in memres_kwargs.items():
+                    if k in overridable:
+                        merged[k] = v
+                cfg = Qwen3MemResConfig(**merged)
+            else:
+                cfg = Qwen3MemResConfig(
+                    **{**base_cfg.to_dict(), **memres_kwargs}
+                )
             return Qwen3MemResForCausalLM.from_pretrained(
                 a.pretrained, config=cfg, dtype=torch.bfloat16
             ).to(self.device)
@@ -2104,8 +2149,110 @@ class Trainer:
             dist.destroy_process_group()
 
 
+def _eval_only_run(trainer: "Trainer") -> dict:
+    """Run _phase_aligned_eval N times (with distinct RNG seeds) plus
+    the cheap routing + readout diagnostics once, then aggregate.
+
+    Returns a dict with, for every PA key, {mean, std, ci95, seeds}.
+    """
+    a = trainer.args
+    # Scalar-metric keys actually produced by _phase_aligned_eval
+    # (see definition in train_chain.py: pa_cb_dnm / pa_cb_dsh /
+    # pa_ws_dnm / pa_ws_dsh plus the raw CE means).
+    pa_keys = [
+        "pa_ws_ce_mem", "pa_ws_ce_nomem", "pa_ws_ce_shuffle",
+        "pa_ws_dnm", "pa_ws_dsh",
+        "pa_cb_ce_mem", "pa_cb_ce_nomem", "pa_cb_ce_shuffle",
+        "pa_cb_dnm", "pa_cb_dsh",
+        "n_pa_scored", "n_pa_cb_scored",
+    ]
+    per_seed: dict[str, list[float]] = {k: [] for k in pa_keys}
+    for s in range(a.eval_seeds):
+        # _phase_aligned_eval seeds its RNG off a.seed + global_step + 17;
+        # drift global_step to get a fresh seed per repeat.
+        saved = trainer.global_step
+        trainer.global_step = saved + 1_000_000 + 7919 * s
+        pa = trainer._phase_aligned_eval()
+        trainer.global_step = saved
+        for k in pa_keys:
+            if k in pa:
+                per_seed[k].append(float(pa[k]))
+    agg: dict = {}
+    import statistics as _st
+    for k, vs in per_seed.items():
+        if not vs:
+            continue
+        m = _st.fmean(vs)
+        sd = _st.pstdev(vs) if len(vs) > 1 else 0.0
+        # Simple approx 95% CI on the mean (t-approx for small N).
+        se = sd / max(len(vs) ** 0.5, 1e-9)
+        agg[k] = {
+            "mean": m, "std": sd, "se": se,
+            "ci95_lo": m - 1.96 * se, "ci95_hi": m + 1.96 * se,
+            "n_seeds": len(vs), "values": vs,
+        }
+    # Routing + readout are deterministic given the model; sample once.
+    rec = trainer._routing_recruitment_summary()
+    mt = trainer._readout_magnitude_diag()
+    return {
+        "pa_n_chains": a.phase_aligned_eval_n_chains,
+        "n_seeds": a.eval_seeds,
+        "pa": agg,
+        "routing": rec,
+        "readout": mt,
+    }
+
+
 def main() -> None:
-    Trainer(parse_args()).fit()
+    args = parse_args()
+    trainer = Trainer(args)
+    if args.eval_only:
+        if trainer.is_main:
+            print(
+                f"=== eval_only: n_chains={args.phase_aligned_eval_n_chains}"
+                f" seeds={args.eval_seeds} ===",
+                flush=True,
+            )
+        out = _eval_only_run(trainer)
+        if trainer.is_main:
+            pa = out.get("pa", {})
+            for k in ("pa_cb_dnm", "pa_cb_dsh", "pa_ws_dnm", "pa_ws_dsh"):
+                if k in pa:
+                    v = pa[k]
+                    print(
+                        f"  {k:38s}: mean={v['mean']:+.4f}"
+                        f"  std={v['std']:+.4f}"
+                        f"  95% CI=[{v['ci95_lo']:+.4f},"
+                        f" {v['ci95_hi']:+.4f}]"
+                        f"  (n={args.phase_aligned_eval_n_chains},"
+                        f" seeds={v['n_seeds']})",
+                        flush=True,
+                    )
+            rt = out.get("routing", {})
+            mt = out.get("readout", {})
+            rec_max = rt.get(
+                "rec_alpha_mem_max", rt.get("rec_gate_max_abs", 0.0)
+            )
+            print(
+                f"  ROUTE: mode={rt.get('rec_mode', '?')}"
+                f"  alpha_or_gate_max={rec_max:.4f}"
+                f"  frac_open={rt.get('rec_frac_open', 0.0):.2f}",
+                flush=True,
+            )
+            print(
+                f"  READOUT: ||m^t||/||embed|| mean="
+                f"{mt.get('mt_norm_ratio_mean', 0.0):.2f}",
+                flush=True,
+            )
+            if args.eval_out:
+                import json as _json
+                Path(args.eval_out).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.eval_out).write_text(
+                    _json.dumps(out, indent=2), encoding="utf-8"
+                )
+                print(f"  wrote {args.eval_out}", flush=True)
+        return
+    trainer.fit()
 
 
 if __name__ == "__main__":

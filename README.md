@@ -23,11 +23,15 @@ broke, why it broke, and what the surviving recipe actually is.
    LME + MSC + PG-19 + TV). Every prolonged failure used a narrow,
    single-source distribution (LongMemEval alone). We spent three
    months debugging the architecture when the limit was the data.
-2. **The phase-aligned callback-token Δ_sh-m metric is the single
-   highest-value diagnostic we added.** Adopting it in v8 exposed
-   architectural failure modes that the standard eval read as
-   `Δ_sh-m ≈ 0 "noise"`, and surfaced the first reproducible positive
-   signal on the chain trainer (v9 / v9c, PA CB Δ_sh-m ≈ +0.03).
+2. **The phase-aligned callback-token diagnostic pair
+   (Δ_nm-m, Δ_sh-m) is the single highest-value eval we added.**
+   Adopting it in v8 exposed architectural failure modes that the
+   standard eval read as `Δ_sh-m ≈ 0 "noise"`. The signal to watch
+   is **CB Δ_nm-m**, which on v9c grows *monotonically* from −0.03
+   to +0.16 nats across training — memory learning to help callback
+   tokens more and more. PA CB Δ_sh-m (shuffle-discrimination) is
+   weaker and largely drowned in eval noise at our default n=48
+   chains; it needs n≥256 to be resolvable.
 3. **Routing mode is not the binding constraint — distribution is.**
    On LME-only corpora, `attention_parity +4/-4` collapsed (v9d,
    α_mem ≡ 0). On the *same* architecture + *same* curriculum but
@@ -214,20 +218,28 @@ was a data-distribution failure wearing an architecture mask.**
 - Optimizer: AdamW, lr memres = 3–5e-5, lr backbone = 2–5e-6,
   weight_decay = 0.1, cosine decay with warmup = 200–500.
 
-**Evaluation** (all four at every save cycle):
+**Evaluation** (all five at every save cycle):
 
-1. **Phase-aligned callback-token $\Delta_{sh\text{-}m}$** (`pa_cb_dsh`).
-   The primary metric. Matches the curriculum training distribution;
-   scores only the callback answer span.
-2. **Standard $\Delta_{sh\text{-}m}$ on a 40-sequential-session
+1. **Phase-aligned callback-token $\Delta_{nm\text{-}m}$** (`pa_cb_dnm`).
+   *The primary progress metric.* Measures how much memory helps on
+   callback tokens vs bare backbone, on a single-evidence + single-
+   judge window that matches training. Grows monotonically when the
+   recipe is working (−0.03 → +0.16 on v9c over 4 000 steps).
+2. **Phase-aligned callback-token $\Delta_{sh\text{-}m}$** (`pa_cb_dsh`).
+   Tests whether the channel is *episodic* vs generic. Must eventually
+   be > 0 with a tight CI, but at our default `n=48` chains the per-
+   eval std is ~0.014 nats — so individual readings are noisy and
+   selecting on this metric alone biases toward noise peaks. Use
+   n≥256 or bootstrap CI for gating decisions.
+3. **Standard $\Delta_{sh\text{-}m}$ on a 40-sequential-session
    held-out chain.** The deployment-distribution metric; the
    eval-distribution gap is quantified here. Currently ≈ 0 at all
-   v9 peaks.
-3. **Per-sublayer routing recruitment** (`α_mem_max`, `α_mem_mean`,
+   v9 peaks — the open "Wall 5" problem.
+4. **Per-sublayer routing recruitment** (`α_mem_max`, `α_mem_mean`,
    `frac_open`, top sublayers). Mechanistic evidence that *some*
    sublayer × position actually uses memory on held-out data.
    `paper_tools/routing_trace.py`.
-4. **Readout magnitude** (`‖m^t‖/‖embed‖`). Sanity pulse — values
+5. **Readout magnitude** (`‖m^t‖/‖embed‖`). Sanity pulse — values
    near 0 mean `W_V^{read}` has collapsed, values ≫ 1 mean it's
    exploded. Healthy range is ~50–100 with RMSNorm in place.
 
@@ -244,12 +256,29 @@ on the primary $\Delta_{sh\text{-}m}$ against a 1000+-chain sample
    current attempt (window_k=4, carry_state, composed curriculum,
    67 k chains); success threshold is `standard Δ_sh-m > +0.005` at
    step ~20 000.
-2. **Peak-then-decay on PA CB Δ_sh-m.** v9 peaked at +0.0266 step
-   3400 then drifted to −0.0146 by step 3800. v9c peaked at +0.0310
-   step 2800, drifted to −0.0315 by step 4000. `save_best` captures
-   the peak, but the instability itself is an open diagnosis —
-   probably callback-token over-specialisation feeding miscalibrated
-   injection back onto itself.
+2. **PA CB Δ_sh-m eval variance is larger than the effect we're
+   trying to measure.** The "peak-then-decay" pattern we initially
+   read as a mechanistic failure (v9: +0.0266 → −0.0146 in 400
+   steps; v9c: +0.0310 → −0.0315 in 1200 steps) is *mostly* eval
+   noise + max-selection bias, not a coherent decay. On the v9c
+   trajectory the load-bearing diagnostics tell a completely
+   different story: `gate_max` saturates at 0.0044 by step 1400 and
+   stays *exactly* there for the next 2 200 steps; `frac_open`
+   parks at ~0.64; readout magnitude never drifts outside
+   73.48 ± 0.02; **CB Δ_nm-m grows *monotonically* from −0.03 to
+   +0.16** — memory is doing *more* useful work as training
+   progresses, not less. What actually oscillates is only
+   Δ_sh-m, and eval-noise math (CB Δ_sh-m std ≈ 0.014 nats at
+   n=48 chains × ~20 callback tokens) says the max-of-18-evals
+   under zero-mean noise is about +0.032 — which is almost
+   exactly the "peak" we were treating as signal. The real
+   problem here is (i) we need ~500 chains on the PA eval to
+   resolve "Δ_sh-m > 0 in expectation" at p < 0.05, and (ii) the
+   `save_best` on phase-aligned PA CB Δ_sh-m probably latches
+   onto noise. Workarounds: bump `--phase_aligned_eval_n_chains`
+   to 256+, add bootstrap CI to the selection metric, consider
+   switching `--save_best_metric` to a composite that also weighs
+   CB Δ_nm-m (which is the metric with real monotonic signal).
 3. **8B scaling.** `qwen3-8b-xlarge` (L_E=10, ~8.8 B total) exceeds
    a single 96 GB GH200 under full AdamW (~106 GB peak). The v10 run
    is on 4B (fits at ~52 GB peak with gradient checkpointing). 8B
