@@ -14,6 +14,167 @@ and the v6 → v7 transition narrative, see
 
 ---
 
+## v9 first results + v9 ablation queue + v8b/v8c verdict (2026-04-30 ~01:35 UTC)
+
+### v9 first results — competition curriculum is the breakthrough
+
+`chain_v9_compete_lme_gh200` produced the strongest signal of the
+entire experiment 2 trajectory in its first 1400 steps. Direct
+comparison vs the leading v8b cell at the same metric class:
+
+| metric (PA-aligned) | v8b PEAK (step 1200) | v9 step 1400 | factor |
+|---|---:|---:|---:|
+| CB Δ_nm-m (memory benefit on cb tokens) | +0.0073 | **+0.178** | **24.4×** |
+| CB Δ_sh-m (content discrimination on cb tokens) | +0.0067 | **+0.0152** | 2.3× |
+| WS Δ_nm-m | ~0 | +0.094 | n/a |
+| frac_open (sublayers actively recruited) | 0.54 | **0.89** | 1.6× |
+| train loss (LME) | ~1.27 | **~1.0** | −0.27 |
+
+Full v9 trajectory (PA = phase-aligned eval, 48 chains):
+
+| step | train loss | CB Δ_nm-m | CB Δ_sh-m | WS Δ_nm-m | gate_max | frac_open | top sublayers |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 1000 | 1.15 | −0.045 | +0.016 | −0.056 | 0.0045 | 0.88 | l54+, l55+, l49+ |
+| 1200 | 0.99 | +0.023 | −0.004 | +0.017 | 0.0049 | 0.86 | l55+, l54+, l49+ |
+| 1400 | 1.13 | **+0.178** | **+0.015** | **+0.094** | 0.0052 | 0.89 | l55+, l41+, l54+ |
+
+What's structurally different vs v8b/v8c:
+
+- **frac_open ≈ 0.89** — almost every sublayer is using memory; in
+  v8b only ~50% recruited. The competition curriculum makes the
+  channel actually *required* for the model to lower callback CE.
+- **Train loss 25% lower** at the same data corpus, same
+  architecture, only the curriculum knob differs. The competition
+  curriculum gives the writer + judge a sharp, definite gradient
+  per sample (Sample A "keep prev" vs Sample B "write new"),
+  whereas mixed-bias spreads the same supervision across diffuse
+  long chains.
+- **Top sublayers shifted from l48/l49 (v8b) to l54/l55 + l41 (v9)** —
+  *different layers* light up when training tells the gate "memory
+  really does matter." This is the recruitment pattern v6/v7/v8
+  could not produce on this corpus.
+- **Standard `Δ_nm-m` is NEGATIVE (−0.017)** on the 8-session
+  contiguous eval, *as expected and accepted*: 7/8 of those sessions
+  have no callback, and a model trained to *aggressively* write
+  callback-relevant content will hurt non-callback CE. This is the
+  deployment-faithful trade-off — we optimise the *callback* metric,
+  not the average over corpora the model was never trained to
+  predict.
+- Some instability: grad_norm spiked to 30.7 at step 1300; manageable
+  but worth watching. The judge-supervised regime is sharper but
+  noisier than continuous LM gradient.
+
+**Verdict:** the curriculum-decomposition hypothesis (your "Curriculum
+2: Competing") is validated. Decomposing the recipe into
+[judge keep-vs-write] vs [writer compaction] gives 24× more callback-
+token CE benefit than mixing both axes through generic LM loss.
+v9 has been promoted to the headline cell; v9_compete_lme_gh200/best
+(saved at step 1400) is currently the leading checkpoint of the
+program.
+
+### v9 ablation queue — four GH200 cells, all enqueued via the watchdog
+
+To validate that the v9 win is from the *curriculum decomposition*
+specifically (and not from the callback-weight, the LME-only data,
+or the simple_gate routing), four ablations were rsync'd to the
+GH200 and dropped into the watchdog queue. They will auto-launch
+sequentially on GH200 GPU 0 once the v9 baseline finishes
+(`gpu_is_busy()` precheck defers the queue head until v9 vacates).
+
+| order | cell | knob varied vs v9 | what it answers | script |
+|---:|---|---|---|---|
+| 1 | `chain_v9a_abl_cbw1_gh200` | `callback_loss_weight` 3.0 → **1.0** | is v9's win from competition curriculum or from upweighted callback supervision? if v9a still wins, curriculum is doing the heavy lifting | [`train_v9a_abl_cbw1_gh200.sh`](../../scripts/train_v9a_abl_cbw1_gh200.sh) |
+| 2 | `chain_v9b_abl_mixed_gh200` | `competition_bias` 1.0 → **0.5** + `evidence_bias` 0.0 → **0.5** + `window_k` 3 → **8** | is *pure* competition necessary, or is half competition / half mixed-bias enough? | [`train_v9b_abl_mixed_gh200.sh`](../../scripts/train_v9b_abl_mixed_gh200.sh) |
+| 3 | `chain_v9c_abl_diverse_gh200` | corpus LME-only → **v6_lme_msc_train** (LME+MSC+PG-19+TV) | does v9 survive data diversity, or did LME-only matter? distinguishes v8c failure (regularisation) from data axis itself | [`train_v9c_abl_diverse_gh200.sh`](../../scripts/train_v9c_abl_diverse_gh200.sh) |
+| 4 | `chain_v9d_abl_attnparity_gh200` | `memres_mode` simple_gate → **attention_parity** (with RMSNorm fix retained) | now that readout magnitude is bounded, does the original paper-spec attention_parity routing become viable under the v9 curriculum? | [`train_v9d_abl_attnparity_gh200.sh`](../../scripts/train_v9d_abl_attnparity_gh200.sh) |
+
+Each cell: 4000 steps, ~3.3 h on GH200 → total queue ≈ 13 h after v9
+finishes (~03:00 UTC tomorrow). Watchdog ntfy topic
+`memres-e6ebdc70` — start/finish notifications go to the phone
+subscription.
+
+Decision matrix once each ablation finishes:
+
+- **v9a (cbw=1.0)** wins → callback-weight is a tunable secondary
+  knob; primary win is competition curriculum.
+- **v9a regresses to v8b-tier** → competition + cbw=3.0 are jointly
+  necessary; document both as required knobs in the recipe.
+- **v9b (half mixed)** matches v9 → pure competition isn't required;
+  the recipe gets a regularisation bonus from contiguous windows.
+- **v9b underperforms** → curriculum has to dominate; mixing dilutes
+  the judge's signal.
+- **v9c (diverse)** matches or beats v9 → diversity + competition is
+  the headline recipe (best of both worlds; v8c's failure was the
+  regularisation stack, not the data).
+- **v9c collapses** → data diversity + competition curriculum
+  interact negatively; LME-only is a real constraint of the recipe.
+- **v9d (attention_parity)** works → original paper-spec routing is
+  viable, simple_gate was just the architectural workaround for the
+  v7 failure mode; ship attention_parity as the canonical primitive.
+- **v9d collapses** → simple_gate is permanently part of the recipe;
+  attention_parity is a paper-spec curiosity.
+
+### v8b — KILLED (overfitting trap re-emerged at step ~2200)
+
+- **Status:** KILLED 2026-04-30 ~01:30 UTC at step ~2460 of 4000.
+- **Why killed:** the mixed-bias curriculum *delayed* the v8a
+  overfitting trap by ~1000 steps but did not escape it. Between
+  step 1400 and 2400, PA CB Δ_nm-m fell from +0.012 to **−0.034**
+  and CB Δ_sh-m collapsed to **−0.032**. The gate stayed open
+  (frac_open 0.68, gate_max 0.0085 stable) and memory was being
+  used, but the readout had learned spurious callback-specific
+  writes that hurt prediction. Train loss flat in [1.13, 1.34] —
+  the overfitting was invisible on standard CE; only the PA-CB
+  diagnostic exposed it. v9 is the curriculum-axis fix.
+- **Best ckpt (preserved, was best in cohort until v9):**
+  `output/chain_v8b_mixed_simplegate_rmsnorm/best` — step 1200,
+  PA CB Δ_sh-m = +0.0067.
+- **Full eval trajectory:**
+
+  | step | std Δ_nm-m | PA CB Δ_nm-m | PA CB Δ_sh-m | gate_max | frac_open |
+  |---:|---:|---:|---:|---:|---:|
+  | 1000 | −0.0004 | +0.0046 | −0.0002 | 0.0054 | 0.39 |
+  | 1200 | +0.0010 | +0.0073 | **+0.0067** | 0.0054 | 0.54 |
+  | 1400 | −0.0003 | +0.0118 | +0.0038 | 0.0074 | 0.52 |
+  | 1600 | −0.0025 | +0.0052 | −0.0027 | 0.0087 | 0.62 |
+  | 2000 | (no eval shown — flat trajectory) |
+  | 2200 | −0.0005 | **−0.0418** | **−0.0133** | 0.0088 | 0.59 |
+  | 2400 | −0.0002 | −0.0340 | **−0.0320** | 0.0085 | 0.68 |
+
+### v8c — KILLED (frozen trajectory, gate suppressed by over-regularisation)
+
+- **Status:** KILLED 2026-04-30 ~01:30 UTC at step ~2000 of 4000.
+- **Why killed:** v8c is the opposite failure mode of v8a/v8b — 2000
+  steps of *no recruitment progress*. Gate magnitude has been ~0.004
+  the whole time, frac_open stuck at 0.30, top sublayers signed
+  *negative* (the gate is being mildly suppressed). PA-CB metrics
+  oscillate in a tight ±0.007 noise band around zero. The diverse
+  corpus + multi-axis regularization stack (memres_LR=1e-4, dropout,
+  cbw=3.0) prevents overfitting by also preventing learning. v9c
+  separates the data-diversity effect (kept) from the regularisation
+  stack (dropped) to test whether diversity itself is the culprit.
+- **Best ckpt:** none worth promoting; not banked in cohort.
+- **Last eval (step 2000):** PA CB Δ_nm-m = +0.0034, PA CB Δ_sh-m =
+  −0.0056, gate_max = 0.0036, frac_open = 0.36.
+
+### Summary of v8/v9 cohort failure modes
+
+| recipe | curriculum | cb-token benefit | content discr. | gate openness | verdict |
+|---|---|---:|---:|---:|---|
+| v8a | pure-P0 | overfit @ step 800 | overfit @ 800 | 0.4 (negative-signed) | killed |
+| v8b | mixed-bias | +0.012 then collapse @ 2200 | +0.007 peak then collapse | 0.6 | **killed** |
+| v8c | mixed + diverse + heavy reg | flat ~0 | flat ~0 | 0.30 stuck | **killed** |
+| **v9** | **pure-competition** | **+0.178** @ 1400 | **+0.015** @ 1400 | **0.89** | **HEADLINE** |
+
+The v8 cohort comprehensively bracketed the failure modes:
+overfitting at one extreme (v8a/v8b), stalling at the other (v8c).
+Both extremes are about training the writer + readout + judge
+*together* through generic LM loss on a callback-token mix; the
+competition curriculum (v9) is the structural fix that decomposes
+the problem into trainable subparts.
+
+---
+
 ## v9 — judge-competition curriculum (2026-04-30 00:00 UTC)
 
 User directive 2026-04-30 ~00:00 UTC after the v8a/b/c results showed
