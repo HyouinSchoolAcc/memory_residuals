@@ -46,9 +46,39 @@ require() {
 }
 require tmux jq
 
+# Threshold (MiB) above which we consider another process to be "holding"
+# the target GPU and refuse to co-launch. Below this we treat the GPU as
+# effectively free (covers nvidia-smi / nv-fbc / display-server overhead
+# of a few hundred MiB).
+GPU_BUSY_MIB="${GPU_BUSY_MIB:-2048}"
+
+# Returns 0 (true) if the requested GPU index already has a CUDA process
+# using more than $GPU_BUSY_MIB MiB. Used to defer co-launching a new
+# job onto a GPU that is mid-training (which silently OOMs on first
+# step, as happened to chain_v6_lme_gated_purist on 2026-04-29).
+gpu_is_busy() {
+  local gpu_idx="$1"
+  command -v nvidia-smi >/dev/null 2>&1 || return 1
+  # Each line is "<pid>, <gpu_uuid>, <used_mib_with_units>" e.g. "12345, GPU-abc..., 50777 MiB"
+  local line used_mib uuid
+  # Map gpu_idx -> uuid first (so we can match against per-process rows).
+  local target_uuid
+  target_uuid="$(nvidia-smi --id="$gpu_idx" --query-gpu=uuid --format=csv,noheader 2>/dev/null | tr -d ' ')"
+  [ -z "$target_uuid" ] && return 1
+  while IFS=',' read -r _pid uuid used_str; do
+    uuid="$(echo "$uuid" | tr -d ' ')"
+    used_mib="$(echo "$used_str" | tr -d ' MiB')"
+    [ -z "$used_mib" ] && continue
+    if [ "$uuid" = "$target_uuid" ] && [ "$used_mib" -gt "$GPU_BUSY_MIB" ]; then
+      return 0
+    fi
+  done < <(nvidia-smi --query-compute-apps=pid,gpu_uuid,used_memory --format=csv,noheader 2>/dev/null)
+  return 1
+}
+
 trap 'log "watchdog received SIGTERM/SIGINT, exiting"; exit 0' INT TERM
 
-log "starting watchdog: poll=${POLL_SEC}s, queue=$QUEUE"
+log "starting watchdog: poll=${POLL_SEC}s, queue=$QUEUE, gpu_busy_mib=$GPU_BUSY_MIB"
 
 while :; do
   # Reap finished tmux sessions (move running/<name> -> done/ or failed/)
@@ -106,6 +136,24 @@ while :; do
       mv "$spec_path" "$RUN/"
       continue
     fi
+
+    # GPU-busy precheck: if another CUDA process is holding more than
+    # $GPU_BUSY_MIB on the requested GPU, leave the spec in queue and
+    # try again on the next poll. Prevents silent first-step OOMs when
+    # two specs share a "gpu" id (the cause of the 2026-04-29 PURIST
+    # failure on the GH200 — co-launched onto the same gpu 0 as
+    # chain_v6_lme_gated_callback_w12, which was using ~58 GiB).
+    if gpu_is_busy "$gpu"; then
+      # Quietly defer; don't spam the log every poll. Note once on the
+      # first deferral by writing a marker file.
+      defer_marker="$LOGS/$name.deferred_for_gpu"
+      if [ ! -f "$defer_marker" ]; then
+        log "deferring $name: gpu $gpu busy (>${GPU_BUSY_MIB} MiB used by another process)"
+        : > "$defer_marker"
+      fi
+      continue
+    fi
+    rm -f "$LOGS/$name.deferred_for_gpu"
 
     cwd="${cwd:-$REPO}"
     venv="${venv:-$VENV}"

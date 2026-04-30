@@ -13,9 +13,11 @@ paper.  Compared to the legacy ``train_memres.py``:
 * Saves: best-by-validation-CE checkpoint, last checkpoint, full optimizer
   state for continuation.
 
-The data format is the JSONL produced by ``paper_tools/prepare_pairs.py``
-(``history``, ``current`` keys per line).  History compresses into ``M_c``
-once per step and the loss is taken on the current session.
+The data format is the JSONL produced by
+``archive/paper_tools/prepare_pairs.py`` (``history``, ``current`` keys per
+line). History compresses into ``M_c`` once per step and the loss is taken
+on the current session. (The pair-trainer pipeline is dormant; v6 work
+uses ``train_chain.py`` and ``paper_tools/build_conversational_callback_chains.py``.)
 """
 
 from __future__ import annotations
@@ -113,16 +115,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--memres_extraction_depth", type=int, default=0)
     p.add_argument("--memres_num_blocks", type=int, default=8)
 
-    # Data
+    # Data. The pair corpora are archived under archive/datasets/pairs/;
+    # this trainer is dormant (v6 work uses train_chain.py). If you want to
+    # reproduce the run3 pair-warmup, restore the corpora and pass the path.
     p.add_argument(
         "--train_data",
-        default="paper_artifacts/pairs/stage1_train_h1024_c512.pt",
+        default="archive/datasets/pairs/stage1_train_h1024_c512.pt",
         help="Path to a pre-tokenized .pt file produced by "
-        "paper_tools/pretokenize_pairs.py (history_ids, current_ids).",
+        "archive/paper_tools/pretokenize_pairs.py (history_ids, current_ids).",
     )
     p.add_argument(
         "--eval_data",
-        default="paper_artifacts/pairs/stage1_validation_h1024_c512.pt",
+        default="archive/datasets/pairs/stage1_validation_h1024_c512.pt",
     )
     p.add_argument(
         "--history_len",

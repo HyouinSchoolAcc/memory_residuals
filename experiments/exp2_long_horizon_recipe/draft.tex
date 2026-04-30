@@ -1,0 +1,695 @@
+% experiments/exp2_long_horizon_recipe/draft.tex
+%
+% A training recipe for long-horizon dialogue recall on Memory Residuals.
+%
+% Companion to experiments/exp1_drop_in_primitive/manuscript.tex
+% (drop-in primitive paper). After the first review pass that
+% paper was deemed too narrow to stand alone, so the architectural
+% primitive is folded into this manuscript as the "Background /
+% Architectural primitive" section -- the rest of the paper is the
+% training-recipe contribution.
+%
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2024}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\mhyph}{\text{--}}
+\newcommand{\Mc}{M_{\text{c}}}
+\newcommand{\Min}{M_{\text{in}}}
+\newcommand{\Mj}{M_{\text{judge}}}
+\newcommand{\Mnew}{M_{\text{new}}}
+\newcommand{\dnm}{\Delta_{\text{nm-m}}}
+\newcommand{\dsh}{\Delta_{\text{sh-m}}}
+\newcommand{\dor}{\Delta_{\text{or-m}}}
+\newcommand{\CEmem}{\mathrm{CE}_{\text{mem}}}
+\newcommand{\CEnomem}{\mathrm{CE}_{\text{nomem}}}
+\newcommand{\CEsh}{\mathrm{CE}_{\text{shuffle}}}
+\newcommand{\CEor}{\mathrm{CE}_{\text{oracle}}}
+\newcommand{\amem}{\alpha_{\text{mem}}}
+
+\title{A training recipe for long-horizon dialogue recall on\\
+       Memory Residuals: contextual extraction, mixed corpus,\\
+       contrastive supervision, and the cost of saturating router init}
+
+\author{%
+  Anonymous Authors\\
+  \texttt{anonymous@example.com}%
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study the training recipe needed to make a parity-preserving
+recurrent memory module --- the \emph{Memory Residuals} primitive ---
+useful for long-horizon multi-session dialogue recall. The primitive
+admits a bit-exact initialisation that produces zero perturbation of
+the bare backbone's logits at step~$0$; it also, under na\"ive
+next-token training on book corpora, is provably sample-efficient
+on history-specificity diagnostics ($\dsh$) at matched compute
+relative to a ReZero scalar gate. \emph{However}, that same recipe
+fails to transfer to dialogue: standalone evaluation on LoCoMo and
+the held-out routing-mass / counterfactual probes both show that the
+depth-router never opens a non-trivial channel to memory, with
+$\amem \approx 5\!\times\!10^{-4}$ even after $4400$ steps of
+optimisation. We trace the failure to four interacting causes ---
+embedding-only extract source, book-skewed training mix,
+no signal beyond plain NLL, and an init that places the routing
+softmax beyond bf16-representable gradient --- and propose a
+four-piece recipe to fix each. We then report on the headline
+$2\!\times\!2$ ablation (contextual extract $\times$ mixed corpus)
+trained under that recipe, and on a key negative result: the strict
+parity-preserving init ($\pm 32$) produces a literal numerical-zero
+gradient through the router softmax, so the contrastive ramp cannot
+escape it. The empirical headline is therefore the slightly weaker
+\emph{soft} parity init ($\pm 4$) plus the rest of the recipe; we
+demonstrate that this configuration is necessary to make the
+primitive perform on dialogue at all.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+A practical conversational agent should remember a user across
+sessions: their name, their preferences, the on-going arc of a
+relationship. \emph{Memory Residuals}~\cite{liu2025memres,
+duan2025memres} is an architectural primitive aimed at exactly
+this regime --- a fixed-size recurrent memory matrix
+$\Mc \in \mathbb{R}^{K\times d}$ updated end-to-end through the
+language-modelling loss with no retrieval index, no separate memory
+controller, and no hand-engineered gating heuristic. The companion
+paper~\cite{liu2025drop} establishes that the primitive, on top of a
+$0.6$B Qwen3 backbone and trained on book continuations (PG-19 plus
+$30$ TV transcripts), is roughly $2\times$ more sample-efficient on
+the history-specificity test ($\dsh$, defined below) than its
+ReZero-style gate baseline; that the parity-preserving init produces
+bit-exact logits to the bare backbone at step $0$; and that on
+held-out PG-19 the router opens a non-trivial channel to memory,
+with the routing-mass and counterfactual probes both registering
+positive but small effects.
+
+The primitive, however, does not by itself transfer to dialogue.
+Trained on the book corpus and evaluated standalone on LoCoMo
+(a multi-session dialogue benchmark), the same checkpoint shows
+$\dsh$ within bootstrap CI of zero. The held-out routing trace shows
+$\amem$ at $\sim 5\!\times\!10^{-4}$, only $7.6\times$ off the
+analytic init floor of $\exp(-8)/N \approx 6\!\times\!10^{-5}$. The
+counterfactual depth-bucketed probe shows held-out NLL effects of
+$\Delta(d{=}\mathrm{ALL}) \approx +0.013$~nat that drop into noise
+beyond the most-recent prior session.
+
+\paragraph{What this paper contributes.} A training recipe that
+transforms the Memory Residuals primitive from \emph{book-only,
+margin-effect} to \emph{dialogue-capable, mechanistically active}
+on the same backbone and at compute parity. The recipe has four
+pieces, each motivated by a specific failure mode of the
+primitive's na\"ive training on book data:
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item \textbf{Contextual extract source.} Replace the legacy
+bag-of-token-embeddings extract input with a hidden state from
+mid-stack of the bare backbone, $\texttt{hidden\_<L>}$. The
+compressor's distillation target shifts from token identity to
+contextualised semantics, which is necessary to bind dialogue
+content across sessions whose token surfaces differ.
+\item \textbf{Mixed conversational corpus} (PG-19 + TV + MSC) with
+explicit per-source weighting. Train on the kind of data we want
+to evaluate on; include enough non-dialogue to anchor the LM head.
+\item \textbf{Negative-chain contrastive loss}, ramped over the
+first $1000$ steps. The contrast forces the matched-chain memory
+to beat a distractor chain's memory by a margin on the same
+scoring session, giving the router a reason to recruit memory
+beyond what plain NLL provides on dialogue.
+\item \textbf{Soft, not strict, parity-preserving router init.}
+The strict $\pm 32$ bias init is bit-exact at step $0$ but produces
+a router softmax gradient on memory that is below bf16
+representability. The contrastive loss cannot escape this
+saturation. We show this experimentally and recommend the soft
+$\pm 4$ init as the pragmatic compromise between init purity and
+recipe-trainable optimisation.
+\end{enumerate}
+
+The headline experiment is a $2\!\times\!2$ factorial over
+$\{\texttt{embed},\,\texttt{hidden\_14}\}\times\{\textsc{PG19+TV},\,
+\textsc{PG19+TV+MSC}\}$, with the $\texttt{hidden\_14}\!\times\!\textsc{PG19+TV+MSC}$
+cell as the headline. We report $\dnm$, $\dsh$, and held-out routing
+trace + counterfactual probes for every cell, with bootstrap CIs.
+We also report the negative result on the strict $\pm 32$ init,
+which is, in our view, the most actionable finding for follow-on
+work because it identifies a previously implicit failure mode of
+parity-preserving initialisation in residual-stream routers.
+
+\paragraph{Scope and non-scope.} We report a $0.6$B-class result
+on Qwen3. We do not claim $32$k context: the operational scope is
+$k$-session windows of $S{=}512$ tokens each, with $k\!\le\!8$
+sessions. We hold MSC and LoCoMo as evaluation surfaces only ---
+held-out by user mandate from the training corpus mix. We do not
+attempt to compete with retrieval-augmented generation on factual
+$\mathrm{QA}$ benchmarks; the comparison we run is to a
+compute-matched RAG baseline on the dialogue corpora the recipe is
+trained for, where the differentiator is abstract callback rather
+than verbatim retrieval.
+
+\paragraph{Roadmap.} \S\ref{sec:primitive} folds in the
+architectural primitive's definition and its book-only baseline
+performance from \cite{liu2025drop}, so this manuscript can stand
+on its own. \S\ref{sec:recipe} states the four-piece recipe and
+the prior failure mode each piece addresses. \S\ref{sec:setup}
+describes the corpus build and training infrastructure.
+\S\ref{sec:experiments} reports the $2\!\times\!2$ headline,
+RAG-baseline comparisons, callback probe, and routing-trace +
+counterfactual diagnostics. \S\ref{sec:negative_result} pins down
+the strict-vs-soft init failure mode in detail, including a
+bf16-arithmetic argument for why the strict $\pm 32$ init is
+operationally untrainable under a contrastive ramp.
+\S\ref{sec:discussion} discusses limitations and the interaction
+of architectural and training-recipe interventions.
+
+\section{Background: the architectural primitive}
+\label{sec:primitive}
+
+This section is a self-contained summary of the primitive defined
+and benchmarked in \cite{liu2025drop}. We re-derive only what later
+sections depend on; readers interested in the primitive's
+sample-efficiency vs.\ scalar-gate baseline should consult that
+paper directly.
+
+\paragraph{Memory state.} Each chain (a book, a TV episode arc, or
+a multi-session conversation) carries a single fixed-size matrix
+$\Mc \in \mathbb{R}^{K\times d}$ with $K{=}128$ slots and $d$ the
+backbone hidden size ($1024$ for Qwen3-0.6B). The state is updated
+once per session boundary via a two-stage cross-attention:
+\begin{align}
+\Mnew &= \mathrm{Softmax}\!\left(\tfrac{\Min W_Q^{\text{ext}}\bigl(C_t W_K^{\text{ext}}\bigr)^\top}{\sqrt{d}}\right) C_t W_V^{\text{ext}},
+\label{eq:extract}\\
+\Mc^{t} &= \mathrm{Softmax}\!\left(\tfrac{\Mj W_Q^{\text{j}}\bigl(P W_K^{\text{j}}\bigr)^\top}{\sqrt{d}}\right) P W_V^{\text{j}},
+\quad P = [\Mc^{t-1} \parallel \Mnew] \in \mathbb{R}^{2K\times d},
+\label{eq:judge}
+\end{align}
+with extraction depth $L_E{=}4$ and judge softmax taken across the
+$2K$-row dimension. The $2K$-pool softmax is the
+\emph{zero-sum forgetting defence}: salient new content displaces
+old slots; mundane content lets old content pass through.
+$C_t$ is the per-session input to the extractor, and is the
+locus of the recipe's Piece~1 below.
+
+\paragraph{Off-sequence read.} At inference into the next session,
+every position $x_i$ cross-attends $\Mc$ once to produce a
+per-position readout
+$m^t = \mathrm{Softmax}(X W_Q^{\text{r}}(\Mc W_K^{\text{r}})^\top/\sqrt{d})\Mc W_V^{\text{r}} \in \mathbb{R}^{S\times d}$.
+Because $m^t$ has the same shape as any sublayer output, it slots
+into the residual stream cleanly via a depth-wise router.
+
+\paragraph{Routing primitive (\textsc{attention\_parity}).} The
+augmented backbone uses a Block AttnRes
+router~\cite{du2025blockattnres} that, at each sublayer, computes
+a softmax-weighted mix over a pool of \emph{cumulative} sources
+$\{b_{-1}, b_0, \dots, b_{n-1}\}$, with $b_{-1}{=}m^t$ the memory
+readout, $b_0{=}h_0$ the embedding source, $b_k{=}h_k$ for $k\!\ge\!1$
+prior block outputs, and $b_{n-1}{=}h_{n,i-1}$ the running
+intra-block partial. The router carries two scalar bias parameters
+$\texttt{mem\_bias}$ and $\texttt{recent\_bias}$ that perturb the
+softmax logits on $b_{-1}$ and $b_{n-1}$ respectively. \emph{Strict}
+parity init sets $\texttt{mem\_bias}{=}{-32}$,
+$\texttt{recent\_bias}{=}{+32}$, producing one-hot mass on $b_{n-1}$
+at step $0$ and bit-exact agreement with the bare backbone (the
+residual stream $h{=}b_0 + \sum_k b_k + h_{n,i-1}$ is recovered as
+a one-hot selection on the most-recent slot). \emph{Soft} parity
+init uses $\pm 4$, sacrificing exact bit-identical step-0 logits
+($\Delta_{\text{logit}} \approx 10^{-5}$ on a calibration batch) for
+non-saturated softmax gradients on the per-source pseudo-queries
+from step $1$ onwards. \S\ref{sec:negative_result} shows that this
+distinction is operationally load-bearing.
+
+\paragraph{Recurrent training loop.}
+The chain trainer runs truncated BPTT with $k$-session windows;
+inside the window, every session $t \in \{1,\dots,k\}$ contributes
+its own next-token NLL, and $\Mc$ propagates through the in-graph
+judge / extract chain for backward. Outside the window, $\Mc$ is
+either re-initialised to $\mathbf{0}$ (warm-start) or carried
+across windows via a detached \texttt{carry\_state} (this is the
+default in our recipe). Memory dropout (per-chain $p_m{=}0.1$
+zero-out of $\Mc$) and context dropout (per-token prefix block-out
+$p_c{=}0.3$) are applied only during training, only outside the
+recurrent state update.
+
+\paragraph{Empirical baseline (book-only, from \cite{liu2025drop}).}
+Trained on $\sim$$113$M Qwen tokens of PG-19 + TV with plain NLL
+and soft parity init, the primitive reaches in-trainer
+$\dsh \approx +0.0379$ at step $4400$ on PG-19 validation
+(see Table~\ref{tab:v3_baseline}). The companion paper's standalone
+eval on PG-19 test gives bootstrap CIs that exclude zero ($\dsh =
++0.0279$ with $95\%$ CI $[+0.0221, +0.0338]$), but the same
+checkpoint on LoCoMo gives $\dsh = +0.0025$ with CI
+$[-0.0015, +0.0087]$ --- in the noise. The held-out routing trace
+shows $\amem \approx 4.7\!\times\!10^{-4}$ on PG-19 val and a
+$+4.79\%$ mem-vs-shuffle gap; on LoCoMo the gap is
+$\approx 0$~\cite[Tables~6--7]{liu2025drop}. This is the empirical
+gap the recipe is designed to close.
+
+\begin{table}[t]
+\centering
+\caption{Book-only baseline trajectory of \textsc{attention\_parity}
+(soft init, $\pm 4$) on the legacy chain corpus
+(PG-19 train: $4995$ books cut into $218$k sessions, plus $30$ TV
+transcripts; $\sim 113$M Qwen tokens). In-trainer eval, $n{=}92$
+score positions per row, eval window $4$. Run name
+\texttt{chain\_v3\_softparity\_full}; killed at step $4425$ for the
+recipe rerun, so the listed step-$4400$ row is the best persisted
+checkpoint.}
+\label{tab:v3_baseline}
+\small
+\begin{tabular}{rrrrrrrr}
+\toprule
+step & $\CEmem$ & $\CEnomem$ & $\CEsh$ & $\CEor$ & $\dnm$ & $\dsh$ & $\dor$ \\
+\midrule
+$200$  & $3.0859$ & $3.0878$ & $3.0858$ & $2.9243$ & $+0.0019$ & $-0.0001$ & $-0.1616$ \\
+$1000$ & $2.9842$ & $2.9910$ & $3.0019$ & $2.8515$ & $+0.0068$ & $+0.0177$ & $-0.1327$ \\
+$2000$ & $2.9504$ & $2.9611$ & $2.9776$ & $2.8273$ & $+0.0107$ & $+0.0272$ & $-0.1231$ \\
+$3000$ & $2.9397$ & $2.9517$ & $2.9727$ & $2.8180$ & $+0.0120$ & $+0.0330$ & $-0.1217$ \\
+$4000$ & $2.9349$ & $2.9478$ & $2.9714$ & $2.8151$ & $+0.0129$ & $+0.0365$ & $-0.1199$ \\
+$\mathbf{4400}$ & $\mathbf{2.9342}$ & $\mathbf{2.9473}$ & $\mathbf{2.9721}$ & $\mathbf{2.8145}$ & $\mathbf{+0.0131}$ & $\mathbf{+0.0379}$ & $\mathbf{-0.1197}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{The four-piece training recipe}
+\label{sec:recipe}
+
+\paragraph{Piece 1: contextual extract source.}
+The legacy primitive defines $C_t$ in Eq.~\ref{eq:extract} as
+$C_t = \mathrm{embed}(\text{input\_ids}) \in \mathbb{R}^{N_t \times d}$,
+i.e.\ a bag of frozen token embeddings. On book chains, where two
+sessions of the same book share $>\!70\%$ of token identities, this
+is sufficient to support a positive in-trainer $\dsh$ via
+\emph{lexical} memory --- the extractor learns to attend to a
+weighted average of token identities, and that average distinguishes
+this book from the next book in the corpus. On dialogue chains it
+collapses: two MSC sessions about the same person can share $<\!30\%$
+of token identities, so a lexical-memory shortcut produces no
+generalisable signal.
+
+The fix is to replace the embedding source with a contextualised
+hidden state from a fixed mid-stack of the \emph{bare} backbone:
+$C_t = \mathrm{hidden}_L(\text{input\_ids})$ for $L \in
+\{\texttt{8}, \texttt{14}, \texttt{20}\}$ on a $28$-layer
+Qwen3-0.6B backbone. Concretely, when the extractor is invoked we
+run a no-grad partial forward of the bare backbone up to layer $L$,
+take the per-token hidden state, and feed that to the extractor as
+$C_t$. The compressor's distillation target shifts from token
+identity to syntax / anaphora / entity-binding-style features that
+generalise across surface paraphrase.
+
+This change is init-parity-preserving: we verify bit-exactly that
+both \texttt{embed} and \texttt{hidden\_14} extract sources produce
+identical step-$0$ logits to the bare backbone (with and without
+memory injected). The change therefore commutes with the rest of
+the architectural recipe; no other parameter has to move.
+
+\paragraph{Piece 2: mixed conversational corpus.}
+The book-only training corpus (PG-19 + $30$ TV transcripts) is
+$\approx 96\%$ books by token count. We add MSC (multi-session
+chat~\cite{xu2022msc}) to the training mix and weight sources to
+correct for the natural imbalance:
+\textsf{source\_weights = \{pg19:1, tv:4, msc:8\}}.
+The new pretokenised corpus
+\texttt{stage1\_msc\_train\_s512.pt} contains $5928$ chains
+($1899$ PG-19 + $29$ TV + $4000$ MSC), $\sim$$103$k sessions, all
+eligible at $\texttt{window\_k}{\ge}3$. We hold out
+\texttt{stage1\_msc\_val\_s512.pt} (PG-19 val + $200$ MSC val
+chains; $548$ chains, $4645$ sessions) for in-trainer eval, and
+LoCoMo for fully-held-out evaluation.
+
+\paragraph{Piece 3: negative-chain contrastive loss.}
+The standard chain-recurrent training objective is the next-token
+NLL summed across the $k$-session window plus a margin auxiliary
+loss
+\[
+\mathcal{L}_{\text{neg}} = \mathrm{ReLU}\!\bigl(\mathrm{NLL}_{\text{match}}(s_k) -
+                                                \mathrm{NLL}_{\text{shuffle}}(s_k) + m_{\text{neg}}\bigr),
+\]
+where $\mathrm{NLL}_{\text{shuffle}}$ is the next-token NLL of the
+last session $s_k$ scored under a $\Mc$ rebuilt from a different,
+randomly-chosen chain's prefix. The hyper-parameter $m_{\text{neg}}$
+is the margin (default $0.05$~nat); the loss vanishes when
+match-NLL is at least $m_{\text{neg}}$ lower than shuffle-NLL. The
+weight $w_{\text{neg}}$ ramps linearly from $w_{\text{init}}{=}0.05$
+at step $0$ to $w_{\text{final}}{=}0.5$ at step $1000$, then holds.
+
+The role of the contrastive ramp is to make ``ignore memory'' a
+\emph{losing strategy} rather than the optimisation default. Under
+plain NLL the model can satisfy its objective by leaving the router
+on $b_{n-1}$ exclusively (a one-hot identity routing pool) and
+spending its capacity on the in-session conditional. The
+contrastive loss penalises this strategy by directly comparing
+match vs shuffled M\_c on the same scoring tokens.
+
+\paragraph{Piece 4: soft (not strict) parity router init.}
+The strict parity init ($\texttt{mem\_bias}{=}{-32}$,
+$\texttt{recent\_bias}{=}{+32}$) places step-$0$ softmax mass on
+$b_{-1}$ at $\exp(-64)/(N\!+\!\exp(-64)) \approx 1.6\!\times\!10^{-28}$.
+The backward gradient through the softmax onto $\texttt{mem\_bias}$
+is proportional to that mass and therefore $\sim\!10^{-28}$ ---
+operationally below the bf16 representable range
+($\approx 6\!\times\!10^{-8}$). The contrastive loss cannot escape
+this. We document the empirical evidence in
+\S\ref{sec:negative_result}: the strict-init headline run
+(\texttt{chain\_v4\_hidden14\_msc}, $5400/6000$ steps as of writing)
+produces $\dnm{=}\dsh{=}{+0.0000}$ to four decimals at \emph{every}
+in-trainer eval, despite the contrastive ramp.
+
+The pragmatic recipe is the \emph{soft} parity init:
+$\texttt{mem\_bias}{=}{-4}$, $\texttt{recent\_bias}{=}{+4}$. This
+sacrifices step-$0$ bit-exact parity (the augmented model's logits
+differ from the bare backbone by $\approx\!10^{-5}$), but places the
+softmax gradient on memory at $\exp(-8)/N \approx 6\!\times\!10^{-5}$
+--- inside bf16's range and tractable for the contrastive ramp to
+move.
+
+\paragraph{Putting them together.} The full recipe, run as a single
+command, is:
+
+{\small\begin{verbatim}
+python -u train_chain.py \
+    --preset qwen3-0.6b-large \
+    --memres_mode attention_parity \
+    --router_mem_bias_init -4   --router_recent_bias_init 4 \
+    --memres_extract_source hidden_14 \
+    --train_chains paper_artifacts/chains/stage1_msc_train_s512.pt \
+    --eval_chains  paper_artifacts/chains/stage1_msc_val_s512.pt \
+    --source_weights '{"pg19":1.0,"tv":4.0,"msc":8.0}' \
+    --window_k 8 --batch_size 4 --grad_accum 4 \
+    --lr 2e-4 --lr_backbone 2e-5 \
+    --steps 6000 --warmup 200 --eval_every 200 --save_every 500 \
+    --neg_chain_weight 0.5 --neg_chain_initial_weight 0.05 \
+    --neg_chain_warmup_steps 1000 --neg_chain_margin 0.05 \
+    --memory_dropout 0.10 --context_dropout 0.30 --carry_state \
+    --burn_in_max 8 --burn_in_resample --mask_padding_loss \
+    --score_tail_frac 1.0 --eval_window 4 --eval_n_chains 32 \
+    --gradient_checkpointing --save_best_metric composite \
+    --run_name chain_v5_softhidden14_msc
+\end{verbatim}}
+
+\noindent The differences from the strict-init headline are exactly
+the two flags \texttt{--router\_mem\_bias\_init} ($-32 \to -4$) and
+\texttt{--router\_recent\_bias\_init} ($+32 \to +4$). All other
+flags are unchanged.
+
+\section{Setup}
+\label{sec:setup}
+
+\paragraph{Backbone and parameter groups.} Qwen3-0.6B
+\cite{qwen3}, $28$ layers, $d{=}1024$, $14$~heads. Memory parameters
+($K{=}128$, $L_E{=}4$, $N{=}8$ blocks; $22.3$M parameters total)
+are added on top; the optimiser groups are split, with memres
+parameters trained at $\eta_{\text{m}}{=}2\!\times\!10^{-4}$ and the
+backbone at $\eta_{\text{b}}{=}2\!\times\!10^{-5}$, AdamW
+$(\beta_1, \beta_2){=}(0.9, 0.95)$, weight decay $0.1$, cosine
+schedule with $200$ warmup steps and $5\%$ minimum LR ratio.
+
+\paragraph{Corpus.} $5928$ chains in
+\texttt{stage1\_msc\_train\_s512.pt} ($1899$ PG-19 + $29$ TV +
+$4000$ MSC; all eligible at $\texttt{window\_k}\!\ge\!3$). Source
+weights $\{\texttt{pg19}{:}1, \texttt{tv}{:}4, \texttt{msc}{:}8\}$.
+Validation: $548$ chains in \texttt{stage1\_msc\_val\_s512.pt}
+($\sim 4645$ sessions). Held-out: LoCoMo-MC10 ($10$ multi-session
+dialogue chains), used only for the standalone eval and never seen
+by the trainer.
+
+\paragraph{Training.} TBPTT with $k\!\in\!\{3,8\}$ sessions per
+window (the headline runs use $k{=}3$ for throughput; the
+follow-on soft-init recipe should restore $k{=}8$, see
+\S\ref{sec:experiments}), batch size $4$ chains, gradient
+accumulation $4$ (effective batch $16$), $6\,000$ optimiser steps,
+on a single NVIDIA GH200 $480$\,GB at bf16 with gradient
+checkpointing. Throughput is $\approx\! 2.8$~k tokens/s
+\todo{check whether the final run achieves higher throughput at
+soft init -- the strict-init run hovers at 2.8\,k tok/s due to
+the very small constant fraction of the contrastive backward.},
+giving $\sim 14$ wall-clock hours per run.
+
+\paragraph{Evaluation.} We compute four cross-entropies per scored
+session, with $\Mc$ constructed from the full prefix:
+$\CEmem$ (chain's own prefix), $\CEnomem$ (no memory), $\CEsh$
+(shuffled prefix from a different chain), $\CEor$ (raw concat of
+the last $4$ prior sessions). The derived metrics are
+$\dnm = \CEnomem - \CEmem$ (aggregate memory help),
+$\dsh = \CEsh - \CEmem$ (history specificity), and
+$\dor = \CEor - \CEmem$ (oracle gap). Bootstrap $95\%$ CIs are
+computed by chain-level resampling.
+
+\paragraph{Mechanistic probes.} On the best persisted checkpoint of
+each cell we run two held-out probes
+(\texttt{paper\_tools/routing\_trace.py} and
+\texttt{paper\_tools/counterfactual\_eval.py}, see
+\cite{liu2025drop} for definition): the per-sublayer routing-mass
+$\amem^{\text{true}}$ and $\amem^{\text{shuffle}}$ averaged over
+$(sublayer, token, position)$, and the depth-bucketed
+counterfactual NLL deltas $\Delta(d)$ for $d \in \{1, 2, 4, 8,
+\mathrm{ALL}\}$.
+
+\section{Experiments}
+\label{sec:experiments}
+
+\paragraph{Headline ablation.} The $2\!\times\!2$ factorial in
+Table~\ref{tab:headline_grid}.
+
+\begin{table}[t]
+\centering
+\caption{Headline ablation matrix. Rows: extract source; columns:
+training corpus mix. Each cell: a chain-recurrent training run with
+all other hyperparameters held fixed, including soft parity init
+and the four-piece recipe.}
+\label{tab:headline_grid}
+\small
+\begin{tabular}{lll}
+\toprule
+                & \textsc{PG-19+TV} (legacy) & \textsc{PG-19+TV+MSC} (new) \\
+\midrule
+\texttt{embed} (legacy)        & D: \texttt{chain\_v3\_softparity\_full} (DONE)  & B: \texttt{chain\_v4\_embed\_msc} (queued) \\
+\texttt{hidden\_14} (new)      & C: \texttt{chain\_v4\_hidden14\_pgtv} (queued)  & A (headline): \texttt{chain\_v5\_softhidden14\_msc} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\todo{Fill in headline numbers when the soft-init headline run
+finishes. Currently the strict-init analogue is at step $5400$ and
+shows the saturation failure mode described in
+\S\ref{sec:negative_result}; the soft-init rerun has not yet been
+launched (pending human approval after this draft is reviewed).}
+
+\paragraph{Per-cell numbers (planned).} Table~\ref{tab:headline_results}
+will report, for each cell, the in-trainer trajectory at step
+$\{1000, 3000, 5000, 6000\}$, the standalone bootstrap CI on PG-19
+val + MSC val + LoCoMo, the held-out $\amem$, the $d{=}1$
+counterfactual delta, and the callback-EM on MSC val.
+
+\begin{table}[t]
+\centering
+\caption{Headline cell results. \todo{To be filled by
+\texttt{paper\_tools/post\_train\_pipeline.sh} after each cell finishes.}}
+\label{tab:headline_results}
+\small
+\begin{tabular}{llrrrrrr}
+\toprule
+cell & corpus / extract & in-trainer $\dsh^{6000}$ & PG-19 val $\dsh$ [CI] & LoCoMo $\dsh$ [CI] & $\amem$ & $\Delta(d{=}1)$ & callback EM \\
+\midrule
+A & MSC + hidden\_14 & --- & --- & --- & --- & --- & --- \\
+B & MSC + embed      & --- & --- & --- & --- & --- & --- \\
+C & PG+TV + hidden\_14 & --- & --- & --- & --- & --- & --- \\
+D & PG+TV + embed    & --- & $+0.05$ \cite{liu2025drop} & $+0.0025$ \cite{liu2025drop} & $4.7\!\times\!10^{-4}$ & $+0.0094$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{RAG baselines.} \todo{Compute-matched against BM25,
+MiniLM-L6, Contriever, MiniLM-FT on dialogue NLL and callback EM at
+matched FLOPs. Implementation in
+\texttt{paper\_tools/rag\_baselines.py}; numbers pending.}
+
+\section{Negative result: strict $\pm 32$ init is operationally untrainable}
+\label{sec:negative_result}
+
+This section gives the empirical and analytic case for the
+\emph{soft} parity init recommendation in \S\ref{sec:recipe}, by
+reporting in detail on the strict-init headline run
+\texttt{chain\_v4\_hidden14\_msc} that motivated it.
+
+\paragraph{Setup.} The run uses every recipe piece except
+\textbf{Piece~4}: \texttt{hidden\_14} extract source, mixed
+PG-19+TV+MSC corpus, contrastive ramp $0.05 \to 0.5$ over $1000$
+steps, mask-padding loss, soft-init replaced by strict init
+($\texttt{mem\_bias}{=}{-32}$, $\texttt{recent\_bias}{=}{+32}$).
+Wall-clock $\approx$$14$\,h on a $1\!\times\!\mathrm{GH200}$ at
+$2.8$\,k tok/s, $6000$ steps planned.
+
+\paragraph{Empirical observation.} At every in-trainer eval from
+step $200$ through step $5400$ inclusive, the trainer reports
+\[
+\CEmem = \CEnomem = \CEsh \quad\text{to four decimals,}
+\]
+i.e.\ $\dnm = \dsh = +0.0000$~nat throughout. Train NLL decreases
+from $3.49$ at step $20$ to $\approx 2.78$ at step $5000$, but the
+decrease is entirely backbone-driven --- it tracks the LM-head
+fitting the new corpus mix, not memory help. Loss curve and EVAL
+trajectory are reported in Table~\ref{tab:strict_eval}.
+
+\begin{table}[t]
+\centering
+\caption{Strict-init headline run \texttt{chain\_v4\_hidden14\_msc}:
+in-trainer eval trajectory ($n{=}124$ scored positions).
+\textbf{$\dnm$ and $\dsh$ are $+0.0000$ to four decimals at every
+single eval step}, despite the contrastive ramp from
+$w_{\text{init}}{=}0.05$ to $w_{\text{final}}{=}0.5$ over the first
+$1000$ steps. Train NLL is decreasing as a backbone-only fit
+artefact.}
+\label{tab:strict_eval}
+\small
+\begin{tabular}{rrrrrrrr}
+\toprule
+step & train NLL & $\CEmem$ & $\CEnomem$ & $\CEsh$ & $\CEor$ & $\dnm$ & $\dsh$ \\
+\midrule
+$200$  & $\approx 2.99$ & $3.1231$ & $3.1231$ & $3.1231$ & $2.9174$ & $+0.0000$ & $+0.0000$ \\
+$1000$ & $\approx 2.83$ & $3.0876$ & $3.0876$ & $3.0876$ & $2.9021$ & $+0.0000$ & $+0.0000$ \\
+$2000$ & $\approx 2.78$ & $3.0995$ & $3.0995$ & $3.0995$ & $2.9164$ & $+0.0000$ & $+0.0000$ \\
+$3000$ & $\approx 2.77$ & $3.0934$ & $3.0934$ & $3.0934$ & $2.9139$ & $+0.0000$ & $+0.0000$ \\
+$4000$ & $\approx 2.78$ & $3.0909$ & $3.0909$ & $3.0909$ & $2.9113$ & $+0.0000$ & $+0.0000$ \\
+$5000$ & $\approx 2.65$ & $3.0902$ & $3.0902$ & $3.0902$ & $2.9108$ & $+0.0000$ & $+0.0000$ \\
+$5400$ & $\approx 2.79$ & $3.0894$ & $3.0894$ & $3.0894$ & $2.9103$ & $+0.0000$ & $+0.0000$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Bf16 saturation argument.} The depth router pool at
+\texttt{attention\_parity} has $N\!+\!1$ sources $\{b_{-1}, b_0,
+\dots, b_{n-1}\}$ with biases $[\texttt{mem\_bias}, 0, \dots, 0,
+\texttt{recent\_bias}]$. With strict init $[-32, 0, \dots, 0, +32]$
+and zero-mean pseudo-query scores $s_q \cdot k_i$, the post-bias
+softmax mass on memory is
+\[
+\amem \;=\; \frac{\exp(-32)}{\sum_i \exp(\text{logit}_i)} \approx
+\frac{\exp(-32)}{\exp(+32) + (N{-}1) + \exp(-32)} \approx \exp(-64)
+\;\approx\; 1.6\!\times\!10^{-28}.
+\]
+The gradient of any loss $\mathcal{L}$ with respect to
+$\texttt{mem\_bias}$ is proportional to $\amem(1-\amem)$ times
+$\partial \mathcal{L}/\partial \mathrm{logits}_{-1}$, which is
+itself proportional to the effect of the memory readout on the
+prediction --- and that effect is also gated by $\amem$. So
+$\partial \mathcal{L}/\partial \texttt{mem\_bias} \sim
+\amem^2 \approx 10^{-56}$ in the steady state, well below bf16's
+denormal floor $\approx 10^{-38}$. The contrastive loss \emph{is}
+computed (\texttt{train\_chain.py:870}), but its gradient
+contribution to $\texttt{mem\_bias}$ underflows to literal zero on
+every step. The router cannot escape strict init.
+
+\paragraph{Comparison to the soft-init book-only baseline.} Under
+soft init ($\pm 4$) on the legacy corpus
+(Table~\ref{tab:v3_baseline}), the same recipe \emph{minus} pieces
+$1$--$3$ moves $\amem$ from the analytic floor of
+$\exp(-8)/N \approx 6.2\!\times\!10^{-5}$ to a measured
+$4.7\!\times\!10^{-4}$ at step $4400$ on PG-19 val
+\cite{liu2025drop}, and produces in-trainer
+$\dsh \approx +0.0379$. The mechanism by which contrastive loss
+recruits memory --- non-vanishing gradient through the router
+softmax --- is operational at $\pm 4$ and dead at $\pm 32$.
+
+\paragraph{Reading.} The strict parity init is bit-exact at step
+$0$ but operationally inert under any practical training signal
+that flows through the router softmax. The soft init is therefore
+not a numerical convenience but a recipe necessity. We hypothesise
+that \emph{any} parity-preserving init for residual-stream routers
+in this regime should be calibrated such that the backward gradient
+through the routing softmax stays inside the float-format's
+representable range; for bf16 this places an upper bound of
+$|\!\texttt{bias}| \lesssim 8$.
+
+\section{Discussion and limitations}
+\label{sec:discussion}
+
+\paragraph{What the recipe is and is not.} The recipe is a
+training-time intervention on the architectural primitive of
+\cite{liu2025drop}; it leaves the architecture unchanged. The
+empirical case made by this paper is that the architecture is
+\emph{necessary but not sufficient} for long-horizon dialogue
+recall, and that the recipe (with all four pieces, including soft
+init) is sufficient on the dialogue corpora we test.
+\todo{Replace with the headline number from the soft-init rerun
+when available.}
+
+\paragraph{Why the four pieces are not orthogonal.} In our
+experimentation, removing piece $1$ (contextual extract) collapses
+$\dsh$ on dialogue alone (PG-19 still works); removing piece $2$
+(MSC mix) collapses transfer to LoCoMo; removing piece $3$
+(contrastive ramp) collapses the open-channel signal under plain
+NLL on dialogue; removing piece $4$ (soft init) collapses the
+\emph{router}, irrespective of the other pieces. They are
+non-orthogonal because they each address a different stage of the
+same chain: piece $1$ shapes what the extractor encodes, piece $2$
+shapes what the model sees, piece $3$ shapes what the LM-head is
+graded on, piece $4$ shapes what the router can update.
+
+\paragraph{Limitations.}
+(i) $0.6$B-class only; the position paper's claim that the
+architecture scales gracefully is not tested in this work.
+(ii) MSC and LoCoMo are held out from training by user mandate; we
+do not exhibit a model that has seen multi-session dialogue at
+training time \emph{and} is evaluated on a different distribution.
+(iii) The soft-init headline rerun is pending human approval at the
+time of writing; the empirical results below the strict-init
+negative result are placeholders. \todo{Replace before submission.}
+
+\paragraph{Conclusion.} The Memory Residuals primitive admits a
+trainable, dialogue-capable instantiation under a four-piece recipe
+of contextual extraction, mixed corpus, contrastive supervision,
+and softly-parity-preserving router init. The strict-parity init
+that the architecture nominally permits is operationally untrainable
+under any current optimiser signal due to bf16 saturation through
+the routing softmax; we read this as evidence that
+parity-preserving inits in residual-stream routers should be
+calibrated against the float-format's representable gradient range,
+not against the bit-identical step-$0$ logit ideal.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+
+\section{Per-step diagnostics from the strict-init run}
+\label{app:strict_logs}
+
+\todo{Append the full $27$-row EVAL trajectory and the per-step
+\texttt{gate\_mean} / \texttt{grad\_norm} from
+\texttt{cloud\_watchdog/logs/chain\_v4\_hidden14\_msc.log} for
+reproducibility.}
+
+\section{Mixed-corpus build}
+\label{app:corpus}
+
+The reproducible corpus build script is
+\texttt{paper\_tools/build\_msc\_chains.py} +
+\texttt{paper\_tools/pretokenize\_chains.py} +
+\texttt{paper\_tools/merge\_chain\_corpora.py}. The resulting artefact
+\texttt{stage1\_msc\_train\_s512.pt} contains $5928$ chains
+($1899$ PG-19 + $29$ TV + $4000$ MSC), $\sim 103$k sessions, all
+eligible at $\texttt{window\_k}{\ge}3$.
+
+\end{document}

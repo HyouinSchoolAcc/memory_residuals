@@ -42,8 +42,11 @@ def main() -> None:
     )
     p.add_argument(
         "--out_dir",
-        default="paper_artifacts/locomo_chains",
+        default="archive/datasets/locomo_chains",
         type=Path,
+        help="LoCoMo session-format JSONLs. The legacy default location was "
+             "paper_artifacts/locomo_chains/; that directory is now archived "
+             "since v6 doesn't use LoCoMo for training.",
     )
     a = p.parse_args()
 

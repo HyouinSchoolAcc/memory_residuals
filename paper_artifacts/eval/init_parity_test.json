@@ -7,9 +7,8 @@
   "tolerance": 0.001,
   "cases": [
     {
-      "label": "residual_no_mem",
-      "memres_mode": "residual",
-      "block_attnres_parity_init": false,
+      "label": "simple_gate_no_mem",
+      "memres_mode": "simple_gate",
       "memory_attached": false,
       "expect_parity": true,
       "logit_diff_vs_base": {
@@ -27,9 +26,8 @@
       "matches_expectation": true
     },
     {
-      "label": "residual_with_mem",
-      "memres_mode": "residual",
-      "block_attnres_parity_init": false,
+      "label": "simple_gate_with_mem",
+      "memres_mode": "simple_gate",
       "memory_attached": true,
       "expect_parity": true,
       "logit_diff_vs_base": {
@@ -47,9 +45,8 @@
       "matches_expectation": true
     },
     {
-      "label": "block_attnres_default_no_mem",
-      "memres_mode": "block_attnres",
-      "block_attnres_parity_init": false,
+      "label": "attention_base_no_mem",
+      "memres_mode": "attention_base",
       "memory_attached": false,
       "expect_parity": false,
       "logit_diff_vs_base": {
@@ -67,15 +64,14 @@
       "matches_expectation": true
     },
     {
-      "label": "block_attnres_default_with_mem",
-      "memres_mode": "block_attnres",
-      "block_attnres_parity_init": false,
+      "label": "attention_base_with_mem",
+      "memres_mode": "attention_base",
       "memory_attached": true,
       "expect_parity": false,
       "logit_diff_vs_base": {
         "max_abs": 34.375,
-        "mean_abs": 13.115762710571289,
-        "rms": 13.951844215393066
+        "mean_abs": 13.104456901550293,
+        "rms": 13.940335273742676
       },
       "init_diagnostics": {
         "depth_router.mem_bias[0]": -8.0,
@@ -87,9 +83,8 @@
       "matches_expectation": true
     },
     {
-      "label": "block_attnres_parity_init_no_mem",
-      "memres_mode": "block_attnres",
-      "block_attnres_parity_init": true,
+      "label": "attention_parity_no_mem",
+      "memres_mode": "attention_parity",
       "memory_attached": false,
       "expect_parity": true,
       "logit_diff_vs_base": {
@@ -107,9 +102,8 @@
       "matches_expectation": true
     },
     {
-      "label": "block_attnres_parity_init_with_mem",
-      "memres_mode": "block_attnres",
-      "block_attnres_parity_init": true,
+      "label": "attention_parity_with_mem",
+      "memres_mode": "attention_parity",
       "memory_attached": true,
       "expect_parity": true,
       "logit_diff_vs_base": {

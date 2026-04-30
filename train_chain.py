@@ -38,6 +38,7 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
@@ -123,12 +124,92 @@ def parse_args() -> argparse.Namespace:
              "cross-attention. 'hidden_14' is the recommended default for "
              "a 28-layer Qwen3 backbone (mid-stack, semantic).",
     )
+    p.add_argument(
+        "--memres_update_mode", default="competitive",
+        choices=["competitive", "gated"],
+        help="MemoryBlock recurrent update mode. 'competitive' (default, "
+             "v3-v5) uses the zero-sum softmax over [M_c^{t-1} || M_new] "
+             "where each slot is fully replaced or fully kept. 'gated' (v6+) "
+             "adds a per-slot sigmoid write gate so the model can KEEP an "
+             "existing slot rather than overwrite it -- useful for long "
+             "horizons where a fact written at session 1 must survive "
+             "through sessions 2..N without being clobbered by intervening "
+             "session content. Init bias -1.0 -> g ~ 0.27 (modest writes).",
+    )
 
-    # Data
+    # Callback supervision (v6+ long-horizon recipe)
+    p.add_argument(
+        "--callback_loss_weight", type=float, default=0.0,
+        help="When > 0, tokens flagged in the corpus's session_callback_mask "
+             "get an additional NLL weight of (1 + callback_loss_weight). "
+             "The mask is loaded from the .pt file as 'session_callback_mask' "
+             "(shape == session_ids.shape, int8 0/1). Tokens with mask=1 "
+             "are typically the answer span of a synthesised or curated "
+             "callback question (e.g. LongMemEval), so this concentrates "
+             "gradient where memory retrieval actually matters. Set to 0 "
+             "(default) to recover the legacy uniform NLL.",
+    )
+    p.add_argument(
+        "--callback_window_bias", type=float, default=0.0,
+        help="When > 0, with this probability sample a chain window aligned "
+             "so that the callback session is INSIDE the window (and is "
+             "the last session in the window). 0 = uniform sampling "
+             "(default; the callback is rarely seen on long chains "
+             "because it sits at position L-1 and only one window covers "
+             "it). 1.0 = always include the callback. 0.5-0.9 is a "
+             "reasonable training mix.",
+    )
+    p.add_argument(
+        "--curriculum_competition_bias", type=float, default=0.0,
+        help="When > 0, with this probability build a JUDGE-COMPETITION "
+             "window: a 3-session window structured as either "
+             "[evidence, distractor, callback] (50%, 'keep-prev' sample: "
+             "M_c after evidence is the relevant memory; the judge step at "
+             "the distractor must keep prev memory and reject new content) "
+             "OR [noise, evidence, callback] (50%, 'write-new' sample: M_c "
+             "after noise is irrelevant; the judge step at evidence must "
+             "write the new content and discard prev memory). Both samples "
+             "score the same callback session, so the gradient signal "
+             "directly trains the write_gate / judge to be content-aware "
+             "about when to KEEP vs WRITE. This isolates the judge sub-"
+             "problem from the writer / readout sub-problem (which is what "
+             "--curriculum_evidence_bias trains; the P0 evidence+callback "
+             "window has M_c=0 at the judge step, so the judge degenerates "
+             "to a no-competition aggregate). Requires --window_k >= 3. "
+             "On chains with cb_pos < 3 falls through to subsequent "
+             "branches. Composes with --curriculum_evidence_bias and "
+             "--callback_window_bias: competition is tried first, then "
+             "evidence-callback curriculum, then callback alignment, then "
+             "uniform. See experiments/exp2_long_horizon_recipe/runs.md "
+             "v9 section for the curriculum-decomposition rationale.",
+    )
+    p.add_argument(
+        "--curriculum_evidence_bias", type=float, default=0.0,
+        help="When > 0, with this probability build a CURRICULUM window of "
+             "the form [evidence, ...intermediates, callback] instead of a "
+             "contiguous slice. Concretely: pick a random evidence position "
+             "i in [0, callback_pos), pick (window_k - 2) random intermediate "
+             "positions strictly between i and callback_pos, and stack them "
+             "in chronological order ending in the callback session. This "
+             "shortens the credit-assignment path between an early-session "
+             "fact and the callback that depends on it -- the missing piece "
+             "for the chain trainer per the v3-v6 routing-collapse diagnosis. "
+             "The user controls difficulty by setting --window_k: window_k=2 "
+             "is pure evidence+callback (P0), window_k=3 adds 1 distractor "
+             "(P1), window_k=5 adds 3 (P2), window_k=8 is full-distractor (P3, "
+             "equivalent to --callback_window_bias). Falls back to contiguous "
+             "sampling on chains where callback_pos < window_k - 1. Composes "
+             "with --callback_window_bias: curriculum is tried first, then "
+             "callback alignment, then uniform.",
+    )
+
+    # Data. Defaults point at the active v6 LongMemEval-S corpora.
+    # Pre-v6 corpora (stage1_*, msc_*, tv_*) live in archive/datasets/ if
+    # you need to reproduce historical runs.
     p.add_argument("--train_chains",
-                   default="paper_artifacts/chains/stage1_train_s512.pt")
+                   default="paper_artifacts/chains/lme_train_s512.pt")
     p.add_argument("--eval_chains",
-                   default="paper_artifacts/chains/stage1_validation_s512.pt")
+                   default="paper_artifacts/chains/lme_val_s512.pt")
     p.add_argument("--session_len", type=int, default=512,
                    help="Must match the .pt file's session_len.")
     p.add_argument("--window_k", type=int, default=4,
@@ -243,12 +324,34 @@ def parse_args() -> argparse.Namespace:
                    help="If set, resample burn-in per chain in {0,4,8,...,burn_in_max} "
                         "so the model sees M_c states from a range of recurrence "
                         "depths during training.")
-    p.add_argument("--save_best_metric", choices=("ce_mem", "composite"),
-                   default="composite",
-                   help="ce_mem: legacy; minimised. composite: maximise "
-                        "delta_nomem_minus_mem + 2*delta_shuffle_minus_mem "
-                        "(penalises both channel collapse and shortcut "
-                        "learning). Default: composite.")
+    p.add_argument("--save_best_metric",
+                   choices=("ce_mem", "composite", "phase_aligned"),
+                   default="phase_aligned",
+                   help="ce_mem: legacy; minimised. "
+                        "composite: maximise standard-eval "
+                        "(delta_nomem_minus_mem + 2*delta_shuffle_minus_mem). "
+                        "phase_aligned (default; v8+): maximise "
+                        "(pa_cb_dsh + 0.5 * pa_ws_dsh) on the phase-aligned "
+                        "eval that matches the curriculum training "
+                        "distribution. The phase-aligned callback-token "
+                        "delta_sh-m is the only metric that actually "
+                        "measures whether the readout is content- "
+                        "discriminative on the tokens we care about, "
+                        "without being polluted by the train/eval "
+                        "distribution mismatch on M_c statistics.")
+    p.add_argument("--phase_aligned_eval_n_chains", type=int, default=48,
+                   help="Number of LME chains (with cb_pos >= 1) to use "
+                        "for the phase-aligned eval. The eval picks one "
+                        "random evidence position per chain and one "
+                        "shuffle partner, so cost is roughly 4 forwards "
+                        "per chain (mem readout + nomem + shuffle + "
+                        "compress * 2).")
+    p.add_argument("--diag_routing_n_chains", type=int, default=8,
+                   help="Number of chains to use for the per-sublayer "
+                        "routing-recruitment diagnostic (alpha_mem "
+                        "trace in attention_parity mode; gate snapshot "
+                        "in simple_gate mode -- the latter doesn't need "
+                        "data forwards). Cheap, default 8.")
 
     # Conversational-pipeline knobs
     p.add_argument("--mask_padding_loss", action="store_true",
@@ -325,6 +428,27 @@ class ChainCorpus:
         self.chain_names: list[str] = blob["chain_names"]
         self.session_len: int = int(blob["session_len"])
         self.tokenizer: str = blob["tokenizer"]
+        # Optional fields (v6+ conversational callback corpora).
+        # Existing pretokenize_chains.py output (PG-19/TV/MSC) lacks these;
+        # we fall back to an all-zeros callback mask and chain_callback_position
+        # sentinel of -1 so the trainer is corpus-format agnostic.
+        if "session_callback_mask" in blob:
+            self.session_callback_mask: torch.Tensor = (
+                blob["session_callback_mask"].to(torch.int8)
+            )
+        else:
+            self.session_callback_mask = torch.zeros_like(
+                self.session_ids, dtype=torch.int8
+            )
+        if "chain_callback_position" in blob:
+            self.chain_callback_position: torch.Tensor = (
+                blob["chain_callback_position"].long()
+            )
+        else:
+            # Sentinel: -1 means "no callback session in this chain".
+            self.chain_callback_position = torch.full(
+                (len(self.chain_starts),), -1, dtype=torch.long
+            )
 
     def __len__(self) -> int:
         return len(self.chain_starts)
@@ -337,6 +461,36 @@ class ChainCorpus:
         s = int(self.chain_starts[chain_idx])
         return self.session_ids[s + start : s + start + k]
 
+    def chain_window_callback_mask(
+        self, chain_idx: int, start: int, k: int,
+    ) -> torch.Tensor:
+        """Same slice as chain_window but on the callback mask."""
+        s = int(self.chain_starts[chain_idx])
+        return self.session_callback_mask[s + start : s + start + k]
+
+    def chain_curriculum_window(
+        self,
+        chain_idx: int,
+        positions: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Stack a non-contiguous window of sessions in the order given.
+
+        ``positions`` is a list of session indices within the chain (each
+        in ``[0, chain_lengths[chain_idx])``); the result is a tensor of
+        shape ``(len(positions), session_len)`` with sessions in the
+        listed order, plus the matching callback mask of the same shape.
+        Used by the curriculum sampler to construct
+        ``[evidence, ...intermediates, callback]`` windows that collapse
+        the credit-assignment path between an early-session fact and a
+        late-session callback.
+        """
+        s = int(self.chain_starts[chain_idx])
+        idxs = torch.tensor([s + p for p in positions], dtype=torch.long)
+        return (
+            self.session_ids.index_select(0, idxs),
+            self.session_callback_mask.index_select(0, idxs),
+        )
+
     def chain_prefix(self, chain_idx: int, end: int) -> torch.Tensor:
         s = int(self.chain_starts[chain_idx])
         return self.session_ids[s : s + end]
@@ -345,12 +499,18 @@ class ChainCorpus:
 def _detect_source(name: str) -> str:
     """Detect the corpus source of a chain from its name.
 
-    'msc_<id>'  -> 'msc'   (multi-session chat dialogues)
-    leading digit -> 'pg19'   (PG-19 books are named '<book_id>')
-    anything else -> 'tv'    (TV episode chains have show-name prefixes)
+    'msc_<id>'         -> 'msc'         (multi-session chat dialogues)
+    'longmemeval_<id>' -> 'longmemeval' (LongMemEval-S, callback-supervised)
+    'realtalk_<id>'    -> 'realtalk'    (REALTALK 21-day messaging)
+    leading digit      -> 'pg19'        (PG-19 books are named '<book_id>')
+    anything else      -> 'tv'          (TV episode chains have show-name prefixes)
     """
     if name.startswith("msc_"):
         return "msc"
+    if name.startswith("longmemeval_"):
+        return "longmemeval"
+    if name.startswith("realtalk_"):
+        return "realtalk"
     if name[:1].isdigit():
         return "pg19"
     return "tv"
@@ -365,18 +525,47 @@ class ChainSampler:
         seed: int,
         window_k: int,
         source_weights: dict[str, float] | None = None,
+        callback_window_bias: float = 0.0,
+        curriculum_evidence_bias: float = 0.0,
+        curriculum_competition_bias: float = 0.0,
     ):
         self.corpus = corpus
         self.rank = rank
         self.world_size = world_size
         self.window_k = window_k
         self.rng = random.Random(seed + rank * 7919)
+        # Probability of sampling a window that ENDS at the callback session
+        # (i.e. start = max(0, cb_pos - window_k + 1)). Only fires for
+        # chains whose chain_callback_position >= 0. Lets the trainer
+        # actually see the callback supervision on long chains where
+        # uniform sampling would only hit it ~1/L of the time.
+        self.callback_window_bias = float(callback_window_bias)
+        # Probability of building a CURRICULUM window
+        # [evidence, ...intermediates, callback] -- used to collapse the
+        # credit-assignment path between an early-session fact and the
+        # callback that depends on it. See --curriculum_evidence_bias
+        # CLI help for the rationale.
+        self.curriculum_evidence_bias = float(curriculum_evidence_bias)
+        # Probability of building a JUDGE-COMPETITION pair window
+        # [(evidence|noise), (distractor|evidence), callback] specifically
+        # designed to train the judge layer's keep-vs-write decision in
+        # isolation from the writer/readout sub-problem. See
+        # --curriculum_competition_bias CLI help for the rationale and the
+        # paired sample structure.
+        self.curriculum_competition_bias = float(curriculum_competition_bias)
 
         # Default source up-weights.  PG-19 has ~218k chains so it dominates
         # by token count; TV (~30 chains) and MSC (~4k chains) get
         # multiplicative up-weight on per-chain length so the sampler
         # actually visits them.
-        default_w = {"pg19": 1.0, "tv": 4.0, "msc": 3.0}
+        # LongMemEval (450 chains, callback-supervised) is upweighted by
+        # default because it's the only corpus with explicit memory
+        # supervision; mixing in MSC for distribution otherwise dilutes
+        # the gradient signal on memory tokens.
+        default_w = {
+            "pg19": 1.0, "tv": 4.0, "msc": 3.0,
+            "longmemeval": 4.0, "realtalk": 1.0,
+        }
         if source_weights:
             default_w.update(source_weights)
 
@@ -409,7 +598,18 @@ class ChainSampler:
         if self.total <= 0:
             raise RuntimeError("No eligible chains for sampling")
 
-    def sample_window(self) -> tuple[int, int, torch.Tensor, torch.Tensor | None]:
+    def sample_window(
+        self,
+    ) -> tuple[int, int, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
+        """Sample a (chain_idx, start, window, burn_in, callback_mask) tuple.
+
+        ``start`` is the position of the FIRST included session in the chain.
+        For contiguous windows it indexes ``window`` exactly. For curriculum
+        windows (non-contiguous), ``start`` is the evidence position and the
+        intermediate / callback positions are not exposed; the precomputed
+        ``callback_mask`` is then non-None and the trainer must use it
+        instead of re-slicing the corpus mask via (start, window_k).
+        """
         r = self.rng.random() * self.total
         # binary search
         lo, hi = 0, len(self.cum) - 1
@@ -422,14 +622,150 @@ class ChainSampler:
         chain_idx = lo
         length = int(self.corpus.chain_lengths[chain_idx])
         max_start = length - self.window_k
-        start = self.rng.randint(0, max_start)
+        cb_pos = int(self.corpus.chain_callback_position[chain_idx])
+
+        # Branch 0: judge-competition pair (NEW in v9). Builds a 3-session
+        # window that ISOLATES the judge layer's keep-vs-write decision.
+        # Two paired structures, sampled 50/50:
+        #
+        #   Sample A (KEEP-PREV, judge must keep evidence in memory):
+        #     window = [evidence, distractor, callback]
+        #     -- step 0: M = compress(extract(evidence), 0)  (writer + extractor)
+        #     -- step 1: M = compress(extract(distractor), M_prev)  -- THE JUDGE STEP
+        #                  judge sees prev_M = M_after(evidence) (relevant)
+        #                  judge sees C_t  = extract(distractor)   (irrelevant)
+        #                  correct behaviour: gate small, KEEP M_prev
+        #     -- step 2: forward(callback, M_c=M); CB tokens scored
+        #
+        #   Sample B (WRITE-NEW, judge must overwrite irrelevant memory):
+        #     window = [noise, evidence, callback]
+        #     -- step 0: M = compress(extract(noise), 0)
+        #     -- step 1: M = compress(extract(evidence), M_prev)  -- THE JUDGE STEP
+        #                  judge sees prev_M = M_after(noise)     (irrelevant)
+        #                  judge sees C_t  = extract(evidence)    (relevant)
+        #                  correct behaviour: gate large, WRITE C_t
+        #     -- step 2: forward(callback, M_c=M); CB tokens scored
+        #
+        # Both samples score the same callback session, so the gradient
+        # directly trains the write_gate / judge weights to be content-
+        # aware. Requires window_k >= 3 and cb_pos >= 2 (Sample A) or
+        # cb_pos >= 2 with evidence_pos >= 1 (Sample B).
+        # Note on label noise: the LME corpus does NOT annotate which
+        # earlier session contains the actual referenced fact -- only
+        # that cb_pos is the session that CONTAINS the callback
+        # question. The "evidence" in Sample A and "noise" in Sample B
+        # are uniform random picks from [0, cb_pos).
+        #
+        # This is INTENTIONAL and correct, not a corpus shortcoming:
+        # at deployment we will not have ground-truth evidence
+        # annotations either. The model's job is to compact arbitrary
+        # incoming sessions into M_c such that whatever might be
+        # callback-relevant survives, and to write_gate / judge based
+        # on observed content alignment with downstream demand. The
+        # training curriculum therefore reflects the deployment
+        # regime: the model sees a stream of sessions, must compact
+        # them, and gets graded on callback prediction quality. Across
+        # many samples the gradient signal averages to "the
+        # writer + judge should preserve content that LOOKS like it
+        # could be referenced later" -- which is exactly the
+        # generalisable inductive bias we want.
+        #
+        # We do NOT special-case the "evidence is the actual referent"
+        # subset because doing so would teach the judge to rely on
+        # an oracle signal (ground-truth evidence labels) that won't
+        # exist at inference. Sample A's "evidence" is whatever
+        # session happens to be picked; Sample B's "evidence" is
+        # likewise. Over many windows the writer + judge are forced
+        # to compact + decide using only content cues, which is
+        # exactly the inference-time regime.
+        if (
+            self.curriculum_competition_bias > 0.0
+            and self.window_k >= 3
+            and cb_pos >= 2
+            and self.rng.random() < self.curriculum_competition_bias
+        ):
+            keep_prev = self.rng.random() < 0.5
+            if keep_prev:
+                # Sample A: [evidence, distractor, callback]
+                # evidence_pos in [0, cb_pos - 2], distractor in (evidence, cb_pos)
+                evidence_pos = self.rng.randint(0, cb_pos - 2)
+                distractor_pos = self.rng.randint(evidence_pos + 1, cb_pos - 1)
+                positions = [evidence_pos, distractor_pos, cb_pos]
+                anchor = evidence_pos
+            else:
+                # Sample B: [noise, evidence, callback]
+                # cb_pos >= 2 (outer guard) ensures evidence_pos >= 1 is safe
+                evidence_pos = self.rng.randint(1, cb_pos - 1)
+                noise_pos = self.rng.randint(0, evidence_pos - 1)
+                positions = [noise_pos, evidence_pos, cb_pos]
+                anchor = noise_pos
+            if positions:
+                window, cb_mask = self.corpus.chain_curriculum_window(
+                    chain_idx, positions
+                )
+                # Pad to window_k if window_k > 3 by re-using the first
+                # session as additional context. This is rare and only
+                # happens when a cell mixes competition_bias with a
+                # window_k > 3 setting; the typical v9 cell uses
+                # window_k=3 which is the natural fit.
+                if self.window_k > 3:
+                    pad_n = self.window_k - 3
+                    pad_pos = [positions[0]] * pad_n + positions
+                    window, cb_mask = self.corpus.chain_curriculum_window(
+                        chain_idx, pad_pos
+                    )
+                return chain_idx, anchor, window, None, cb_mask
+
+        # Branch 1: curriculum [evidence, ...intermediates, callback]. Requires
+        # an annotated callback position and enough room to fit window_k - 1
+        # earlier sessions. window_k=2 needs cb_pos >= 1 (one evidence slot);
+        # window_k=k needs cb_pos >= k-1 (one evidence + k-2 intermediates).
+        if (
+            self.curriculum_evidence_bias > 0.0
+            and cb_pos >= self.window_k - 1
+            and self.rng.random() < self.curriculum_evidence_bias
+        ):
+            evidence_pos = self.rng.randint(0, cb_pos - 1)
+            n_intermediate = self.window_k - 2
+            if n_intermediate > 0:
+                # Sample intermediates strictly between evidence and callback.
+                # If the gap is too small (rare given the eligibility check),
+                # fall through to contiguous below.
+                gap = list(range(evidence_pos + 1, cb_pos))
+                if len(gap) >= n_intermediate:
+                    intermediates = sorted(self.rng.sample(gap, n_intermediate))
+                    positions = [evidence_pos, *intermediates, cb_pos]
+                    window, cb_mask = self.corpus.chain_curriculum_window(
+                        chain_idx, positions
+                    )
+                    # No burn-in for curriculum: M_c starts fresh at evidence
+                    # so the credit-assignment chain is exactly [evidence -> ... -> callback].
+                    return chain_idx, evidence_pos, window, None, cb_mask
+            else:
+                # window_k == 2: just [evidence, callback]
+                positions = [evidence_pos, cb_pos]
+                window, cb_mask = self.corpus.chain_curriculum_window(
+                    chain_idx, positions
+                )
+                return chain_idx, evidence_pos, window, None, cb_mask
+
+        # Branch 2: callback alignment (existing behavior). Window is
+        # contiguous and ends at cb_pos.
+        if (
+            self.callback_window_bias > 0.0
+            and cb_pos >= 0
+            and cb_pos < length
+            and self.rng.random() < self.callback_window_bias
+        ):
+            start = max(0, cb_pos - self.window_k + 1)
+            start = min(start, max_start)
+        else:
+            start = self.rng.randint(0, max_start)
         window = self.corpus.chain_window(chain_idx, start, self.window_k)
-        # Burn-in: optionally include the chain prefix [0:start] for a
-        # no-grad recurrent unroll before TBPTT.  Returns None when start=0.
         burn_in = (
             self.corpus.chain_window(chain_idx, 0, start) if start > 0 else None
         )
-        return chain_idx, start, window, burn_in
+        return chain_idx, start, window, burn_in, None
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +816,9 @@ class Trainer:
         self.train_sampler = ChainSampler(
             self.train_corpus, self.rank, self.world_size, args.seed,
             args.window_k, source_weights=sw,
+            callback_window_bias=args.callback_window_bias,
+            curriculum_evidence_bias=args.curriculum_evidence_bias,
+            curriculum_competition_bias=args.curriculum_competition_bias,
         )
         if self.is_main:
             print(
@@ -585,6 +924,7 @@ class Trainer:
             router_mem_bias_init=a.router_mem_bias_init,
             router_recent_bias_init=a.router_recent_bias_init,
             memres_extract_source=a.memres_extract_source,
+            memres_update_mode=a.memres_update_mode,
         )
         if a.pretrained:
             base_cfg = AutoConfig.from_pretrained(a.pretrained)
@@ -691,6 +1031,42 @@ class Trainer:
         mask[:, :, cutoff:, :cutoff] = neg_inf
         return {"full_attention": mask}
 
+    def _weighted_lm_loss(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        callback_mask: torch.Tensor,
+        callback_loss_weight: float,
+    ) -> torch.Tensor:
+        """Per-position weighted causal LM NLL.
+
+        - logits:        (B, S, V), unshifted (matches HF Qwen3 forward).
+        - labels:        (B, S), values in [0, V) or -100 for ignore (built by
+                         _build_labels with --mask_padding_loss / --score_tail_frac).
+        - callback_mask: (B, S), 0/1 marking callback-span tokens.
+        - callback_loss_weight: scalar; final per-token weight is
+                                (1 + callback_loss_weight * mask).
+
+        We do the standard HF causal-LM shift (predict tokens [1..S) from
+        positions [0..S-1)) and reduce as a *weighted mean* over valid
+        positions, so the loss magnitude stays comparable to the legacy
+        uniform-NLL even when callback positions are sparse.
+        """
+        shift_logits = logits[..., :-1, :].contiguous()      # (B, S-1, V)
+        shift_labels = labels[..., 1:].contiguous()          # (B, S-1)
+        shift_mask = callback_mask[..., 1:].contiguous().to(shift_logits.dtype)
+        nll = F.cross_entropy(
+            shift_logits.flatten(0, 1),
+            shift_labels.flatten(),
+            reduction="none",
+            ignore_index=-100,
+        ).view_as(shift_labels)                              # (B, S-1)
+        valid = (shift_labels != -100).to(shift_logits.dtype)
+        weights = 1.0 + callback_loss_weight * shift_mask
+        weighted = nll * weights * valid
+        denom = (weights * valid).sum().clamp_min(1.0)
+        return weighted.sum() / denom
+
     def _build_labels(self, input_ids: torch.Tensor) -> torch.Tensor:
         """Construct loss labels honouring --mask_padding_loss / --score_tail_frac.
 
@@ -736,13 +1112,14 @@ class Trainer:
         # length at ``--burn_in_max`` for memory; longer prefixes are simply
         # tail-truncated (we keep the most recent burn_in_max sessions).
         windows = []
+        callback_masks: list[torch.Tensor] = []
         burn_ins: list[torch.Tensor | None] = []
         # Long-horizon training protocol: when --burn_in_resample is set, draw
         # a per-chain burn-in length from {0, 4, 8, ..., burn_in_max} so the
         # judge step sees M_c at a range of recurrence depths each batch.
         # Otherwise, behave as before: cap at burn_in_max, full prefix.
         for _ in range(a.batch_size):
-            _, _, w, b = self.train_sampler.sample_window()
+            ci, st, w, b, cb_mask = self.train_sampler.sample_window()
             if a.burn_in_resample and a.burn_in_max > 0 and b is not None:
                 step = max(4, a.burn_in_max // 5)
                 choices = [0] + list(range(step, a.burn_in_max + 1, step))
@@ -756,9 +1133,19 @@ class Trainer:
             elif a.burn_in_max == 0:
                 b = None
             windows.append(w)
+            # For curriculum windows the sampler hands back a precomputed
+            # mask aligned to the non-contiguous slice; for legacy contiguous
+            # windows we slice it ourselves from (st, window_k).
+            if cb_mask is None:
+                cb_mask = self.train_corpus.chain_window_callback_mask(
+                    ci, st, a.window_k
+                )
+            callback_masks.append(cb_mask)
             burn_ins.append(b)
         # (B, k, S)
         window = torch.stack(windows).to(self.device)
+        # (B, k, S) int8 with 1's at callback supervision positions.
+        callback_mask_window = torch.stack(callback_masks).to(self.device)
 
         model = self._model()
         cfg = model.config
@@ -822,6 +1209,8 @@ class Trainer:
             session = window[:, t]                         # (B, S)
             input_ids = session[:, :-1]
             labels = self._build_labels(input_ids)
+            # Per-session callback mask (B, S-1) aligned with input_ids.
+            cb_mask_t = callback_mask_window[:, t, :-1]
 
             # Memory dropout: zero out M_c (don't change topology).
             drop_mem = rng.random() < a.memory_dropout
@@ -842,13 +1231,34 @@ class Trainer:
             else:
                 attn_mask = causal_mask_dict
 
-            out = self.wrapped(
-                input_ids=input_ids,
-                labels=labels,
-                M_c=read_M,
-                attention_mask=attn_mask,
+            # When callback supervision is on AND this session has any
+            # callback tokens, compute the loss manually so we can
+            # multiply the NLL on callback positions by (1 + weight).
+            # Otherwise, fall back to the model's default reduction.
+            use_cb_loss = (
+                a.callback_loss_weight > 0.0
+                and bool(cb_mask_t.any().item())
             )
-            losses.append(out.loss)
+            if use_cb_loss:
+                out = self.wrapped(
+                    input_ids=input_ids,
+                    labels=None,
+                    M_c=read_M,
+                    attention_mask=attn_mask,
+                )
+                logits = out.logits  # (B, S-1, V)
+                loss_t = self._weighted_lm_loss(
+                    logits, labels, cb_mask_t, a.callback_loss_weight,
+                )
+                losses.append(loss_t)
+            else:
+                out = self.wrapped(
+                    input_ids=input_ids,
+                    labels=labels,
+                    M_c=read_M,
+                    attention_mask=attn_mask,
+                )
+                losses.append(out.loss)
 
             # Snapshot M_c right before the *last* session's update so we can
             # use it (and a paired shuffle M_c) for the negative-chain loss.
@@ -884,7 +1294,7 @@ class Trainer:
             with torch.no_grad():
                 shuffle_windows = []
                 for _ in range(a.batch_size):
-                    _, _, sw, sb = self.train_sampler.sample_window()
+                    _, _, sw, sb, _ = self.train_sampler.sample_window()
                     if sb is not None and a.burn_in_max > 0 and sb.shape[0] > a.burn_in_max:
                         sb = sb[-a.burn_in_max:]
                     elif a.burn_in_max == 0:
@@ -965,7 +1375,7 @@ class Trainer:
             with torch.no_grad():
                 distractor_list = []
                 for _ in range(B):
-                    _, _, dw, _ = self.train_sampler.sample_window()
+                    _, _, dw, _, _ = self.train_sampler.sample_window()
                     distractor_list.append(dw[0])
                 distractor_F = torch.stack(distractor_list).to(self.device)
 
@@ -1008,6 +1418,307 @@ class Trainer:
     # ------------------------------------------------------------------
     # Recurrent evaluation
     # ------------------------------------------------------------------
+
+    @torch.no_grad()
+    def _per_position_nll(
+        self,
+        model,
+        input_ids: torch.Tensor,
+        M_c: torch.Tensor | None,
+    ) -> torch.Tensor:
+        """Return per-position next-token NLL of shape (S-1,).
+
+        Uses fp32 log-softmax so that small CE differences (the regime
+        we care about for callback-token Δ_sh-m on a few-thousand-vocab
+        slice) are numerically meaningful.
+        """
+        out = model(input_ids=input_ids, M_c=M_c)
+        logits = out.logits  # (1, S, V)
+        targets = input_ids[:, 1:]
+        log_probs = torch.log_softmax(logits[:, :-1, :].float(), dim=-1)
+        nll = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+        return nll.squeeze(0)  # (S-1,)
+
+    @torch.no_grad()
+    def _phase_aligned_eval(self) -> dict:
+        """Eval that matches the curriculum training distribution.
+
+        For every chain that has an annotated callback position
+        ``cb_pos >= 1`` (LongMemEval-style), pick one random evidence
+        position ``e`` in ``[0, cb_pos)``, build M_c from session ``e``
+        only (fresh start, single judge step -- exactly what the P0
+        curriculum trains on), then score session ``cb_pos`` under
+        three M_c regimes:
+
+          - mem:     M_c built from this chain's evidence session.
+          - nomem:   M_c = None.
+          - shuffle: M_c built from a *different* chain's evidence
+                     session (chosen uniformly from the eligible pool).
+
+        Reduce per-position NLL two ways:
+
+          - whole-session ("ws_*"): mean NLL over non-padding tokens of
+            the callback session. The legacy reduction; dominated by
+            filler tokens and therefore noisy.
+          - callback-only ("cb_*"): mean NLL only over tokens flagged
+            in ``session_callback_mask`` (the answer span). This is
+            the strongest single signal that the readout is content-
+            discriminative on the tokens that actually require memory
+            to predict.
+
+        Why this is the right "is the model learning?" lens:
+
+          - Same M_c distribution as training (1 fresh evidence).
+          - Same per-token weighting in spirit as
+            ``--callback_loss_weight``.
+          - Decoupled from the standard-eval distribution mismatch
+            that makes Δ_nm-m look catastrophic during P0 training.
+
+        Returns a dict with keys prefixed ``pa_`` so they can sit
+        alongside the legacy standard-eval keys without collision.
+        """
+        a = self.args
+        model = self._model()
+        ev = self.eval_corpus
+        rng = random.Random(a.seed + self.global_step + 17)
+
+        eligible = [
+            i for i in range(len(ev))
+            if int(ev.chain_callback_position[i]) >= 1
+        ]
+        if len(eligible) < 2:
+            return {"n_pa_scored": 0}
+        rng.shuffle(eligible)
+        eligible_for_score = eligible[: a.phase_aligned_eval_n_chains]
+
+        ws_mem, ws_no, ws_sh = [], [], []
+        cb_mem, cb_no, cb_sh = [], [], []
+        for ci in eligible_for_score:
+            cb_pos = int(ev.chain_callback_position[ci])
+            e = rng.randint(0, cb_pos - 1)
+            evidence = ev.chain_session_at(ci, e).to(self.device).unsqueeze(0)
+            callback = ev.chain_session_at(ci, cb_pos).to(self.device).unsqueeze(0)
+            cb_mask = ev.session_callback_mask[
+                int(ev.chain_starts[ci]) + cb_pos
+            ].to(self.device)  # (S,)
+
+            # mem: M_c from this chain's evidence (fresh, single judge step).
+            C_e = model.model.extract_source(evidence[:, :-1])
+            M_c = model.model.compress_session(C_e, None)
+
+            # shuffle: M_c from a different chain's evidence.
+            others = [j for j in eligible if j != ci]
+            if not others:
+                M_sh = None
+            else:
+                other_idx = rng.choice(others)
+                o_cb_pos = int(ev.chain_callback_position[other_idx])
+                o_e = rng.randint(0, o_cb_pos - 1)
+                o_evidence = (
+                    ev.chain_session_at(other_idx, o_e)
+                    .to(self.device)
+                    .unsqueeze(0)
+                )
+                C_o = model.model.extract_source(o_evidence[:, :-1])
+                M_sh = model.model.compress_session(C_o, None)
+
+            input_ids = callback[:, :-1]
+            valid = (input_ids[0, :] != self.eos_id).float()
+            cb_mask_in = cb_mask[: input_ids.shape[1]].float() * valid
+            valid_sh = valid[1:]
+            cb_mask_sh = cb_mask_in[1:]
+
+            nll_mem = self._per_position_nll(model, input_ids, M_c)
+            nll_no = self._per_position_nll(model, input_ids, None)
+            if M_sh is not None:
+                nll_sh = self._per_position_nll(model, input_ids, M_sh)
+            else:
+                nll_sh = None
+
+            v_sum = float(valid_sh.sum().item())
+            if v_sum > 0:
+                ws_mem.append(float((nll_mem * valid_sh).sum().item()) / v_sum)
+                ws_no.append(float((nll_no * valid_sh).sum().item()) / v_sum)
+                if nll_sh is not None:
+                    ws_sh.append(float((nll_sh * valid_sh).sum().item()) / v_sum)
+
+            cb_sum = float(cb_mask_sh.sum().item())
+            if cb_sum > 0:
+                cb_mem.append(float((nll_mem * cb_mask_sh).sum().item()) / cb_sum)
+                cb_no.append(float((nll_no * cb_mask_sh).sum().item()) / cb_sum)
+                if nll_sh is not None:
+                    cb_sh.append(float((nll_sh * cb_mask_sh).sum().item()) / cb_sum)
+
+        def m(xs):
+            return float(sum(xs) / len(xs)) if xs else float("nan")
+
+        out = {
+            "n_pa_scored": len(ws_mem),
+            "n_pa_cb_scored": len(cb_mem),
+            "pa_ws_ce_mem": m(ws_mem),
+            "pa_ws_ce_nomem": m(ws_no),
+            "pa_ws_ce_shuffle": m(ws_sh),
+            "pa_cb_ce_mem": m(cb_mem),
+            "pa_cb_ce_nomem": m(cb_no),
+            "pa_cb_ce_shuffle": m(cb_sh),
+        }
+        out["pa_ws_dnm"] = (
+            out["pa_ws_ce_nomem"] - out["pa_ws_ce_mem"]
+            if ws_no and ws_mem else float("nan")
+        )
+        out["pa_ws_dsh"] = (
+            out["pa_ws_ce_shuffle"] - out["pa_ws_ce_mem"]
+            if ws_sh and ws_mem else float("nan")
+        )
+        out["pa_cb_dnm"] = (
+            out["pa_cb_ce_nomem"] - out["pa_cb_ce_mem"]
+            if cb_no and cb_mem else float("nan")
+        )
+        out["pa_cb_dsh"] = (
+            out["pa_cb_ce_shuffle"] - out["pa_cb_ce_mem"]
+            if cb_sh and cb_mem else float("nan")
+        )
+        return out
+
+    @torch.no_grad()
+    def _routing_recruitment_summary(self) -> dict:
+        """Routing-mode-aware per-sublayer recruitment signal.
+
+        For ``simple_gate`` mode: snapshot the per-sublayer scalar gate
+        directly (no forward needed). The gate values are *the* signal
+        for which sublayers are recruiting memory.
+
+        For ``attention_parity`` / ``attention_base``: run a small
+        eval batch (a real callback session with a real evidence M_c)
+        with ``collect_alpha_trace=True`` and report per-sublayer
+        ``alpha_mem`` (the mass the depth router puts on the memory
+        source). The bias param alone (mem_bias) does NOT report
+        recruitment because the actual α depends on the pseudo-query
+        × normalised value alignment.
+        """
+        a = self.args
+        model = self._model()
+        mode = _normalise_memres_mode(
+            getattr(model.config, "memres_mode", "simple_gate"),
+            getattr(model.config, "block_attnres_parity_init", None),
+        )
+
+        if mode == "simple_gate":
+            gate = model.model.memory_gate.gate.float().detach().cpu()
+            absg = gate.abs()
+            n = absg.numel()
+            k = min(3, n)
+            top_idx = torch.topk(absg, k=k).indices.tolist()
+            top = [(int(i), float(gate[i])) for i in top_idx]
+            return {
+                "rec_mode": "simple_gate",
+                "rec_gate_max_abs": float(absg.max()),
+                "rec_gate_mean_abs": float(absg.mean()),
+                "rec_gate_top": top,
+                "rec_frac_open": float((absg > 1e-3).float().mean()),
+            }
+
+        # attention_parity / attention_base path.
+        ev = self.eval_corpus
+        eligible = [
+            i for i in range(len(ev))
+            if int(ev.chain_callback_position[i]) >= 1
+        ][: a.diag_routing_n_chains]
+        if not eligible:
+            return {"rec_mode": mode, "rec_alpha_mem_max": 0.0}
+
+        per_sublayer_acc: list[list[float]] = []
+        for ci in eligible:
+            cb_pos = int(ev.chain_callback_position[ci])
+            e = max(0, cb_pos - 1)
+            evidence = (
+                ev.chain_session_at(ci, e).to(self.device).unsqueeze(0)
+            )
+            callback = (
+                ev.chain_session_at(ci, cb_pos).to(self.device).unsqueeze(0)
+            )
+            C_e = model.model.extract_source(evidence[:, :-1])
+            M_c = model.model.compress_session(C_e, None)
+            out = model(
+                input_ids=callback[:, :-1],
+                M_c=M_c,
+                collect_alpha_trace=True,
+            )
+            trace = getattr(out, "alpha_trace", None)
+            if not trace:
+                continue
+            per_sublayer_acc.append([float(a_t.float().mean().item()) for a_t in trace])
+
+        if not per_sublayer_acc:
+            return {"rec_mode": mode, "rec_alpha_mem_max": 0.0}
+
+        n_sub = len(per_sublayer_acc[0])
+        mean_per_sub = [
+            sum(row[i] for row in per_sublayer_acc) / len(per_sublayer_acc)
+            for i in range(n_sub)
+        ]
+        arr = torch.tensor(mean_per_sub)
+        k = min(3, n_sub)
+        top_idx = torch.topk(arr, k=k).indices.tolist()
+        top = [(int(i), float(arr[i])) for i in top_idx]
+        return {
+            "rec_mode": mode,
+            "rec_alpha_mem_max": float(arr.max()),
+            "rec_alpha_mem_mean": float(arr.mean()),
+            "rec_alpha_mem_top": top,
+            # "Open" sublayer = α_mem above 5% (well above the
+            # uniform-prior floor of 1/(N+2) ~ 10%).
+            "rec_frac_open": float((arr > 0.05).float().mean()),
+        }
+
+    @torch.no_grad()
+    def _readout_magnitude_diag(self) -> dict:
+        """Pulse check: is the readout m^t even non-trivially scaled?
+
+        Computes ``mean(||m^t||) / mean(||embed||)`` on the phase-
+        aligned eval setup (fresh M_c from one evidence session,
+        readout queried by the callback session embeddings).
+
+        - A ratio of ~0 means the V projection has collapsed (or the
+          M_c slots have collapsed onto a near-zero point).  Any
+          gate / α opening downstream is moot.
+        - A ratio of ~1 means m^t is comparable in magnitude to the
+          token embeddings, which is the regime where it can move
+          downstream logits non-trivially.
+        - Initial-parity zero-init of W_V^read in MemoryReadout was
+          REMOVED in the live code (default normal init), so a non-
+          trivial ratio is expected from step 1.
+        """
+        a = self.args
+        model = self._model()
+        ev = self.eval_corpus
+        eligible = [
+            i for i in range(len(ev))
+            if int(ev.chain_callback_position[i]) >= 1
+        ][: a.diag_routing_n_chains]
+        if not eligible:
+            return {"mt_norm_ratio_mean": float("nan")}
+        ratios = []
+        for ci in eligible:
+            cb_pos = int(ev.chain_callback_position[ci])
+            e = max(0, cb_pos - 1)
+            evidence = (
+                ev.chain_session_at(ci, e).to(self.device).unsqueeze(0)
+            )
+            callback = (
+                ev.chain_session_at(ci, cb_pos).to(self.device).unsqueeze(0)
+            )
+            C_e = model.model.extract_source(evidence[:, :-1])
+            M_c = model.model.compress_session(C_e, None)
+            X = model.model.embed_tokens(callback[:, :-1])
+            m_t = model.model.memory_readout(X, M_c)
+            mt_norm = m_t.float().norm(dim=-1).mean().item()
+            h_norm = X.float().norm(dim=-1).mean().item()
+            ratios.append(mt_norm / max(h_norm, 1e-6))
+        return {
+            "mt_norm_ratio_mean": float(sum(ratios) / len(ratios)),
+            "mt_norm_ratio_max": float(max(ratios)),
+        }
 
     @torch.no_grad()
     def evaluate(self) -> dict:
@@ -1072,12 +1783,11 @@ class Trainer:
                 # Recurrent memory update is mandatory regardless of scoring.
                 C_t = model.model.extract_source(sess[:, :-1])
                 M_c = model.model.compress_session(C_t, M_c)
-        model.train()
 
         def mean(xs):
             return float(sum(xs) / len(xs)) if xs else float("nan")
 
-        return {
+        legacy = {
             "n_scored": len(ce_mem),
             "ce_mem": mean(ce_mem),
             "ce_nomem": mean(ce_no),
@@ -1087,6 +1797,23 @@ class Trainer:
             "delta_shuffle_minus_mem": mean(ce_shuffle) - mean(ce_mem),
             "delta_oracle_minus_mem": mean(ce_oracle) - mean(ce_mem),
         }
+        # NEW (v8+): the legacy standard-eval above measures CE over
+        # 511 tokens of mostly-filler content with M_c built sequentially
+        # through 40+ sessions -- a distribution the curriculum-trained
+        # model has never seen and shouldn't be expected to dominate
+        # before architectural recruitment is established.  The three
+        # diagnostics below measure RECRUITMENT (gate / alpha_mem /
+        # readout magnitude) and MATCHED-DISTRIBUTION discrimination
+        # (phase-aligned callback-token Δ_sh-m), which is what we
+        # actually save_best against in v8+ runs.
+        pa = self._phase_aligned_eval()
+        rec = self._routing_recruitment_summary()
+        mt = self._readout_magnitude_diag()
+        out = {**legacy, **pa, **rec, **mt}
+        # Ensure model is back in train mode (the helpers above keep
+        # it eval; the legacy block at the top of evaluate() also did).
+        model.train()
+        return out
 
     def _save(self, tag: str, eval_metrics: dict | None = None) -> None:
         if not self.is_main:
@@ -1173,6 +1900,7 @@ class Trainer:
             if self.global_step % a.eval_every == 0:
                 metrics = self.evaluate()
                 if metrics and self.is_main:
+                    # Legacy standard eval (eval_window=8, sequential M_c).
                     print(
                         f"  EVAL @ step {self.global_step}: n={metrics['n_scored']} "
                         f"mem={metrics['ce_mem']:.4f} nomem={metrics['ce_nomem']:.4f} "
@@ -1182,21 +1910,98 @@ class Trainer:
                         f"Δor-m={metrics['delta_oracle_minus_mem']:+.4f}",
                         flush=True,
                     )
+                    # NEW: phase-aligned eval (matches train distribution).
+                    if metrics.get("n_pa_scored", 0) > 0:
+                        pa_ws_dnm = metrics.get("pa_ws_dnm", float("nan"))
+                        pa_ws_dsh = metrics.get("pa_ws_dsh", float("nan"))
+                        pa_cb_dnm = metrics.get("pa_cb_dnm", float("nan"))
+                        pa_cb_dsh = metrics.get("pa_cb_dsh", float("nan"))
+                        print(
+                            f"  PA-EVAL @ step {self.global_step}: "
+                            f"n={metrics['n_pa_scored']} cb_n={metrics['n_pa_cb_scored']} "
+                            f"WS Δnm-m={pa_ws_dnm:+.4f} Δsh-m={pa_ws_dsh:+.4f} | "
+                            f"CB Δnm-m={pa_cb_dnm:+.4f} Δsh-m={pa_cb_dsh:+.4f}",
+                            flush=True,
+                        )
+                    # NEW: routing recruitment + readout magnitude.
+                    if "rec_mode" in metrics:
+                        rec_mode = metrics["rec_mode"]
+                        if rec_mode == "simple_gate":
+                            top = metrics.get("rec_gate_top", [])
+                            top_str = ", ".join(
+                                f"l{i}={v:+.4f}" for i, v in top
+                            )
+                            print(
+                                f"  ROUTE @ step {self.global_step}: "
+                                f"mode=simple_gate "
+                                f"|gate|_max={metrics.get('rec_gate_max_abs', 0.0):.4f} "
+                                f"|gate|_mean={metrics.get('rec_gate_mean_abs', 0.0):.4f} "
+                                f"frac_open={metrics.get('rec_frac_open', 0.0):.2f} "
+                                f"top=[{top_str}]",
+                                flush=True,
+                            )
+                        else:
+                            top = metrics.get("rec_alpha_mem_top", [])
+                            top_str = ", ".join(
+                                f"l{i}={v:.4f}" for i, v in top
+                            )
+                            print(
+                                f"  ROUTE @ step {self.global_step}: "
+                                f"mode={rec_mode} "
+                                f"α_mem_max={metrics.get('rec_alpha_mem_max', 0.0):.4f} "
+                                f"α_mem_mean={metrics.get('rec_alpha_mem_mean', 0.0):.4f} "
+                                f"frac_open={metrics.get('rec_frac_open', 0.0):.2f} "
+                                f"top=[{top_str}]",
+                                flush=True,
+                            )
+                    if not math.isnan(metrics.get("mt_norm_ratio_mean", float("nan"))):
+                        print(
+                            f"  READOUT @ step {self.global_step}: "
+                            f"||m^t|| / ||embed|| mean="
+                            f"{metrics['mt_norm_ratio_mean']:.3f} "
+                            f"max={metrics.get('mt_norm_ratio_max', float('nan')):.3f}",
+                            flush=True,
+                        )
                     if self.use_wandb:
                         import wandb
                         wandb.log({f"eval/{k}": v for k, v in metrics.items()
                                    if isinstance(v, (int, float))},
                                   step=self.global_step)
-                    # COMPREHENSIVE.md §4.1: minimising ce_mem alone is
-                    # gameable by channel collapse (the model can null memory
-                    # and still drop ce_mem by overfitting the bare backbone).
-                    # The composite (Δ_nm-m + 2·Δ_sh-m) penalises both
-                    # collapse (Δ_nm-m -> 0) and shortcut learning
-                    # (Δ_sh-m -> 0 or negative). We negate so "lower is
-                    # better" semantics of best_eval_ce remain.
+
+                    # save_best score (lower-is-better convention).
+                    #
+                    # ce_mem (legacy): minimise raw memory CE. Gameable by
+                    #   channel collapse (model nulls memory, ce_mem drops
+                    #   from overfitting backbone). Use only on pair-trained
+                    #   warm-ups.
+                    # composite: legacy v6/v7 standard-eval composite,
+                    #   penalises channel collapse (Δ_nm-m -> 0) AND
+                    #   shortcut learning (Δ_sh-m -> 0). Useful when
+                    #   train and eval distributions match.
+                    # phase_aligned (default v8+): matches the curriculum
+                    #   training distribution (1 fresh evidence + callback
+                    #   session). The callback-token-only Δ_sh-m is the
+                    #   ultimate signal that the readout is content-
+                    #   discriminative on the tokens that actually require
+                    #   memory; the whole-session pa_ws_dsh is a regulariser
+                    #   that prevents winning the cb_dsh by random noise.
                     if a.save_best_metric == "ce_mem":
                         score = metrics["ce_mem"]
-                    else:
+                    elif a.save_best_metric == "phase_aligned":
+                        cb_dsh = metrics.get("pa_cb_dsh", float("nan"))
+                        ws_dsh = metrics.get("pa_ws_dsh", float("nan"))
+                        # If the phase-aligned eval failed to score
+                        # anything (no eligible chains), fall back to
+                        # the composite to avoid saving every checkpoint.
+                        if math.isnan(cb_dsh) and math.isnan(ws_dsh):
+                            d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
+                            d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0
+                            score = -(d_nm + 2.0 * d_sh)
+                        else:
+                            cb_term = 0.0 if math.isnan(cb_dsh) else cb_dsh
+                            ws_term = 0.0 if math.isnan(ws_dsh) else ws_dsh
+                            score = -(cb_term + 0.5 * ws_term)
+                    else:  # composite
                         d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
                         d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0
                         score = -(d_nm + 2.0 * d_sh)

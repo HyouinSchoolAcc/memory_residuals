@@ -1,0 +1,368 @@
+[2026-04-29T01:14:02+00:00] starting: bash scripts/train_headline.sh
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+=== Memory Residuals -- recurrent chain trainer ===
+  run_name        : chain_v4_hidden14_msc
+  preset          : qwen3-0.6b-large
+  pretrained      : Qwen/Qwen3-0.6B
+  K, L_E, N       : 128, 4, 8
+  session_len     : 512, window_k=3
+  steps           : 6000, bs=4, grad_accum=4
+  lr              : memres=0.0002, backbone=2e-05
+  reg             : mem_drop=0.1, ctx_drop=0.3, carry_state=True
+  world_size      : 1
+  out_dir         : output/chain_v4_hidden14_msc
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 8348.34it/s]
+[transformers] [1mQwen3MemResForCausalLM LOAD REPORT[0m from: Qwen/Qwen3-0.6B
+Key                                                             | Status  | 
+----------------------------------------------------------------+---------+-
+model.memory_block.extraction_layers.{0, 1, 2, 3, 4}.W_K.weight | MISSING | 
+model.depth_router.w.{0...54}                                   | MISSING | 
+model.memory_block.extraction_layers.{0, 1, 2, 3, 4}.W_Q.weight | MISSING | 
+model.memory_block.judging.W_K.weight                           | MISSING | 
+model.memory_block.M_in                                         | MISSING | 
+model.depth_router.recent_bias                                  | MISSING | 
+model.memory_block.extraction_layers.{0, 1, 2, 3, 4}.W_V.weight | MISSING | 
+model.memory_block.judging.W_Q.weight                           | MISSING | 
+model.memory_readout.W_V.weight                                 | MISSING | 
+model.memory_gate.gate                                          | MISSING | 
+model.memory_block.judge_norm.weight                            | MISSING | 
+model.memory_readout.W_K.weight                                 | MISSING | 
+model.depth_router.mem_bias                                     | MISSING | 
+model.memory_block.M_judge                                      | MISSING | 
+model.memory_readout.W_Q.weight                                 | MISSING | 
+model.depth_router.norm.weight                                  | MISSING | 
+model.memory_block.judging.W_V.weight                           | MISSING | 
+
+Notes:
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+  param groups    : memres=22.3M @ 0.0002, backbone=596.0M @ 2e-05
+  loading train chains: paper_artifacts/chains/stage1_msc_train_s512.pt
+  train: 5928 chains, 5928 eligible (window_k=3); source counts={'pg19': 1899, 'tv': 29, 'msc': 4000}; weights={'pg19': 1.0, 'tv': 4.0, 'msc': 8.0}
+  loading eval chains: paper_artifacts/chains/stage1_msc_val_s512.pt
+  eval: 548 chains, sessions: 4645
+  entering training loop
+[transformers] `use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.
+step     20 | loss 3.4949 | lrs [4e-05, 4.000000000000001e-06] | grad_norm 10.250 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step     40 | loss 3.2270 | lrs [8e-05, 8.000000000000001e-06] | grad_norm 3.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step     60 | loss 3.1639 | lrs [0.00012, 1.2e-05] | grad_norm 3.172 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step     80 | loss 3.0351 | lrs [0.00016, 1.6000000000000003e-05] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    100 | loss 3.0987 | lrs [0.0002, 2e-05] | grad_norm 2.578 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    120 | loss 2.9189 | lrs [0.0001999946130217936, 1.999946130217936e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    140 | loss 3.1064 | lrs [0.00019997845269811184, 1.9997845269811185e-05] | grad_norm 2.375 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    160 | loss 3.2490 | lrs [0.00019995152086169822, 1.9995152086169824e-05] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    180 | loss 2.8902 | lrs [0.00019991382056689408, 1.999138205668941e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    200 | loss 2.9989 | lrs [0.00019986535608929238, 1.998653560892924e-05] | grad_norm 2.500 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 200: n=124 mem=3.1231 nomem=3.1231 shuffle=3.1231 oracle=2.9174 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.2057
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.68it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.67it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/best
+step    220 | loss 2.8690 | lrs [0.00019980613292525285, 1.9980613292525287e-05] | grad_norm 2.344 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step    240 | loss 3.0839 | lrs [0.00019973615779127847, 1.997361577912785e-05] | grad_norm 2.422 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    260 | loss 2.8987 | lrs [0.00019965543862325395, 1.9965543862325397e-05] | grad_norm 2.391 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    280 | loss 2.9474 | lrs [0.0001995639845755456, 1.995639845755456e-05] | grad_norm 2.484 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    300 | loss 2.9088 | lrs [0.00019946180601996302, 1.9946180601996305e-05] | grad_norm 2.422 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    320 | loss 2.8827 | lrs [0.00019934891454458326, 1.9934891454458326e-05] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    340 | loss 2.8270 | lrs [0.00019922532295243604, 1.9922532295243605e-05] | grad_norm 2.297 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    360 | loss 2.9298 | lrs [0.00019909104526005225, 1.9909104526005224e-05] | grad_norm 2.438 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    380 | loss 3.0568 | lrs [0.000198946096695874, 1.98946096695874e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    400 | loss 3.1020 | lrs [0.00019879049369852774, 1.9879049369852774e-05] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 400: n=124 mem=3.1044 nomem=3.1044 shuffle=3.1044 oracle=2.9102 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1942
+step    420 | loss 2.9164 | lrs [0.00019862425391495994, 1.9862425391495995e-05] | grad_norm 2.609 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step    440 | loss 2.8796 | lrs [0.00019844739619843564, 1.9844739619843566e-05] | grad_norm 2.469 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    460 | loss 2.9935 | lrs [0.0001982599406064004, 1.982599406064004e-05] | grad_norm 2.516 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    480 | loss 3.0449 | lrs [0.00019806190839820562, 1.9806190839820563e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    500 | loss 2.9425 | lrs [0.00019785332203269736, 1.9785332203269736e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.71it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.71it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-500
+step    520 | loss 2.7517 | lrs [0.0001976342051656694, 1.976342051656694e-05] | grad_norm 2.438 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    540 | loss 2.6743 | lrs [0.00019740458264718046, 1.9740458264718044e-05] | grad_norm 2.578 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    560 | loss 2.9318 | lrs [0.00019716448051873583, 1.9716448051873583e-05] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    580 | loss 2.8668 | lrs [0.0001969139260103341, 1.969139260103341e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    600 | loss 3.2352 | lrs [0.00019665294753737903, 1.9665294753737906e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 600: n=124 mem=3.1169 nomem=3.1169 shuffle=3.1169 oracle=2.9123 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.2046
+step    620 | loss 3.0975 | lrs [0.0001963815746974568, 1.9638157469745682e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step    640 | loss 2.8601 | lrs [0.00019609983826697955, 1.9609983826697957e-05] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    660 | loss 2.9225 | lrs [0.00019580777019769484, 1.9580777019769486e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    680 | loss 2.8713 | lrs [0.00019550540361306214, 1.9550540361306215e-05] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    700 | loss 2.6469 | lrs [0.00019519277280449624, 1.9519277280449626e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    720 | loss 2.9279 | lrs [0.0001948699132274782, 1.948699132274782e-05] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    740 | loss 2.8558 | lrs [0.0001945368614975345, 1.945368614975345e-05] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    760 | loss 2.8637 | lrs [0.00019419365538608425, 1.9419365538608427e-05] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.7k tok/s
+step    780 | loss 2.7745 | lrs [0.0001938403338161558, 1.938403338161558e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.7k tok/s
+step    800 | loss 2.9861 | lrs [0.00019347693685797216, 1.934769368579722e-05] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 800: n=124 mem=3.0985 nomem=3.0985 shuffle=3.0985 oracle=2.9083 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1902
+step    820 | loss 2.9827 | lrs [0.00019310350572440693, 1.9310350572440696e-05] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step    840 | loss 2.9816 | lrs [0.0001927200827663102, 1.927200827663102e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    860 | loss 2.9182 | lrs [0.00019232671146770548, 1.923267114677055e-05] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    880 | loss 2.8273 | lrs [0.00019192343644085832, 1.9192343644085832e-05] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    900 | loss 2.8982 | lrs [0.0001915103034212168, 1.9151030342121678e-05] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    920 | loss 2.8942 | lrs [0.00019108735926222443, 1.9108735926222445e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step    940 | loss 2.8933 | lrs [0.00019065465193000692, 1.9065465193000692e-05] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    960 | loss 2.8274 | lrs [0.00019021223049793203, 1.9021223049793204e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step    980 | loss 2.9735 | lrs [0.0001897601451410442, 1.8976014514104422e-05] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1000 | loss 2.8298 | lrs [0.0001892984471303743, 1.892984471303743e-05] | grad_norm 3.031 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 1000: n=124 mem=3.0876 nomem=3.0876 shuffle=3.0876 oracle=2.9021 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1855
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.66it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.65it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-1000
+step   1020 | loss 2.9432 | lrs [0.0001888271888271249, 1.888271888271249e-05] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   1040 | loss 3.0157 | lrs [0.00018834642367673192, 1.8834642367673193e-05] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1060 | loss 3.0326 | lrs [0.0001878562062028036, 1.878562062028036e-05] | grad_norm 2.625 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1080 | loss 2.8813 | lrs [0.0001873565920009367, 1.873565920009367e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1100 | loss 2.8883 | lrs [0.00018684763773241158, 1.8684763773241158e-05] | grad_norm 2.656 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1120 | loss 2.9184 | lrs [0.0001863294011177662, 1.863294011177662e-05] | grad_norm 2.656 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1140 | loss 2.9548 | lrs [0.00018580194093025006, 1.8580194093025006e-05] | grad_norm 2.609 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1160 | loss 2.8469 | lrs [0.00018526531698915855, 1.8526531698915854e-05] | grad_norm 3.047 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1180 | loss 2.7996 | lrs [0.00018471959015304903, 1.8471959015304903e-05] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1200 | loss 2.7279 | lrs [0.00018416482231283892, 1.8416482231283894e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 1200: n=124 mem=3.1003 nomem=3.1003 shuffle=3.1003 oracle=2.9077 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1926
+step   1220 | loss 3.0502 | lrs [0.00018360107638478641, 1.8360107638478643e-05] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   1240 | loss 2.8025 | lrs [0.00018302841630335522, 1.830284163033552e-05] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1260 | loss 2.8524 | lrs [0.0001824469070139638, 1.824469070139638e-05] | grad_norm 3.062 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1280 | loss 2.7583 | lrs [0.00018185661446562, 1.8185661446562e-05] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1300 | loss 2.9280 | lrs [0.00018125760560344154, 1.8125760560344156e-05] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1320 | loss 2.5643 | lrs [0.00018064994836106393, 1.8064994836106393e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1340 | loss 2.7642 | lrs [0.00018003371165293603, 1.8003371165293603e-05] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1360 | loss 2.7394 | lrs [0.0001794089653665045, 1.7940896536650448e-05] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1380 | loss 2.5758 | lrs [0.00017877578035428786, 1.7877578035428786e-05] | grad_norm 2.891 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1400 | loss 2.6311 | lrs [0.00017813422842584108, 1.7813422842584108e-05] | grad_norm 3.156 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 1400: n=124 mem=3.1091 nomem=3.1091 shuffle=3.1091 oracle=2.9111 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1981
+step   1420 | loss 2.8925 | lrs [0.00017748438233961174, 1.7748438233961174e-05] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   1440 | loss 2.6573 | lrs [0.00017682631579468824, 1.7682631579468826e-05] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1460 | loss 2.7644 | lrs [0.00017616010342244196, 1.7616010342244197e-05] | grad_norm 2.656 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1480 | loss 2.6850 | lrs [0.00017548582077806294, 1.7548582077806292e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1500 | loss 2.6721 | lrs [0.0001748035443319914, 1.748035443319914e-05] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.76it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.76it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-1500
+step   1520 | loss 2.8083 | lrs [0.0001741133514612452, 1.741133514612452e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1540 | loss 2.7508 | lrs [0.00017341532044064432, 1.7341532044064433e-05] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1560 | loss 2.5411 | lrs [0.000172709530433934, 1.7270953043393402e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1580 | loss 2.7803 | lrs [0.00017199606148480653, 1.7199606148480654e-05] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1600 | loss 2.8128 | lrs [0.00017127499450782357, 1.7127499450782358e-05] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 1600: n=124 mem=3.0907 nomem=3.0907 shuffle=3.0907 oracle=2.9032 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1875
+step   1620 | loss 2.7910 | lrs [0.00017054641127923966, 1.7054641127923964e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   1640 | loss 2.8633 | lrs [0.00016981039442772792, 1.6981039442772794e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1660 | loss 3.0109 | lrs [0.0001690670274250092, 1.690670274250092e-05] | grad_norm 2.594 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1680 | loss 3.1006 | lrs [0.00016831639457638543, 1.6831639457638545e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1700 | loss 2.5436 | lrs [0.0001675585810111787, 1.675585810111787e-05] | grad_norm 2.500 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1720 | loss 2.8527 | lrs [0.0001667936726730765, 1.6679367267307648e-05] | grad_norm 3.188 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1740 | loss 2.6941 | lrs [0.00016602175631038517, 1.6602175631038516e-05] | grad_norm 2.484 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1760 | loss 2.7604 | lrs [0.00016524291946619146, 1.6524291946619145e-05] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1780 | loss 2.9777 | lrs [0.00016445725046843445, 1.6445725046843445e-05] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1800 | loss 2.8721 | lrs [0.00016366483841988825, 1.6366483841988825e-05] | grad_norm 3.031 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 1800: n=124 mem=3.1068 nomem=3.1068 shuffle=3.1068 oracle=2.9169 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1899
+step   1820 | loss 2.7986 | lrs [0.00016286577318805673, 1.6286577318805672e-05] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   1840 | loss 2.8802 | lrs [0.0001620601453949818, 1.620601453949818e-05] | grad_norm 2.531 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1860 | loss 2.8417 | lrs [0.00016124804640696587, 1.6124804640696588e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1880 | loss 2.7624 | lrs [0.00016042956832420995, 1.6042956832420994e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1900 | loss 2.7452 | lrs [0.00015960480397036867, 1.5960480397036868e-05] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1920 | loss 2.9135 | lrs [0.00015877384688202308, 1.5877384688202307e-05] | grad_norm 2.406 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1940 | loss 2.9977 | lrs [0.00015793679129807265, 1.5793679129807267e-05] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   1960 | loss 2.8870 | lrs [0.00015709373214904768, 1.570937321490477e-05] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   1980 | loss 2.9331 | lrs [0.0001562447650463432, 1.562447650463432e-05] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2000 | loss 2.8240 | lrs [0.00015538998627137552, 1.5538998627137552e-05] | grad_norm 2.953 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 2000: n=124 mem=3.0995 nomem=3.0995 shuffle=3.0995 oracle=2.9164 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1831
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.61it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.61it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-2000
+step   2020 | loss 2.8313 | lrs [0.00015452949276466334, 1.5452949276466336e-05] | grad_norm 3.062 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   2040 | loss 2.7109 | lrs [0.0001536633821148333, 1.536633821148333e-05] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2060 | loss 2.7820 | lrs [0.00015279175254755264, 1.5279175254755265e-05] | grad_norm 2.453 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2080 | loss 2.8647 | lrs [0.0001519147029143894, 1.5191470291438941e-05] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2100 | loss 2.7568 | lrs [0.00015103233268160178, 1.5103233268160179e-05] | grad_norm 2.516 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2120 | loss 2.7499 | lrs [0.00015014474191885735, 1.5014474191885735e-05] | grad_norm 3.031 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2140 | loss 2.8396 | lrs [0.00014925203128788445, 1.4925203128788446e-05] | grad_norm 3.062 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2160 | loss 2.7193 | lrs [0.00014835430203105605, 1.4835430203105605e-05] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2180 | loss 2.6201 | lrs [0.0001474516559599077, 1.4745165595990769e-05] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2200 | loss 2.6240 | lrs [0.00014654419544359127, 1.4654419544359129e-05] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 2200: n=124 mem=3.1037 nomem=3.1037 shuffle=3.1037 oracle=2.9206 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1831
+step   2220 | loss 2.7488 | lrs [0.00014563202339726522, 1.4563202339726523e-05] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   2240 | loss 2.6950 | lrs [0.00014471524327042286, 1.4471524327042285e-05] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2260 | loss 2.7985 | lrs [0.00014379395903516026, 1.4379395903516028e-05] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2280 | loss 2.7135 | lrs [0.00014286827517438476, 1.4286827517438478e-05] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2300 | loss 2.7427 | lrs [0.00014193829666996549, 1.419382966699655e-05] | grad_norm 3.125 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2320 | loss 2.7536 | lrs [0.00014100412899082734, 1.4100412899082737e-05] | grad_norm 2.891 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2340 | loss 2.7793 | lrs [0.00014006587808099, 1.4006587808099002e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2360 | loss 2.9944 | lrs [0.0001391236503475524, 1.3912365034755239e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2380 | loss 2.7564 | lrs [0.0001381775526486254, 1.3817755264862541e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2400 | loss 2.7861 | lrs [0.00013722769228121287, 1.3722769228121286e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 2400: n=124 mem=3.0985 nomem=3.0985 shuffle=3.0985 oracle=2.9169 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1816
+step   2420 | loss 2.8442 | lrs [0.0001362741769690433, 1.362741769690433e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   2440 | loss 2.7358 | lrs [0.0001353171148503525, 1.353171148503525e-05] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2460 | loss 2.7420 | lrs [0.00013435661446562, 1.3435661446562003e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2480 | loss 2.7931 | lrs [0.00013339278474525928, 1.333927847452593e-05] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2500 | loss 2.9592 | lrs [0.000132425734997264, 1.3242573499726402e-05] | grad_norm 3.250 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.70it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.70it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-2500
+step   2520 | loss 2.8735 | lrs [0.00013145557489481133, 1.3145557489481134e-05] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2540 | loss 2.8729 | lrs [0.00013048241446382398, 1.30482414463824e-05] | grad_norm 3.031 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2560 | loss 3.1048 | lrs [0.00012950636407049211, 1.2950636407049212e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2580 | loss 3.0837 | lrs [0.00012852753440875677, 1.2852753440875678e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2600 | loss 2.8162 | lrs [0.00012754603648775593, 1.2754603648775594e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 2600: n=124 mem=3.0890 nomem=3.0890 shuffle=3.0890 oracle=2.9135 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1755
+step   2620 | loss 2.8535 | lrs [0.00012656198161923506, 1.2656198161923506e-05] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   2640 | loss 2.7509 | lrs [0.00012557548140492323, 1.2557548140492325e-05] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2660 | loss 2.8071 | lrs [0.00012458664772387634, 1.2458664772387635e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2680 | loss 2.6986 | lrs [0.00012359559271978894, 1.2359559271978893e-05] | grad_norm 2.641 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2700 | loss 2.7798 | lrs [0.00012260242878827588, 1.2260242878827589e-05] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2720 | loss 2.9147 | lrs [0.00012160726856412572, 1.2160726856412573e-05] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2740 | loss 2.5605 | lrs [0.00012061022490852667, 1.2061022490852668e-05] | grad_norm 3.000 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2760 | loss 2.8117 | lrs [0.00011961141089626698, 1.1961141089626698e-05] | grad_norm 2.953 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2780 | loss 2.8520 | lrs [0.00011861093980291118, 1.1861093980291118e-05] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2800 | loss 2.9072 | lrs [0.0001176089250919536, 1.1760892509195362e-05] | grad_norm 2.516 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 2800: n=124 mem=3.0946 nomem=3.0946 shuffle=3.0946 oracle=2.9171 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1774
+step   2820 | loss 2.7638 | lrs [0.00011660548040195017, 1.1660548040195016e-05] | grad_norm 3.141 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   2840 | loss 2.8994 | lrs [0.00011560071953363094, 1.1560071953363094e-05] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2860 | loss 2.7567 | lrs [0.00011459475643699382, 1.1459475643699382e-05] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2880 | loss 2.8253 | lrs [0.00011358770519838148, 1.135877051983815e-05] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2900 | loss 2.6964 | lrs [0.00011257968002754291, 1.125796800275429e-05] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2920 | loss 2.7278 | lrs [0.00011157079524468075, 1.1157079524468076e-05] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2940 | loss 2.4101 | lrs [0.00011056116526748632, 1.1056116526748632e-05] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   2960 | loss 2.5563 | lrs [0.00010955090459816351, 1.095509045981635e-05] | grad_norm 2.625 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   2980 | loss 2.8860 | lrs [0.00010854012781044303, 1.0854012781044303e-05] | grad_norm 2.891 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3000 | loss 2.7248 | lrs [0.0001075289495365886, 1.0752894953658861e-05] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 3000: n=124 mem=3.0934 nomem=3.0934 shuffle=3.0934 oracle=2.9139 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1795
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.61it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.60it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-3000
+step   3020 | loss 2.9384 | lrs [0.0001065174844543965, 1.0651748445439651e-05] | grad_norm 3.266 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   3040 | loss 2.6705 | lrs [0.00010550584727418999, 1.0550584727419e-05] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3060 | loss 2.6935 | lrs [0.00010449415272581002, 1.0449415272581003e-05] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3080 | loss 2.6185 | lrs [0.00010348251554560349, 1.034825155456035e-05] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3100 | loss 2.9043 | lrs [0.0001024710504634114, 1.0247105046341141e-05] | grad_norm 2.516 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3120 | loss 2.5275 | lrs [0.00010145987218955695, 1.0145987218955695e-05] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3140 | loss 2.7012 | lrs [0.00010044909540183651, 1.0044909540183652e-05] | grad_norm 3.156 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3160 | loss 2.8383 | lrs [9.943883473251368e-05, 9.943883473251368e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3180 | loss 3.0033 | lrs [9.842920475531928e-05, 9.842920475531928e-06] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3200 | loss 2.6810 | lrs [9.74203199724571e-05, 9.74203199724571e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 3200: n=124 mem=3.0927 nomem=3.0927 shuffle=3.0927 oracle=2.9157 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1769
+step   3220 | loss 2.9132 | lrs [9.641229480161854e-05, 9.641229480161854e-06] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   3240 | loss 2.8293 | lrs [9.54052435630062e-05, 9.54052435630062e-06] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3260 | loss 2.8907 | lrs [9.439928046636907e-05, 9.439928046636906e-06] | grad_norm 2.609 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3280 | loss 2.6616 | lrs [9.339451959804983e-05, 9.339451959804983e-06] | grad_norm 2.422 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3300 | loss 2.8943 | lrs [9.239107490804642e-05, 9.239107490804642e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3320 | loss 2.7429 | lrs [9.138906019708883e-05, 9.138906019708883e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3340 | loss 2.9002 | lrs [9.038858910373304e-05, 9.038858910373305e-06] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3360 | loss 2.7348 | lrs [8.938977509147338e-05, 8.938977509147338e-06] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3380 | loss 2.5991 | lrs [8.83927314358743e-05, 8.83927314358743e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3400 | loss 2.6324 | lrs [8.739757121172415e-05, 8.739757121172415e-06] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 3400: n=124 mem=3.0884 nomem=3.0884 shuffle=3.0884 oracle=2.9106 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1778
+step   3420 | loss 2.8667 | lrs [8.640440728021108e-05, 8.640440728021109e-06] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   3440 | loss 3.0182 | lrs [8.54133522761237e-05, 8.541335227612369e-06] | grad_norm 3.219 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3460 | loss 2.7606 | lrs [8.44245185950768e-05, 8.44245185950768e-06] | grad_norm 2.656 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3480 | loss 2.8833 | lrs [8.343801838076498e-05, 8.343801838076498e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3500 | loss 2.6366 | lrs [8.245396351224408e-05, 8.245396351224409e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.64it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.63it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-3500
+step   3520 | loss 2.7235 | lrs [8.147246559124326e-05, 8.147246559124327e-06] | grad_norm 2.984 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3540 | loss 3.1058 | lrs [8.049363592950788e-05, 8.049363592950788e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3560 | loss 3.0350 | lrs [7.951758553617604e-05, 7.951758553617604e-06] | grad_norm 2.594 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3580 | loss 2.8125 | lrs [7.854442510518867e-05, 7.854442510518867e-06] | grad_norm 3.109 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3600 | loss 2.5825 | lrs [7.757426500273602e-05, 7.757426500273602e-06] | grad_norm 2.281 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 3600: n=124 mem=3.0896 nomem=3.0896 shuffle=3.0896 oracle=2.9111 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1785
+step   3620 | loss 2.6284 | lrs [7.660721525474072e-05, 7.660721525474072e-06] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   3640 | loss 2.8738 | lrs [7.564338553438e-05, 7.564338553438e-06] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3660 | loss 2.7611 | lrs [7.46828851496475e-05, 7.46828851496475e-06] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3680 | loss 2.8590 | lrs [7.372582303095673e-05, 7.3725823030956734e-06] | grad_norm 3.000 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3700 | loss 2.7685 | lrs [7.277230771878711e-05, 7.2772307718787114e-06] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3720 | loss 3.0065 | lrs [7.182244735137463e-05, 7.182244735137464e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3740 | loss 2.7516 | lrs [7.087634965244761e-05, 7.0876349652447606e-06] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3760 | loss 2.7257 | lrs [6.993412191901002e-05, 6.993412191901002e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3780 | loss 2.7547 | lrs [6.899587100917264e-05, 6.899587100917263e-06] | grad_norm 3.172 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3800 | loss 2.5836 | lrs [6.806170333003454e-05, 6.806170333003454e-06] | grad_norm 2.484 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 3800: n=124 mem=3.0910 nomem=3.0910 shuffle=3.0910 oracle=2.9113 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1797
+step   3820 | loss 2.8234 | lrs [6.713172482561524e-05, 6.713172482561524e-06] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   3840 | loss 2.7770 | lrs [6.620604096483975e-05, 6.620604096483975e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3860 | loss 2.6339 | lrs [6.52847567295772e-05, 6.52847567295772e-06] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3880 | loss 2.7109 | lrs [6.436797660273481e-05, 6.436797660273482e-06] | grad_norm 2.547 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3900 | loss 2.8329 | lrs [6.345580455640874e-05, 6.345580455640874e-06] | grad_norm 3.281 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3920 | loss 2.5730 | lrs [6.254834404009231e-05, 6.2548344040092315e-06] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3940 | loss 3.0637 | lrs [6.164569796894398e-05, 6.1645697968943985e-06] | grad_norm 3.109 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   3960 | loss 2.8232 | lrs [6.074796871211554e-05, 6.074796871211555e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   3980 | loss 2.5820 | lrs [5.9855258081142674e-05, 5.9855258081142674e-06] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4000 | loss 2.7082 | lrs [5.8967667318398246e-05, 5.896766731839824e-06] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 4000: n=124 mem=3.0909 nomem=3.0909 shuffle=3.0909 oracle=2.9113 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1796
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.67it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.66it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-4000
+step   4020 | loss 2.8445 | lrs [5.8085297085610626e-05, 5.808529708561063e-06] | grad_norm 2.453 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   4040 | loss 2.8497 | lrs [5.720824745244739e-05, 5.72082474524474e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4060 | loss 2.7554 | lrs [5.633661788516672e-05, 5.633661788516672e-06] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4080 | loss 2.6694 | lrs [5.5470507235336635e-05, 5.547050723533664e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4100 | loss 2.7772 | lrs [5.461001372862447e-05, 5.4610013728624475e-06] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4120 | loss 2.9406 | lrs [5.375523495365682e-05, 5.375523495365682e-06] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4140 | loss 2.7819 | lrs [5.2906267850952326e-05, 5.2906267850952335e-06] | grad_norm 2.859 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4160 | loss 2.9548 | lrs [5.206320870192735e-05, 5.206320870192735e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4180 | loss 2.8402 | lrs [5.1226153117976964e-05, 5.122615311797696e-06] | grad_norm 3.141 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4200 | loss 2.7925 | lrs [5.039519602963135e-05, 5.039519602963135e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 4200: n=124 mem=3.0950 nomem=3.0950 shuffle=3.0950 oracle=2.9145 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1805
+step   4220 | loss 2.5388 | lrs [4.9570431675790065e-05, 4.957043167579007e-06] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   4240 | loss 2.6831 | lrs [4.875195359303414e-05, 4.875195359303414e-06] | grad_norm 2.641 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4260 | loss 2.7738 | lrs [4.793985460501821e-05, 4.793985460501821e-06] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4280 | loss 2.8230 | lrs [4.713422681194327e-05, 4.713422681194327e-06] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4300 | loss 3.0642 | lrs [4.6335161580111774e-05, 4.633516158011178e-06] | grad_norm 3.141 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4320 | loss 2.8118 | lrs [4.5542749531565556e-05, 4.554274953156555e-06] | grad_norm 3.094 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4340 | loss 2.7753 | lrs [4.475708053380859e-05, 4.4757080533808595e-06] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 2.7k tok/s
+step   4360 | loss 2.5577 | lrs [4.3978243689614865e-05, 4.3978243689614865e-06] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4380 | loss 2.9402 | lrs [4.32063273269235e-05, 4.320632732692351e-06] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4400 | loss 2.5498 | lrs [4.2441418988821335e-05, 4.244141898882134e-06] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 4400: n=124 mem=3.0899 nomem=3.0899 shuffle=3.0899 oracle=2.9115 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1784
+step   4420 | loss 2.6461 | lrs [4.1683605423614555e-05, 4.168360542361456e-06] | grad_norm 2.625 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   4440 | loss 2.8972 | lrs [4.0932972574990826e-05, 4.093297257499083e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4460 | loss 2.7521 | lrs [4.0189605572272094e-05, 4.01896055722721e-06] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4480 | loss 2.8531 | lrs [3.945358872076039e-05, 3.945358872076039e-06] | grad_norm 2.625 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4500 | loss 2.5576 | lrs [3.8725005492176456e-05, 3.872500549217646e-06] | grad_norm 2.906 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.65it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.65it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-4500
+step   4520 | loss 2.9083 | lrs [3.800393851519349e-05, 3.8003938515193497e-06] | grad_norm 2.812 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4540 | loss 2.9589 | lrs [3.7290469566066e-05, 3.7290469566066e-06] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4560 | loss 2.7520 | lrs [3.6584679559355694e-05, 3.6584679559355696e-06] | grad_norm 2.844 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4580 | loss 2.8630 | lrs [3.588664853875482e-05, 3.588664853875482e-06] | grad_norm 2.922 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4600 | loss 2.8089 | lrs [3.5196455668008635e-05, 3.5196455668008634e-06] | grad_norm 2.922 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 4600: n=124 mem=3.0908 nomem=3.0908 shuffle=3.0908 oracle=2.9112 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1796
+step   4620 | loss 2.8807 | lrs [3.451417922193709e-05, 3.4514179221937093e-06] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   4640 | loss 2.6624 | lrs [3.3839896577558085e-05, 3.3839896577558085e-06] | grad_norm 2.969 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4660 | loss 2.8234 | lrs [3.3173684205311774e-05, 3.3173684205311773e-06] | grad_norm 2.672 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4680 | loss 2.7848 | lrs [3.251561766038827e-05, 3.2515617660388275e-06] | grad_norm 3.078 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4700 | loss 2.8366 | lrs [3.18657715741589e-05, 3.18657715741589e-06] | grad_norm 2.797 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4720 | loss 3.1911 | lrs [3.122421964571215e-05, 3.1224219645712157e-06] | grad_norm 2.938 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4740 | loss 2.5535 | lrs [3.059103463349551e-05, 3.0591034633495515e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4760 | loss 2.9240 | lrs [2.9966288347063986e-05, 2.996628834706399e-06] | grad_norm 2.781 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4780 | loss 2.7336 | lrs [2.9350051638936076e-05, 2.935005163893608e-06] | grad_norm 3.125 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4800 | loss 2.9576 | lrs [2.874239439655847e-05, 2.874239439655847e-06] | grad_norm 2.719 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 4800: n=124 mem=3.0883 nomem=3.0883 shuffle=3.0883 oracle=2.9109 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1774
+step   4820 | loss 2.5657 | lrs [2.8143385534380006e-05, 2.8143385534380006e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   4840 | loss 2.8094 | lrs [2.7553092986036194e-05, 2.7553092986036196e-06] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4860 | loss 2.6362 | lrs [2.6971583696644803e-05, 2.6971583696644803e-06] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4880 | loss 2.9555 | lrs [2.6398923615213618e-05, 2.6398923615213615e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4900 | loss 2.7632 | lrs [2.5835177687161072e-05, 2.583517768716107e-06] | grad_norm 3.078 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4920 | loss 2.9112 | lrs [2.528040984695097e-05, 2.528040984695097e-06] | grad_norm 2.828 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   4940 | loss 2.7233 | lrs [2.473468301084152e-05, 2.473468301084152e-06] | grad_norm 2.922 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4960 | loss 3.0485 | lrs [2.4198059069749984e-05, 2.4198059069749986e-06] | grad_norm 2.953 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   4980 | loss 2.7541 | lrs [2.367059888223379e-05, 2.367059888223379e-06] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5000 | loss 2.6455 | lrs [2.3152362267588416e-05, 2.3152362267588418e-06] | grad_norm 3.250 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 5000: n=124 mem=3.0902 nomem=3.0902 shuffle=3.0902 oracle=2.9108 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1793
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.68it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  2.67it/s]
+Saved checkpoint -> output/chain_v4_hidden14_msc/step-5000
+step   5020 | loss 2.4939 | lrs [2.2643407999063316e-05, 2.264340799906332e-06] | grad_norm 3.062 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   5040 | loss 2.7369 | lrs [2.2143793797196406e-05, 2.2143793797196407e-06] | grad_norm 3.391 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5060 | loss 2.7917 | lrs [2.165357632326808e-05, 2.1653576323268083e-06] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   5080 | loss 2.5437 | lrs [2.1172811172875123e-05, 2.1172811172875123e-06] | grad_norm 2.688 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   5100 | loss 2.9362 | lrs [2.0701552869625715e-05, 2.0701552869625715e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5120 | loss 2.6879 | lrs [2.0239854858955813e-05, 2.0239854858955817e-06] | grad_norm 3.016 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5140 | loss 2.5821 | lrs [1.9787769502067987e-05, 1.978776950206799e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   5160 | loss 3.1587 | lrs [1.9345348069993088e-05, 1.934534806999309e-06] | grad_norm 2.734 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5180 | loss 2.9010 | lrs [1.8912640737775596e-05, 1.8912640737775597e-06] | grad_norm 3.266 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5200 | loss 2.9222 | lrs [1.8489696578783243e-05, 1.8489696578783244e-06] | grad_norm 2.656 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+  EVAL @ step 5200: n=124 mem=3.0899 nomem=3.0899 shuffle=3.0899 oracle=2.9108 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1791
+step   5220 | loss 2.9039 | lrs [1.8076563559141686e-05, 1.8076563559141686e-06] | grad_norm 2.875 | gate_mean +0.0000 max 0.0000 | 1.7k tok/s
+step   5240 | loss 2.7323 | lrs [1.767328853229453e-05, 1.767328853229453e-06] | grad_norm 3.188 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5260 | loss 2.5974 | lrs [1.727991723368983e-05, 1.727991723368983e-06] | grad_norm 3.062 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5280 | loss 3.0807 | lrs [1.6896494275593076e-05, 1.6896494275593076e-06] | grad_norm 2.922 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5300 | loss 2.9707 | lrs [1.6523063142027852e-05, 1.652306314202785e-06] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5320 | loss 2.7929 | lrs [1.6159666183844216e-05, 1.6159666183844216e-06] | grad_norm 3.234 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   5340 | loss 2.6379 | lrs [1.5806344613915747e-05, 1.5806344613915748e-06] | grad_norm 3.078 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5360 | loss 2.7608 | lrs [1.5463138502465513e-05, 1.5463138502465514e-06] | grad_norm 2.891 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5380 | loss 2.7859 | lrs [1.5130086772521806e-05, 1.5130086772521808e-06] | grad_norm 3.031 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5400 | loss 2.7951 | lrs [1.4807227195503778e-05, 1.4807227195503779e-06] | grad_norm 2.766 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+  EVAL @ step 5400: n=124 mem=3.0894 nomem=3.0894 shuffle=3.0894 oracle=2.9103 Δnm-m=+0.0000 Δsh-m=+0.0000 Δor-m=-0.1790
+step   5420 | loss 2.8300 | lrs [1.449459638693787e-05, 1.449459638693787e-06] | grad_norm 2.750 | gate_mean +0.0000 max 0.0000 | 1.8k tok/s
+step   5440 | loss 2.7995 | lrs [1.4192229802305168e-05, 1.4192229802305169e-06] | grad_norm 2.922 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s
+step   5460 | loss 2.8847 | lrs [1.3900161733020467e-05, 1.3900161733020468e-06] | grad_norm 2.562 | gate_mean +0.0000 max 0.0000 | 2.9k tok/s
+step   5480 | loss 2.8030 | lrs [1.3618425302543208e-05, 1.361842530254321e-06] | grad_norm 2.703 | gate_mean +0.0000 max 0.0000 | 2.8k tok/s

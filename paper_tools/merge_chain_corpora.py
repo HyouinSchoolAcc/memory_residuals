@@ -49,6 +49,11 @@ def main() -> None:
     chain_starts: list[int] = []
     chain_lengths: list[torch.Tensor] = []
     chain_names: list[str] = []
+    # Optional callback fields; if any input has them, we propagate them
+    # (zero-filling the parts that don't).
+    has_callback = any("session_callback_mask" in p for p in parts)
+    session_callback_mask: list[torch.Tensor] = []
+    chain_callback_position: list[torch.Tensor] = []
 
     row_offset = 0
     chain_offset = 0
@@ -66,8 +71,28 @@ def main() -> None:
         chain_lengths.append(p["chain_lengths"])
         chain_names.extend(p["chain_names"])
 
+        if has_callback:
+            if "session_callback_mask" in p:
+                session_callback_mask.append(
+                    p["session_callback_mask"].to(torch.int8)
+                )
+            else:
+                session_callback_mask.append(
+                    torch.zeros_like(p["session_ids"], dtype=torch.int8)
+                )
+            if "chain_callback_position" in p:
+                chain_callback_position.append(
+                    p["chain_callback_position"].to(torch.int32)
+                )
+            else:
+                chain_callback_position.append(
+                    torch.full((n_chains,), -1, dtype=torch.int32)
+                )
+
         print(f"  part {src_idx}: {args.inputs[src_idx]} "
-              f"({n_chains} chains, {n_rows} sessions)")
+              f"({n_chains} chains, {n_rows} sessions"
+              + (f", cb={int((p.get('session_callback_mask', torch.zeros(0))).sum())}"
+                 if has_callback else "") + ")")
         row_offset += n_rows
         chain_offset += n_chains
 
@@ -81,6 +106,9 @@ def main() -> None:
         "session_len": session_len,
         "tokenizer": tokenizer,
     }
+    if has_callback:
+        merged["session_callback_mask"] = torch.cat(session_callback_mask, dim=0)
+        merged["chain_callback_position"] = torch.cat(chain_callback_position, dim=0)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(merged, args.out)

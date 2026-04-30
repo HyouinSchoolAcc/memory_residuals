@@ -1,0 +1,8 @@
+# Commands log (timestamp UTC, exit code, command)
+
+2026-04-29T15:12:55Z  0  mkdir -p logs/agent_session_20260429_1011/writer
+2026-04-29T15:12:57Z  0  ssh ubuntu@192.222.50.225 'echo connected; hostname; uptime; tmux ls; ls -lat ~/memory_residuals/output/chain_v4_hidden14_msc/'
+2026-04-29T15:13:05Z  0  ssh ubuntu@192.222.50.225 'tmux capture-pane -t cwd-chain_v4_hidden14_msc -p -S -200000'  # returned 24 empty lines; pane is blank because trainer's stdout redirected to log file
+2026-04-29T15:13:30Z  0  ssh ubuntu@192.222.50.225 'tmux list-panes; ps -ef | grep train_chain'  # found pid 11737, full cmdline; differs from README (window_k=3 not 8, lr=2e-4, +memory_dropout 0.10, ctx_drop 0.30, carry_state, save_best_metric=composite, warmup=100 not 200)
+2026-04-29T15:13:45Z  0  ssh ubuntu@192.222.50.225 'cat /home/ubuntu/memory_residuals/paper_tools/cloud_watchdog/logs/chain_v4_hidden14_msc.log'  # 367 lines
+2026-04-29T15:14:10Z  0  ssh ubuntu@192.222.50.225 'grep -E "EVAL @ step" $L'  # all 27 EVAL lines, all show +0.0000 / +0.0000

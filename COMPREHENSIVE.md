@@ -909,20 +909,425 @@ In rough priority order for the paper:
   The interesting metric is the *capture ratio* (memory $\Delta$ as a
   fraction of oracle $\Delta$), not the raw $\Delta$.
 
-## Removed from the project
+## Removed / archived from the working tree
 
-To keep the working tree small, the following have been deleted (the
-information they captured is preserved in eval JSONs / paper tables):
+Anything not immediately needed for the active v6 recipe lives under
+`archive/`. Reference papers (`memory_residuals.{pdf,txt}`,
+`atn_residuals.pdf`) deliberately stay at the top level: agents
+should be able to step back to the architectural spec without
+spelunking. Inventory of the archive:
 
-- `output/{_smoke*,_pilot*,smoke_*,memres-d512-*,run1*,run2*,chain1*,
-  chain2*,chain_fresh_small}` — superseded scratch runs.
-- `paper_artifacts/runs/qwen3-{0.6b,8b}-{small,large}` — old pair-trained
-  pilot checkpoints; numbers retained in `paper_artifacts/eval/`.
-- `paper_artifacts/pairs/` — old pair JSONLs and pre-tokenised tensors,
-  superseded by chain corpora.
-- `wandb/`, `__pycache__/`, `data/friends_scripts.jsonl` — debug
-  artifacts and a legacy single-show JSONL.
-- Legacy training/eval scripts moved to `legacy/`:
-  `eval_base.py`, `eval_memres.py`, `train_memres.py`,
-  `train_memres_chain.py`, `modeling_memory_residuals.py`,
-  `probe_memres.py`, `visualize_memres.py`, `atn_.pdf`.
+- `archive/scripts/` — every KILLED v3/v4/v5/v6-attempt training
+  script (`train_ablation_*`, `train_headline*`, `train_v6_lme_msc_gated_gh200.sh`),
+  plus `sentinel_local_ablations.sh` and `cloud_chain_enqueue.sh`.
+- `archive/paper_tools/` — superseded or one-shot tools:
+  `rag_baseline*.py`, `audit_data.py`, `eval_suite.py`,
+  `prepare_pairs.py`, `build_msc_chains.py`,
+  `build_callback_pairs.py`, `build_longhorizon_chains.py`,
+  `post_train_pipeline.sh` (hardcoded to v3 paths),
+  `watchdog.sh`, `build_tables.py`, `eval_matrix.sh`,
+  `notify_eval.sh`, `pull_overnight.sh`,
+  `run_overnight_traces.sh`, `cloud_handoff.sh`.
+- `archive/datasets/` — pre-v6 chain corpora (PG-19+TV `stage1_*`,
+  MSC `msc_*` and `stage1_msc_*`, `tv_train_s512.pt`,
+  `locomo_s512.pt`, the synthetic-passkey `archive_pg19_passkey/`)
+  and the legacy pair JSONLs (`pairs/`, `pairs_eval/`,
+  `locomo_chains/`).
+- `archive/eval/` — eval JSONs from KILLED runs and pre-v3 small
+  pilots (`run1_*`, `run2_*`, `run3_*`, `chain2_*`,
+  `chain_fresh1_*`, `chain_tv*`, `chain_v2_abl_residual_mode_*`,
+  `chain_v2_phaseA_trajectories.*`, `qwen3-0.6b-*.json`,
+  `qwen3-8b-*.json`, `rag_qwen3-0.6b.json`).
+- `archive/figures/` — pre-v6 plots (`callback_probe_chart.png`,
+  `run2_*.png`, `run3_*.png`).
+- `archive/agent_sessions/` — v5-era observer/writer/monitor notes
+  (`agent_session_20260429_1011/`).
+- `archive/docs/` — archived data audit (`data_audit.{json,md}`).
+
+What's gitignored entirely: `output/`, `logs/`, `wandb/`,
+`__pycache__/`, large .pt files (see `.gitignore`).
+
+---
+
+# Part III — Stage-1 6-day calendar (was docs/paper1_calendar.md)
+
+This was the original day-by-day plan for paper 1 when it was still
+being aimed at multi-session dialogue. It is preserved here as a
+historical record of how the scope landed where it did. The active
+paper-2 plan is in [`experiments/exp2_long_horizon_recipe/runs.md`](experiments/exp2_long_horizon_recipe/runs.md);
+the active paper-1 status is summarised in
+[`experiments/exp1_drop_in_primitive/README.md`](experiments/exp1_drop_in_primitive/README.md).
+
+## Original Stage-1 claim (since narrowed)
+
+> *On multi-session dialogue benchmarks (LoCoMo, MSC test, NIAH,
+> RULER), at matched compute, Memory Residuals with the soft-parity
+> Block AttnRes routing pool reach lower NLL and higher callback-EM
+> than (a) the no-memory baseline, (b) BM25 retrieval, (c) dense
+> MiniLM retrieval, and (d) a fine-tuned dense retriever.*
+
+That claim has been narrowed to "sample-efficient on books" for
+paper 1; the dialogue half is paper 2.
+
+## Resources (2× H100 NVL local + 1× GH200 cloud)
+
+| asset | location | hours / day | notes |
+|---|---|---:|---|
+| local GPU 0 | `cuda:0` (H100 NVL 96 GB) | 16 | residential power-down 8 h |
+| local GPU 1 | `cuda:1` (H100 NVL 96 GB) | 16 | residential power-down 8 h |
+| cloud GPU   | `192.222.50.225` (GH200 480 GB) | 24 | $2.49/h × 96 h ≈ $240, $260 reserve |
+
+## Day-by-day skeleton
+
+- **Day 0.** v3 softparity_full + v3 attentionbase_full extending v2
+  to step 6000; cloud watchdog up; first eval JSONs landing in
+  `paper_artifacts/eval/`. Decision triggers: adopt v3 softparity if
+  Δ_sh-m > +0.020 on PG-19 standalone; keep attentionbase row of
+  ablation table if Δ_sh-m > +0.010.
+- **Day 1.** Mixed-corpus softparity (PG-19 40% + TV 20% + MSC 40%)
+  on local GPU 0; mixed-corpus simple_gate baseline on local GPU 1;
+  cloud runs NIAH on v3 best ckpts and pre-fetches RAG baseline
+  models. Hard blocker: build `paper_artifacts/chains/mixed_train_s512.pt`
+  via `paper_tools/build_msc_chains.py` first.
+- **Day 2.** Standalone eval on the day-1 ckpts (PG-19 val/test,
+  LoCoMo, MSC test, TV held-out); cloud runs RAG baselines (BM25,
+  MiniLM, Contriever, MiniLM-FT) at matched FLOPs and downloads the
+  RULER S=4k subset. Decision: if E1 LoCoMo Δ_sh-m ≥ E2 Δ_sh-m + 1 SE,
+  the headline holds; otherwise reframe as paper 2.
+- **Day 3.** Local GPU 0 runs the counterfactual sensitivity probe
+  (alter session t-k, measure ΔNLL on session t for k ∈ {1, 5, 10})
+  + per-depth routing trace; local GPU 1 runs E3 mixed-corpus
+  `attention_base` to fill the ablation table; cloud runs RULER and
+  begins LongBench-en.
+- **Day 4.** Local GPU 0 runs E4, the hidden-state extraction
+  ablation (consume `hidden_states[14]` instead of
+  `embed_tokens(input_ids)` in `compress_session`); cloud finishes
+  the RAG / RULER / LongBench cells and runs callback EM on
+  generation outputs.
+- **Day 5.** Standalone eval on E4; ablation table fill; cloud
+  released. Save the remaining $260 of cloud budget.
+
+The calendar was overtaken by the v4→v5→v6 dead-end ladder
+(documented in [`experiments/exp2_long_horizon_recipe/README.md`](experiments/exp2_long_horizon_recipe/README.md)
+"What was wrong before"). The current state is: paper 1 is dormant
+as a self-contained primitive paper; paper 2 owns the active
+research thread.
+
+---
+
+# Part IV — Historical run ledger (v2 → v6, was runs.md)
+
+The `runs.md` ledger now contains only the active v7 cells (the
+v6 entries were superseded by v7 on 2026-04-29 ~20:33 UTC). The
+v2/v3/v4/v5/v6 entries — all KILLED or superseded — are preserved
+here so the v5 → v6 → v7 narrative is auditable.
+
+## 2026-04-29: v6 → v7 transition and the simple_gate finding
+
+After two failed v5 → v6 pivots that attacked only the writer side
+(LME corpus, callback supervision, gated update, callback-window
+bias), the failure analysis on the v3 standalone routing trace
+(`paper_artifacts/eval/routing_v3sp_*.json`) located the binding
+constraint on the *router* side: α_mem ≈ 4.7e-4 averaged across 55
+sublayers AND α_mem on `mem` runs essentially identical to α_mem on
+`shuffle` runs at every sublayer. The router was content-blind and
+saturated against memory.
+
+The v7 P0 cells launched 2026-04-29 ~20:40 UTC pivoted the recipe
+on **two new axes simultaneously**:
+
+1. **Compression curriculum P0**: every training window is
+   `[evidence_session, callback_session]` (window_k=2, non-contiguous
+   sampling via new `--curriculum_evidence_bias` flag). Shortest
+   possible credit-assignment path between an early-session fact and
+   the callback that depends on it. Implemented in
+   `train_chain.py: ChainCorpus.chain_curriculum_window` +
+   `ChainSampler.sample_window` curriculum branch.
+2. **Routing-mode A/B**: two `attention_parity` cells with different
+   bias settings (mem=−2 / mem=−4) plus one `simple_gate` cell on the
+   GH200 testing whether the depth-wise softmax pool is the
+   structural problem.
+
+**Result**: simple_gate produced non-zero `gate_max` within 20 steps
+(0.0004 → 0.0074 by step 400, monotonically growing) where every
+`attention_parity` configuration in the v3-v7 lineage has stayed
+pinned at 0.0000 indefinitely. This is the empirical confirmation of
+the routing-side diagnosis. The paper's "block AttnRes routing pool"
+section needs to be rewritten — `attention_parity` is the structural
+problem, not the feature, on the chain trainer.
+
+**Caveat**: pure-P0 curriculum (`curriculum_evidence_bias=1.0`)
+introduced a separate train/eval distribution mismatch that produced
+strongly negative Δ_nm-m on the standard eval (Δ_nm-m=−0.147 on
+V3BIAS at step 1200). Memory is *harmful* on the eval distribution
+because the readout learned to use M_c built from one fresh evidence
+session and the eval M_c is built sequentially through 40+ sessions.
+Curriculum mix needs to be redesigned for v8 (mixed-bias 0.5,
+phase-aligned eval). See `experiments/exp2_long_horizon_recipe/runs.md`
+"v7 P0 results so far" for the full diagnosis and v8 plan.
+
+**Watchdog patch landed alongside v7**: `paper_tools/cloud_watchdog/watchdog.sh`
+now has a `gpu_is_busy()` precheck (defers spec launch when another
+CUDA process holds > `GPU_BUSY_MIB` MiB on the target GPU; default
+2048). Fixes the silent first-step OOM that killed PURIST on
+2026-04-29 18:30 UTC when the watchdog co-launched it onto a busy
+GH200.
+
+## v6 long-horizon runs (KILLED 2026-04-29 ~20:33 UTC and ~21:03 UTC)
+
+Three v6 cells launched 2026-04-29 17:55-18:08 UTC, all KILLED in
+favour of the v7 pivot.
+
+### A — `chain_v6_lme_gated_callback`
+
+- **Status:** KILLED 2026-04-29 ~20:33 UTC at step ~1410 (PID 37321
+  SIGTERM). Δ_sh-m regressed to negative at steps 1200/1400 after
+  flatlining around +0.0005 / step 1000.
+- **Machine:** local H100 NVL, GPU 0.
+- **Final eval trajectory:** Δ_sh-m peaked at +0.0005 (step 1000)
+  then went −0.0004 (step 1200) and −0.0001 (step 1400). gate_max
+  stayed 0.0000 throughout. Detailed table in `runs.md` (v6
+  KILLED section).
+- **Verdict:** four-axis writer pivot (corpus, gated update,
+  callback loss, callback-window bias) did not open the router.
+- **Superseded by:** v7 P0 cells (router-side pivot via simple_gate
+  ablation + compression curriculum).
+
+### B — `chain_v6_lme_competitive_callback` (architecture A/B for the writer)
+
+- **Status:** KILLED 2026-04-29 ~20:33 UTC at step ~1400 (PID 38226
+  SIGTERM). Same gate_max=0 / Δ_sh-m ≈ 0 pattern as cell A.
+- **Machine:** local H100 NVL, GPU 1.
+- **Single-knob diff vs v6 A:** `--memres_update_mode competitive`
+  vs `gated`.
+- **Verdict:** A/B against gated is uninterpretable when both cells
+  fail at the router. Killed for information yield.
+
+### C — `chain_v6_lme_gated_callback_w12` (window-depth ablation, GH200)
+
+- **Status:** KILLED 2026-04-29 21:03 UTC at step ~420 of 8000.
+  Same gate_max=0 / Δ_sh-m ≈ 0 / Δ_nm-m ≈ 0 pattern as the local
+  cells, just at slower step rate (2.3k tok/s vs 5.3k locally
+  because TBPTT is 1.5× deeper).
+- **Machine:** GH200, GPU 0.
+- **Single-knob diff vs v6 A:** `--window_k 12` (vs 8);
+  `--burn_in_max 32` (vs 24); `--eval_window 12` (vs 8).
+- **Verdict:** confirmed the v3/v6 router-collapse pattern is
+  depth-axis-independent — deeper TBPTT alone does not rescue v6.
+- **Replaced by:** `chain_v7_p0_simplegate` (architectural ablation
+  on the same GH200 GPU; much higher information yield).
+- **Watchdog spec moved to `failed/`.**
+
+### D — `chain_v6_lme_gated_purist` (GH200, FAILED to launch)
+
+- **Status:** FAILED 2026-04-29 18:30:49 UTC at step 0 with
+  `torch.OutOfMemoryError`. Spec in
+  `paper_tools/cloud_watchdog/failed/1777487405_chain_v6_lme_gated_purist.json`.
+- **Cause:** watchdog co-launched PURIST (`"gpu": "0"`) onto the
+  same GH200 GPU as the still-running w12 cell (also `"gpu": "0"`,
+  holding ~58 GiB). PURIST loaded its 35 GiB process and OOM-killed
+  at the first forward pass. Fixed in watchdog by `gpu_is_busy()`
+  precheck (2026-04-29 ~21:03 UTC).
+- **Cell (planned, never executed):** v6 GATED minus carry_state,
+  burn_in, with v3-equivalent learning rates (3e-4 / 3e-5).
+- **Subsumed by:** v7 P0 V3BIAS (which tests v3's bias on LME with
+  curriculum). Not separately re-queued.
+
+## v5 soft-init runs (KILLED — superseded by v6)
+
+All v5 runs share: soft `±4` parity init, `attention_parity` routing,
+K=128, L_E=4, N=8, window_k=3, mem_drop=0.10, ctx_drop=0.30,
+carry_state, neg_chain ramp 0.05 → 0.5 over 1000 steps,
+`burn_in_max=8` with resample, `mask_padding_loss`,
+`save_best_metric=composite`, gradient checkpointing. 6000 steps total.
+
+### A (HEADLINE) — `chain_v5_softhidden14_msc`
+
+- **Status:** KILLED 2026-04-29 18:01 UTC at step ~1080 (v6 pivot).
+- **Reason:** `gate_max` stuck at 0.000 through 1080 steps — memory
+  channel never opened despite 2.5h of GH200 wallclock. Same failure
+  mode as local cells C and B prime: regulariser-removal alone isn't
+  enough; the corpus + supervision + architecture pivot is needed.
+- **Final EVAL (step ~600 last reported):** Δ_sh-m ≈ 0 (memory
+  contributing virtually nothing).
+- **Machine:** GH200 (192.222.50.225), tmux killed; watchdog spec
+  moved to `failed/`.
+- **Script:** `archive/scripts/train_headline_softinit.sh`
+- **Superseded by:** `chain_v6_lme_gated_callback_w12`.
+- **Log preserved:** remote
+  `paper_tools/cloud_watchdog/logs/chain_v5_softhidden14_msc_KILLED_v6_pivot_step1080.log`.
+
+### B — `chain_v5_softembed_msc`
+
+- **Status:** KILLED 2026-04-29 16:53 UTC at step ~1460.
+- **Reason:** catastrophic divergence in eval forward pass starting
+  step ~1200. `ce_mem` ran from 3.10 → 3.62 in 400 steps; `ce_nomem`
+  stable at ~3.14. Memory channel actively poisoning prediction.
+  Train loss was fine (~2.7), so the breakage was eval-only.
+  Diagnosis: the regulariser stack (`mem_drop=0.10 + ctx_drop=0.30 +
+  neg_chain ramp 0.05→0.5`) drove early-stage posterior collapse on
+  memory; once the model learned to ignore memory, the contrastive
+  ramp peaking at step 1000 satisfied its margin loss adversarially
+  by making both `mem` and `shuffle` forwards bad (with `shuffle`
+  slightly worse). EVAL trajectory:
+
+  | step | ce_mem | ce_nomem | ce_shuffle | Δ_sh-m |
+  |---:|---:|---:|---:|---:|
+  | 200 | 3.1183 | 3.1159 | 3.1188 | +0.0005 |
+  | 400 | 3.0863 | 3.0891 | 3.0870 | +0.0006 |
+  | 600 | 3.0987 | 3.0994 | 3.0997 | +0.0011 |
+  | 800 | 3.1003 | 3.0981 | 3.0984 | -0.0019 |
+  | 1000 | 3.0982 | 3.0962 | 3.0943 | -0.0039 |
+  | 1200 | 3.1364 | 3.1134 | 3.1849 | +0.0485 (fake — both bad) |
+  | 1400 | **3.6253** | 3.1453 | 3.5211 | -0.1041 |
+
+- **Script:** `archive/scripts/train_ablation_b_softembed_msc.sh`
+- **Superseded by:** `chain_v5_softembed_msc_noreg` (cell B prime).
+
+### B' — `chain_v5_softembed_msc_noreg` (cell B prime)
+
+- **Status:** KILLED 2026-04-29 17:53 UTC at step ~1540 (v6 pivot).
+- **Reason:** confirmed regulariser-removal is NOT enough. Loss
+  dropped fine (3.13 → 2.65) but `gate_max` stuck at 0.000
+  throughout training. This is the same "memory channel never opens"
+  failure as cell A and cell C; the bottleneck is corpus +
+  supervision + architecture, not regularisers.
+- **Script:** `archive/scripts/train_ablation_b_prime_no_reg.sh`
+- **Superseded by:** `chain_v6_lme_competitive_callback`.
+
+### C — `chain_v5_softhidden14_pgtv`
+
+- **Status:** KILLED 2026-04-29 17:53 UTC at step ~1620 (v6 pivot).
+- **Reason:** same `gate_max=0` failure as A and B'. Final EVAL
+  @ step 1600: Δ_sh-m = +0.0006 (memory contributing virtually
+  nothing), Δ_or-m = -0.2268 (oracle is 0.23 nats better, so memory
+  COULD help if recruited).
+- **Script:** `archive/scripts/train_ablation_c_softhidden14_pgtv.sh`
+- **Superseded by:** `chain_v6_lme_gated_callback` (local H100 GPU 0)
+  and `chain_v6_lme_competitive_callback` (local H100 GPU 1).
+
+### D — `chain_v5_softembed_pgtv` (CANCELLED)
+
+- **Status:** NEVER STARTED. v5 factorial 2x2 was abandoned in favour
+  of v6 pivot — all v5 cells confirmed `gate_max=0` regardless of
+  corpus/extract source/regulariser combination.
+
+## v4 hard-init runs (negative-result baselines)
+
+All v4 runs share v5's knobs except `--router_mem_bias_init -32
+--router_recent_bias_init 32`. Across every logged EVAL line, all v4
+runs show `mem == nomem == shuffle` to 4 decimals (`Δ_sh-m =
++0.0000`). This is the bf16-saturation failure mode that motivates
+the recipe paper's central methodological contribution. Diagnosis in
+`archive/agent_sessions/agent_session_20260429_1011/writer/findings_alpha_mem.md`.
+
+### A_v4 — `chain_v4_hidden14_msc`
+
+- **Status:** KILLED 2026-04-29 15:28 UTC at step ~5500/6000.
+- **Reason:** bf16 softmax saturation diagnosis; replaced by v5 cell A.
+- **Machine:** GH200; watchdog spec moved to
+  `paper_tools/cloud_watchdog/failed/1777425221_chain_v4_hidden14_msc.json`.
+- **Script:** `archive/scripts/train_headline.sh` (legacy).
+- **Final state:** `Δ_sh-m = +0.0000` at every EVAL from step 200 → 5400.
+
+### B_v4 — `chain_v4_embed_msc`
+
+- **Status:** KILLED 2026-04-28 23:00 UTC at step 1500. Local GPU was
+  needed for another job; never completed.
+- **Final state:** same `Δ_sh-m = +0.0000` signature as A_v4.
+
+### C_v4 — `chain_v4_hidden14_pgtv`
+
+- **Status:** KILLED 2026-04-28 22:58 UTC at step 500.
+
+## v3 legacy runs (proximate baselines, kept on disk)
+
+These predate the v5 2x2 design and use a different knob set
+(`window_k=8`, no dropouts, no `carry_state`, no `neg_chain` loss).
+They serve as the proximate prior baseline that the recipe paper
+compares against to motivate the recipe's pieces. Best ckpts and
+logs are still in `output/` and `logs/`.
+
+### `chain_v3_softparity_full`
+
+- **Status:** STOPPED 2026-04-28 21:23 UTC at step 4425 / 6000.
+- **Cell-ish:** `embed` × PG-19+TV, soft `±4`. Closest to (but not
+  matching) cell D of the v5 factorial.
+- **Result:** in-trainer Δ_sh-m = +0.0379 at best step 4400; α_mem
+  on PG-19 val = 4.7e-4 in the overnight routing trace.
+- **Eval:** `paper_artifacts/eval/routing_v3sp_*.json` (overnight
+  sweep), summary in
+  `paper_artifacts/eval/overnight_traces_writeup.md`.
+
+### `chain_v3_attentionbase_full`
+
+- **Status:** STOPPED 2026-04-28 21:23 UTC at step 4425 / 6000.
+- **Cell-ish:** `embed` × PG-19+TV, `attention_base` (uniform softmax
+  over deltas, no parity init).
+- **Result:** in-trainer Δ_sh-m = +0.0149 at step 4400; α_mem ≈ 1.5e-4.
+
+### `chain_v2_phaseA_softparity_b4` (oldest kept)
+
+- **Status:** STOPPED 2026-04-28 02:31 UTC at step 4400.
+- **Result:** PG-19 val Δ_sh-m = +0.0529 [+0.0246, +0.0915]; PG-19
+  test Δ_sh-m = +0.0279 [+0.0221, +0.0338] (bootstrap CI).
+- **Use:** the original "Δ_sh-m CI excludes zero on books" point;
+  carried over from exp 1 / paper-1 era.
+
+## v3-vs-v5-cell-C comparison (motivation for the v6 PURIST cell)
+
+Asked late on 2026-04-29: "is v5 cell C just v3 with different
+corpus, and if so why did it fail so badly?" Answer: it isn't just
+corpus — seven knobs differ, and several of them appear to have
+actively broken what v3 had working. Both runs use PG-19+TV,
+attention_parity at -4/+4.
+
+| knob | v3 sp | v5 cell C |
+|---|---:|---:|
+| **window_k** | **8** | **3** |
+| extract source | embed | hidden_14 |
+| memory_dropout | 0.0 | 0.10 |
+| context_dropout | 0.0 | 0.30 |
+| carry_state | False | True |
+| neg_chain_weight | 0.0 (no contrastive) | 0.5 with 0.05→0.5 ramp |
+| burn_in_max | 0 (default) | 8 + resample |
+| lr (memres / backbone) | 3e-4 / 3e-5 | 2e-4 / 2e-5 |
+
+EVAL trajectories:
+
+```
+        v3 sp                     v5 cell C
+step    Δ_sh-m   Δ_nm-m            Δ_sh-m   Δ_nm-m
+ 200    -0.0001  +0.0019            +0.0008  -0.0011
+ 400    +0.0042  +0.0025            +0.0003  -0.0105
+ 600    +0.0089  +0.0040            +0.0005  -0.0129
+ 800    +0.0107  +0.0054            -0.0003  -0.0104
+1000    +0.0177  +0.0068
+1600                                +0.0006  (last EVAL before kill)
+4400    +0.0379  +0.0131
+```
+
+v3 climbed monotonically with mem CE *decreasing*; v5 cell C stayed
+flat with Δ_nm-m **negative and deepening** (memory actively hurting)
+and mem CE *rising* (3.14 → 3.16 by step 600). Hypothesis ranking
+for the regression:
+
+1. `window_k 3` vs `8` cuts recurrent-judge gradient depth by 2.7×;
+   credit assignment for "compress prior session into M_c so it pays
+   off later" gets crushed.
+2. `neg_chain_weight 0.5` with ramp gives the model an incentive
+   solution-set that includes "make memory weak so mem ≈ shuffle"
+   (lazy) and "make both mem and shuffle bad with shuffle slightly
+   worse" (adversarial — what killed cell B).
+3. `memory_dropout 0.10` + `context_dropout 0.30` add noise before
+   the channel has any signal to lose.
+4. `carry_state True` × `window_k 3` carries M_c forward without
+   enough TBPTT depth to clean it; M_c becomes a noise reservoir.
+5. `hidden_14` vs `embed` extract is plausibly neutral or positive
+   per writer's thesis but never empirically validated.
+6. `lr 2e-4` vs `3e-4` is a small uniform slowdown.
+
+v6 already addresses items 1-3 and partly 4 (window_k=8, no
+dropouts, no contrastive, but carry_state still True). v6 PURIST
+tests the remaining items (carry_state, burn_in, lr) by running
+v3's training knobs on the LME callback corpus.

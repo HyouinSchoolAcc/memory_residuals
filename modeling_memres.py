@@ -218,6 +218,23 @@ class Qwen3MemResConfig(Qwen3Config):
         #                   forward per session boundary (~50% per-step
         #                   overhead on Qwen3-0.6B).
         memres_extract_source: str = "embed",
+        # Recurrent memory update mode (Stage 2 of MemoryBlock):
+        #   "competitive" -- M_c^t = judge(M_c^{t-1}, M_new) where judge is
+        #                    a single softmax over [M_c^{t-1} || M_new].
+        #                    Each slot of M_c^t is a softmax-weighted sum
+        #                    of one row from M_c^{t-1} OR one row from M_new,
+        #                    so a slot can be FULLY replaced with new info
+        #                    in one step (zero-sum competition). Default,
+        #                    matches all paper experiments through v5.
+        #   "gated"       -- M_c^t = (1 - g) * M_c^{t-1} + g * judge(...)
+        #                    where g in [0, 1]^{B x K x 1} is a learned per-
+        #                    slot sigmoid gate computed from (M_c^{t-1}, M_new).
+        #                    Init bias is -1.0 so g ~ 0.27 at step 0, giving
+        #                    modest non-replacing writes. Lets the model
+        #                    learn to *not* update slots that hold useful
+        #                    long-horizon information rather than being
+        #                    forced into a zero-sum overwrite every step.
+        memres_update_mode: str = "competitive",
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -252,6 +269,13 @@ class Qwen3MemResConfig(Qwen3Config):
         self.router_recent_bias_init = router_recent_bias_init
         # Extraction source policy (see __init__ docstring above).
         self.memres_extract_source = memres_extract_source
+        # Recurrent memory update mode (see __init__ docstring above).
+        if memres_update_mode not in ("competitive", "gated"):
+            raise ValueError(
+                f"memres_update_mode must be 'competitive' or 'gated'; "
+                f"got {memres_update_mode!r}"
+            )
+        self.memres_update_mode = memres_update_mode
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +332,11 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
     if isinstance(module, MemoryBlock):
         nn.init.normal_(module.M_in, std=std)
         nn.init.normal_(module.M_judge, std=std)
+        # In gated mode, override HF's generic Linear init with the
+        # zero-weight + -1 bias init that gives g ~ 0.27 at step 0.
+        if getattr(module, "update_mode", "competitive") == "gated":
+            nn.init.zeros_(module.write_gate.weight)
+            nn.init.constant_(module.write_gate.bias, -1.0)
     elif isinstance(module, MemoryReadout):
         # Read-out V projection stays at the default normal init so m^t has
         # well-scaled non-zero magnitude at step 0; the augmented model is
@@ -392,11 +421,17 @@ class MemoryBlock(nn.Module):
         num_vectors: int,
         extraction_depth: int = 0,
         eps: float = 1e-6,
+        update_mode: str = "competitive",
     ):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_vectors = num_vectors
         self.extraction_depth = extraction_depth
+        if update_mode not in ("competitive", "gated"):
+            raise ValueError(
+                f"update_mode must be 'competitive' or 'gated'; got {update_mode!r}"
+            )
+        self.update_mode = update_mode
 
         # Stage 1: learnable extraction queries M_in  (K x d)
         self.M_in = nn.Parameter(torch.empty(num_vectors, hidden_size))
@@ -419,6 +454,19 @@ class MemoryBlock(nn.Module):
         # exhibits unbounded growth of |M_c|_F and the readout becomes
         # numerically degenerate.
         self.judge_norm = Qwen3RMSNorm(hidden_size, eps=eps)
+
+        # In "gated" mode, add a per-slot sigmoid write gate so that the
+        # recurrent update can choose to KEEP an existing slot (g ~ 0)
+        # rather than overwrite it with the judge output. The gate is a
+        # function of the prior slot M_c^{t-1} and the new candidate M_new,
+        # so the model can learn content-dependent forgetting / writing.
+        # Init bias is -1.0 so g ~ 0.27 at step 0: modest writes early,
+        # most of the prior memory is preserved (which is also the
+        # behaviour we want with longer chains).
+        if update_mode == "gated":
+            self.write_gate = nn.Linear(2 * hidden_size, 1, bias=True)
+            nn.init.zeros_(self.write_gate.weight)
+            nn.init.constant_(self.write_gate.bias, -1.0)
 
     def extract(self, C: torch.Tensor) -> torch.Tensor:
         """Stage 1: refine M_in queries over C_t for 1 + L_E layers.
@@ -460,7 +508,18 @@ class MemoryBlock(nn.Module):
         M_new = self.extract(C)
         if M_c_prev is None:
             M_c_prev = torch.zeros_like(M_new)
-        return self.judge(M_c_prev, M_new)
+        candidate = self.judge(M_c_prev, M_new)
+        if self.update_mode == "competitive":
+            return candidate
+        # Gated mode: per-slot sigmoid gate g in [0,1]^{B x K x 1}.
+        # M_c^t = (1 - g) * M_c^{t-1} + g * candidate.
+        # When the prior is the zero matrix (first session, no warm-start),
+        # this collapses to g * candidate — same gradient signal as the
+        # competitive path on step t=0, so the gate doesn't suppress the
+        # model's first ever memory write.
+        gate_input = torch.cat([M_c_prev, M_new], dim=-1)  # (B, K, 2d)
+        g = torch.sigmoid(self.write_gate(gate_input))     # (B, K, 1)
+        return (1 - g) * M_c_prev + g * candidate
 
 
 # ---------------------------------------------------------------------------
@@ -476,15 +535,57 @@ class MemoryReadout(nn.Module):
     shape of any standard attention layer output, so it drops directly
     into the depth-wise routing pool at v_0 without broadcasting.
 
-        m^t = Softmax(X W_Q (M_c W_K)^T / sqrt(d)) M_c W_V
+        m^t = RMSNorm( Softmax(X W_Q (M_c W_K)^T / sqrt(d)) M_c W_V )
+
+    Why the RMSNorm on the output (added in v8, see
+    ``paper_artifacts/eval/diag_v7_*.json`` for the diagnostic data
+    that motivated it):
+
+      The paper's spec assumes the foundational sources of the depth
+      pool (b_{-1}=m^t, b_0=h_1, b_k=block summaries) are commensurate
+      in scale because they all live in R^{S x d}. The code never
+      enforced this for m^t directly: there is RMSNorm on M_c (the
+      writer's output) and RMSNorm in the BlockAttnResRouter for
+      *score* computation, but no RMSNorm on m^t itself. Consequently,
+      the scale of m^t = (attn @ V) where V = W_V @ M_c drifts to
+      whatever ||W_V^read|| the optimizer happens to find:
+
+        - In ``attention_parity`` mode at soft ±4 the per-sublayer
+          alpha_mem sits at ~4e-4, the gradient on W_V^read is
+          ~1000x weaker than on backbone params, ``weight_decay=0.1``
+          erodes W_V^read each step, ||W_V^read|| -> 0, ||m^t|| -> 0,
+          and the architecture causally collapses to the bare
+          backbone (verified empirically on chain_v7_p0_softerbias
+          step-2000: ||m^t||/||embed|| = 1.66e-10, pa_cb_dsh = 0.0
+          to floating-point precision).
+        - In ``simple_gate`` mode the gate gives W_V^read direct LM
+          gradient, so ||W_V^read|| can grow without bound. On
+          chain_v7_p0_simplegate step-500 we measured
+          ||m^t||/||embed|| = 165, which dominates the residual
+          stream and pushes Δ_nm-m on callback tokens to -0.66.
+
+      RMSNorm on the readout output rescales m^t back to ~sqrt(d),
+      matching the embedding norm and making memory injection
+      commensurate with the LM contribution at every depth. The
+      learnable scalar weight (initialized to 1) lets the model still
+      modulate the magnitude over training, but bounded.
+
+    Init parity is preserved by both downstream injection paths:
+    ``simple_gate`` has gate=0 at init so h + 0*RMSNorm(m^t) = h;
+    ``attention_parity`` has alpha_mem ~ exp(-mem_bias)/N at init so
+    the contribution to h is multiplied by an effectively-zero
+    softmax weight regardless of m^t magnitude.
     """
 
-    def __init__(self, hidden_size: int):
+    def __init__(self, hidden_size: int, eps: float = 1e-6):
         super().__init__()
         self.scale = hidden_size**-0.5
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
+        # See class docstring above for the empirical justification.
+        # weight init is 1.0 (HF _init_weights for Qwen3RMSNorm).
+        self.out_norm = Qwen3RMSNorm(hidden_size, eps=eps)
 
     def forward(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
         """X: (B, S, d) queries;  M_c: (B, K, d) memory slots  ->  (B, S, d)"""
@@ -492,7 +593,7 @@ class MemoryReadout(nn.Module):
         K = self.W_K(M_c)
         V = self.W_V(M_c)
         attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
-        return attn @ V
+        return self.out_norm(attn @ V)
 
 
 # ---------------------------------------------------------------------------
@@ -719,8 +820,11 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             config.hidden_size,
             config.memres_num_vectors,
             config.memres_extraction_depth,
+            update_mode=getattr(config, "memres_update_mode", "competitive"),
         )
-        self.memory_readout = MemoryReadout(config.hidden_size)
+        self.memory_readout = MemoryReadout(
+            config.hidden_size, eps=config.rms_norm_eps,
+        )
         assert self.memory_block.hidden_size == config.hidden_size
         assert self.memory_readout.W_V.out_features == config.hidden_size
         # Block AttnRes router: one pseudo-query w_{n,i} per routed sublayer

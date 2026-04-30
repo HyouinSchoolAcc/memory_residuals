@@ -9,16 +9,24 @@ build/
 *.safetensors
 data_pipeline/
 tea_debug.log
-paper_artifacts/chains/stage1_train_s512.pt
-paper_artifacts/chains/stage1_train_s512_full.pt
-paper_artifacts/chains/msc_train_s512.pt
-paper_artifacts/chains/msc_val_s512.pt
-paper_artifacts/chains/stage1_msc_train_s512.pt
-paper_artifacts/chains/stage1_msc_val_s512.pt
-paper_artifacts/pairs/
+
+# Large pre-tokenised corpora (active v6)
+paper_artifacts/chains/lme_train_s512.pt
+paper_artifacts/chains/lme_val_s512.pt
+paper_artifacts/chains/v6_lme_msc_train_s512.pt
+paper_artifacts/chains/realtalk_eval_s512.pt
+
+# Training & sync logs
 logs/
+
+# Cloud watchdog state directories
 paper_tools/cloud_watchdog/queue/
 paper_tools/cloud_watchdog/running/
 paper_tools/cloud_watchdog/done/
 paper_tools/cloud_watchdog/failed/
 paper_tools/cloud_watchdog/.ntfy_topic
+
+# Archive: heavy artifacts only.
+# Keep archived scripts / docs / eval JSONs so the paper trail is reproducible
+# in git, but don't carry the multi-hundred-MB corpora.
+archive/datasets/

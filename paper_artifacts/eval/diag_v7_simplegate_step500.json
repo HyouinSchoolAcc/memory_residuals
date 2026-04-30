@@ -1,0 +1,36 @@
+{
+  "model_path": "output/chain_v7_p0_simplegate_remote/step-500",
+  "corpus": "paper_artifacts/chains/lme_val_s512.pt",
+  "n_pa_scored": 48,
+  "n_pa_cb_scored": 48,
+  "pa_ws_ce_mem": 2.208014528674717,
+  "pa_ws_ce_nomem": 2.1500257466927786,
+  "pa_ws_ce_shuffle": 2.206714327124287,
+  "pa_cb_ce_mem": 2.78201273027176,
+  "pa_cb_ce_nomem": 2.1182289799977725,
+  "pa_cb_ce_shuffle": 2.776080417137372,
+  "pa_ws_dnm": -0.05798878198193824,
+  "pa_ws_dsh": -0.0013002015504297582,
+  "pa_cb_dnm": -0.6637837502739874,
+  "pa_cb_dsh": -0.005932313134387801,
+  "rec_mode": "simple_gate",
+  "rec_gate_max_abs": 0.008544921875,
+  "rec_gate_mean_abs": 0.0030115672852844,
+  "rec_gate_top": [
+    [
+      51,
+      -0.008544921875
+    ],
+    [
+      52,
+      -0.006805419921875
+    ],
+    [
+      29,
+      -0.0064697265625
+    ]
+  ],
+  "rec_frac_open": 0.8571428656578064,
+  "mt_norm_ratio_mean": 164.56867757741273,
+  "mt_norm_ratio_max": 174.51522592783434
+}
