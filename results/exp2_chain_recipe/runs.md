@@ -25,6 +25,449 @@ and the v6 → v7 transition narrative, see
 
 ---
 
+## Diagnostic audit & v11r — readout-warmup architectural fix (2026-05-01 ~06:55 UTC)
+
+User directive 2026-05-01 after v11i finished and v11j started:
+> "I care much more that evidence of a working recipe surfaces so we
+>  can mega-scale a project and clear of potential loopholes. For
+>  example, the competition mechanism really bothers me, just as much
+>  as 'memory condensation' is not working to a correct gradient."
+> "Sure, do everything you just said" (re: D1-D5 diagnostics + an
+>  architectural fix).
+
+### Diagnostic toolkit shipped (D1-D5)
+
+Five mechanism-level audits, all integrated into `src/train_chain.py`
+or shipped as standalone tools:
+
+| ID  | What it measures | How |
+|-----|------------------|-----|
+| D1  | Per-module gradient L2 norms (M_in / extract / M_judge / judge / readout / router / write_gate / backbone) at each `--log_every` step. Surfaces gradient starvation in the writer subsystem. | `--diagnose_grad_groups` flag; logs `grad/<group>` to wandb and prints `|g|/|g_bb|` ratios per step. |
+| D2  | Judge attention decisiveness: row-entropy vs `log(2K)`, mean keep-vs-write mass, variance over rows, effective rank of the average judge attention pattern. | `--diagnose_memory_dynamics` flag; computed in `_memory_dynamics_eval`; uses `MemoryBlock.judge_attention(...)` (new helper in `modeling_memres.py`). |
+| D3  | M_c stability per session step (`||M_c^t - M_c^{t-1}||_F / ||M_c^{t-1}||_F`); chain-distinguishability via pairwise normalized Frobenius distance between distinct-chain `M_c^T`s. Detects content-blind writer. | Same `_memory_dynamics_eval` pass. |
+| D4  | Synthetic gold-standard task: 5000-chain persona-callback corpus, 256-item closed set, 9 sessions/chain (persona + 7 fillers + callback). Hard ground truth: `callback_ce → 0` only if memory works. | `tools/build_synthetic_persona_callback.py`; corpora at `paper_artifacts/chains/synthd4_persona_callback_{train,val}_s512.pt`. |
+| D5  | TTT-on-readout disambiguator: freeze writer + router + LM head, train ONLY the readout (W_Q/W_K/W_V) for 300 steps. If callback CE drops, writer encoded the info; readout was the bottleneck. | `tools/d5_ttt_readout.py`. |
+
+### Audit run on `chain_v11g_ap_baseline_gh200/best` (~Apr 30 22:42 UTC)
+
+Eval-only invocation against the synthetic D4 corpus:
+
+```text
+ROUTE: mode=attention_parity  alpha_or_gate_max=0.0092  frac_open=0.00
+READOUT: ||m^t||/||embed|| mean=77.23
+D2-JUDGE: row_entropy=5.541 (uniform=5.545; norm=0.999) keep_mean=0.500
+          keep_var=0.0000 eff_rank=1.02
+D3-MC   : Δ_step mean=1.347 max=1.383 self||M||=1.000 pair=0.022
+          (pair/self=0.022)
+pa_cb_dnm = +0.373  pa_cb_dsh = +0.0023  pa_cb_evidence_lift = +0.016
+                                                          (synth)
+```
+
+Recorded at `results/exp2_chain_recipe/v11g_diag_synth.json`.
+
+D5 with 300 readout-only steps (lr 1e-3, batch 4):
+
+```text
+baseline callback_ce: 8.1989
+final    callback_ce: 4.2629
+Δ                   : -3.9359  (-48.0%)
+VERDICT: LIKELY R: the writer encoded the information; the
+                   readout was the bottleneck.
+```
+
+Recorded at `results/exp2_chain_recipe/v11g_d5_ttt.json`.
+
+### Diagnosis (mechanism, not symptom)
+
+1. The **judge** is decision-less (D2 entropy/uniform = 99.9 %; effective
+   rank 1.02; keep mass exactly 0.500 across all rows). However, this
+   is a *symptom* not the disease — the V-projection of the judge
+   still carries chain-content (D5 functionally proves it).
+2. The **writer** does encode chain-specific content (D5 unblocks
+   48 % of the callback CE gap by tuning the readout *alone*). Its
+   structural pair-distinguishability (D3 = 2.2 %) is small but
+   information-theoretically sufficient.
+3. The **readout** is the structural bottleneck. After 4 000 joint
+   steps the readout has learned essentially random projections
+   from M_c — the LM-loss signal it received was attenuated by the
+   router's ~1 % alpha_mem (D5 demonstrates ~3.9 nats of recoverable
+   callback CE remained on the table after 4 000 steps).
+4. The **router** locked the memory pathway closed
+   (`alpha_mem_max = 0.0092`, `frac_open = 0`) before the readout had
+   time to converge. Cause: every step the readout's m^t worsens the
+   LM loss, the router learns to route around it. Effect: the readout
+   gets even less gradient. Lock-in.
+5. v9c worked because its readout norm magnitude (`m^t`-norm/embed
+   `~ 165` at step 500 in chain_v7_p0_simplegate; `~ 77` at step 4 000
+   in v11g) was preserved by `simple_gate`'s scalar boost; it did
+   *NOT* mean the writer was producing structurally distinct M_c —
+   D3 says it almost certainly was content-blind by structural metrics
+   in v9c too.
+
+### Architectural fix shipped: scaffolded readout warmup (v11r)
+
+`train_chain.py` — new CLI knobs:
+
+| flag | default | purpose |
+|------|---------|---------|
+| `--readout_warmup_steps` | 0 (off) | Phase 1 length. Freezes writer + router + backbone + LM head; only the readout (`memory_readout.W_Q/W_K/W_V/out_norm`) trains. |
+| `--readout_warmup_router_bias` | 4.0 | `mem_bias` value held throughout phase 1. Forces routing toward memory so the readout receives strong LM gradient. |
+| `--readout_warmup_anneal_steps` | 200 | After phase 1, linearly anneal `mem_bias` from `--readout_warmup_router_bias` back to `--router_mem_bias_init` over this many steps. |
+
+Implementation: `Trainer._readout_warmup_freeze`, `_readout_warmup_unfreeze`,
+`_set_mem_bias`; called from `Trainer.fit` per-step. Smoke-tested on v11g/best
+init: at end of phase 1 (step 4) all groups except readout received zero
+gradient (D1 confirmed); at step 8 (post-anneal) the routing had already
+opened to `alpha_mem_max = 0.0614` (vs 0.0092 on v11g/best — 6× higher) and
+`frac_open = 0.11` (vs 0.0).
+
+### v11r config (single-knob vs v11g)
+
+Adds:
+- `--readout_warmup_steps 500`
+- `--readout_warmup_router_bias 4.0`
+- `--readout_warmup_anneal_steps 200`
+- `--contrastive_infonce_weight 0.5` with 500-step warmup (same as v11q)
+- `--diagnose_grad_groups`
+- `--diagnose_memory_dynamics`
+
+Everything else identical to v11g (attention_parity +4/0, gated update,
+hidden_14 extract source, P2 readout norm 0.05, P0 evidence curriculum,
+4 000 steps, lr_memres=5e-5, lr_backbone=2e-5, callback_loss_weight=3.0).
+
+### Decision triggers (v11r)
+
+| step | required signal |
+|------|-----------------|
+| 200 (mid-warmup) | `nce_gap > +0.5` (readout learning to discriminate). |
+| 500 (end-warmup, pre-anneal) | `||m^t||/||embed|| ∈ [0.3, 50]`; `judge_row_entropy_norm < 1.0` (D2 dropping). |
+| 1000 (post-anneal) | `pa_cb_dsh > +0.020`, `pa_cb_evidence_lift > +0.020`, `alpha_mem_max > 0.05` (router did not re-close). |
+| 2000 | `pa_cb_dsh > +0.050` (architectural path is real). |
+| 4000 | `pa_cb_dsh > +0.100` (head-line goal). |
+
+KILL @ step 1000 with `alpha_mem_max < 0.01`: warmup did not escape
+lock-in; relaunch with longer warmup (1 000 steps) or stronger
+force-open bias (+6).
+
+### Queue position
+
+GH200 watchdog queue order (oldest mtime first):
+1. v11j — currently running.
+2. v11k — next up (no_evidence ablation).
+3. **v11r — slot 3, the architectural-fix experiment.**
+4. v11l — frozen-backbone control.
+5. v11q — InfoNCE alone (no warmup); ablation isolating supervision-vs-architecture.
+6. v11m, v11p — Chinchilla scaling experiments (last, lowest-leverage given the audit).
+
+Sources of v11r being a "load-bearing experiment":
+1. It is the *only* current run that targets the diagnosed
+   readout-router lock-in directly.
+2. The diagnostic stack (D1-D5) ships inside v11r, so its log will
+   double as a longitudinal dataset of how all five metrics evolve
+   under the new training regime — the exact signal we need to
+   decide whether to scale to 4 B / megacorpus or pivot the
+   architecture again.
+
+### Files added / changed (this iteration)
+
+```
+tools/build_synthetic_persona_callback.py    (D4 corpus generator)
+tools/d5_ttt_readout.py                      (D5 standalone tool)
+src/modeling_memres.py                       (MemoryBlock.judge_attention helper)
+src/train_chain.py                           (D1/D2/D3 telemetry + fix A flags)
+Scripts/train_v11r_ap_readout_warmup_gh200.sh  (v11r launcher)
+paper_artifacts/chains/synthd4_persona_callback_train_s512.pt
+paper_artifacts/chains/synthd4_persona_callback_val_s512.pt
+results/exp2_chain_recipe/v11g_diag_synth.json   (audit data)
+results/exp2_chain_recipe/v11g_d5_ttt.json       (audit data)
+```
+
+---
+
+## v11 campaign — InfoNCE contrastive supervision (2026-05-01 ~06:07 UTC)
+
+User directive 2026-05-01 ~05:54 UTC after the v11g/h/i diagnostic
+review and the post-v11i full rundown:
+> "add a contrastive loss to the GH200, queued"
+
+### Hypothesis under test (v11q)
+
+The v11g grow-then-decay pattern admits two compatible mechanisms:
+backbone co-evolution (b) and readout/writer overfit (a) — but it
+*also* admits a third axis we haven't isolated: the memory subsystem
+is supervised only by next-token CE on callback tokens (<5% of
+training tokens), routed through three softmaxes (judge → depth →
+readout) before any gradient touches the writer. The training
+signal is sparse, indirect, and noisy. v11q tests whether the
+right fix is *dense supervision on Δ_sh-m directly*, before
+attempting any architectural pivot (per-block memory refresh,
+moving m^t out of the depth softmax, two-tier memory).
+
+### What v11q changes (single-knob vs v11g)
+
+`--contrastive_infonce_weight 0.5` with linear ramp 0.05 → 0.5
+over the first 500 steps (`--contrastive_infonce_warmup_steps 500`,
+`--contrastive_infonce_initial_weight 0.05`). Default temperature
+1.0. Callback-only scoring (default `True`). Everything else
+identical to v11g (`attention_parity` +4/0, P0 evidence-aware
+curriculum, P2 readout norm 0.05, hidden_14 extract source,
+`window_k=3`, batch=4, grad_accum=2, lr_memres=5e-5,
+lr_backbone=2e-5, 4 000 steps, 200-step warmup).
+
+### Code change shipped pre-launch
+
+`train_chain.py` — new CLI knobs:
+
+* `--contrastive_infonce_weight <float>` (default 0.0): for each
+  batch element i, score last session i under every batch element
+  j's M_c (B*B forward on the last session only — TBPTT chain is
+  reused). Cross-entropy with diagonal=positive, gradient flows
+  through M_c[j] for all j so the off-diagonal pressure pushes
+  M_c[j] _away_ from chain i's content. Direct attack on
+  Δ_sh-m ≈ 0.
+* `--contrastive_infonce_temperature <float>` (default 1.0): NLL
+  values are typically [1, 4] nats so T=1.0 is natural; lower T
+  sharpens.
+* `--contrastive_infonce_initial_weight <float>` (default
+  =`--contrastive_infonce_weight`) and
+  `--contrastive_infonce_warmup_steps <int>` (default 0): linear
+  ramp.
+* `--contrastive_infonce_callback_only` /
+  `--no-contrastive_infonce_callback_only` (default True): score
+  per-pair NLL only on callback-supervision tokens (with fallback
+  to all valid tokens when no callback is present). Concentrates
+  the contrastive signal on the tokens that actually require
+  memory.
+
+The InfoNCE block sits after the existing `--neg_chain_weight`
+(single-negative hinge) and `--in_chain_contrast_weight`
+(perturbation hinge) blocks. All three are independently
+toggleable; v11q runs InfoNCE alone for clean attribution.
+
+Side fix (carried in the same commit): the in-chain perturbation
+slot variable was named `F`, which silently shadowed
+`import torch.nn.functional as F` for the rest of `_train_step`.
+Renamed to `slot_idx` so InfoNCE's `F.cross_entropy` works.
+Smoke-tested locally on H100: 5 steps run cleanly,
+`nce 1.46x diag 5.5 off 5.4 gap −0.08` at step 1 (uniform-class
+baseline `ln(B=4) ≈ 1.386`, expected at init), throughput
+~5k tok/s on H100 (vs 6k baseline; ~25% per-step overhead).
+
+### v11q decision triggers (sharper than v11g; contrastive directly attacks Δ_sh-m)
+
+* step 200  — `pa_cb_dsh > 0` AND `||m^t||/||embed|| ∈ [0.3, 50]`
+  AND `nce_gap (off − diag) > 0`
+* step 500  — `pa_cb_dsh > +0.005` AND `nce_gap > +0.05`
+* step 1000 — `pa_cb_dsh > +0.020` (vs v11g's +0.005 — the
+  contrastive objective should hit this faster because we're
+  optimising it directly)
+* step 2000 — `pa_cb_dsh > +0.030` AND standard `Δ_sh-m > +0.005`
+* step 4000 — standard `Δ_sh-m > +0.010` (final calibration test)
+* **KILL: step 1000 with `pa_cb_dsh < 0` OR `nce_gap ≤ 0`** —
+  contrastive failed to make the readout content-specific even
+  with dense supervision. The architecture is the wall, not the
+  pedagogy. Pivot to the architectural axis (per-block memory
+  refresh / move m^t out of depth softmax / two-tier memory).
+
+### Why this is the load-bearing experiment
+
+v11l (frozen backbone) tests whether mechanism (b) dominates;
+v11p (frozen + Chinchilla + mega) is the headline scaling test
+under that hypothesis. **Neither addresses the supervision-deficit
+hypothesis.** v11q does. The three together form a diagnostic
+fork that resolves the v11g grow-then-decay attribution:
+
+* **v11l works (no decay) but v11q stays flat** → mechanism (b)
+  dominates; backbone co-evolution is the structural problem and
+  freezing is the answer. Ship the recipe with `--freeze_backbone`.
+* **v11q works (Δ_sh-m positive at step 1000) but v11l decays** →
+  pedagogy was the bottleneck; sparse callback-CE-only supervision
+  was insufficient and dense contrastive supervision opens the
+  channel even with the backbone trainable. Ship the recipe with
+  contrastive aux loss and full backbone training.
+* **Both work** → both axes contribute; combine them in the next
+  cell (v11r).
+* **Neither works** → the v11 architectural recipe (Block-AttnRes
+  on m^t inside the same softmax as `b_k`) is structurally broken
+  even with dense supervision and a stable backbone target.
+  Architectural pivot required: B1 (per-block memory refresh) or
+  B5 (two-tier memory). This is the cleanest single-experiment
+  falsification of the paper's "implicit cognitive routing via
+  depth softmax" claim we have in flight.
+
+### Status (2026-05-01 ~06:11 UTC)
+
+* **v11q_ap_contrastive** — ENQUEUED on GH200 watchdog. Spec
+  `paper_tools/cloud_watchdog/queue/1777615619_chain_v11q_ap_contrastive_gh200.json`,
+  launcher `scripts/train_v11q_ap_contrastive_gh200.sh`. mtime
+  manually set to `2026-04-30 23:27:24.700 +0000` (between v11l
+  and v11m) so the watchdog's `ls -1tr` ordering puts v11q in
+  **slot 3** of the queue: v11j (running) → v11k → v11l → **v11q**
+  → v11m → v11p. ETA-to-start: ~9 h (v11j ~5 h remaining +
+  v11k 3 h + v11l 3 h). The l ↔ q diagnostic fork resolves in
+  ~12.3 h after v11q starts (3.3 h to step 4000), well before the
+  ~27 h Chinchilla cells launch.
+
+---
+
+## v11 campaign — frozen-backbone + Chinchilla expansion (2026-04-30 ~22:30 UTC)
+
+User directive 2026-04-30 ~22:30 UTC after the v11g grow-then-decay
+review:
+> "It seems to me that a frozen backbone with only tuning the
+> summarizer for memory is now a necessary ablation study, can you
+> make one in the image of v11g and add it to the gh200 queue?
+> remove the 4B model. And after that, add any tests you deem
+> necessary onto the queue as well. If data is issue, make more
+> data. I know from a fact that attention parity works better, so
+> there's no need there. Think of a way we can apply the chincilla
+> budget to our system."
+
+### What v11g actually showed (the trigger for this expansion)
+
+Single-cell PA-eval trajectory of `chain_v11g_ap_baseline_gh200` on
+GH200:
+
+| step | α_mem_max | top sublayers | PA CB Δnm-m | PA CB Δsh-m |
+|---:|---:|---|---:|---:|
+| 200 | 0.0047 | l54, l53, l13 | +0.0181 | −0.0010 |
+| 400 | 0.0108 | l12, l54, l13 | **+0.0360 ← peak** | +0.0011 |
+| 600 | 0.0124 | l12, l13, l11 | +0.0301 | +0.0156 |
+| 800 | 0.0111 | l12, l11, l13 | +0.0152 | +0.0014 |
+| 1000 | 0.0113 | l12, l13, l9 | **−0.0191** | −0.0099 |
+| 1200 | 0.0104 | l12, l13, l11 | −0.0124 | −0.0006 |
+| 1400 | 0.0102 | l13, l12, l11 | −0.0174 | +0.0218 |
+
+`α_mem_max` peaks at step 600 then monotonically declines while
+`α_mem_mean` keeps creeping up (0.0025 → 0.0034) — the depth router
+is *redistributing* memory mass from a few sharp sublayers across
+many shallow ones, not closing the channel. Top sublayers shifted
+from {l54, l53} late at step 200 to {l11, l12, l13} early by step
+400 and stayed there. This is the canonical attention_parity
+"grow-then-decay" pattern that v8a/v8b/v11g all exhibit on the
+matched-distribution PA-eval; v9c is the only run on record that
+*didn't* decay (it bootstrapped slowly through step 1000 then
+plateaued through step 4000 at +0.12 to +0.18 PA CB Δnm-m).
+
+Two competing mechanisms are consistent with the observations:
+
+* **(b) Backbone co-evolution** — as the trainable backbone fine-
+  tunes its block-AttnRes summary heads (`b_0..b_{N-1}`) for the
+  LME chain task, those heads become better-conditioned predictors,
+  the depth softmax in `attention_parity` reallocates mass to them,
+  and `m^t` loses its voice. This is structural to AP (block
+  summaries compete inside the same softmax as memory).
+* **(a) Readout / writer overfit** — the memory subsystem itself
+  drifts toward a degenerate fit on the training distribution, and
+  pa_cb_dnm reverses sign on the matched-distribution eval because
+  the readout's content-conditioning learnt during steps 200–600
+  has been over-specialised by step 1000.
+
+Independently of which dominates, the memory subsystem is *literally
+from-scratch*: the load report shows 18/18 memres tensors MISSING
+from the pretrained Qwen3-0.6B checkpoint. With ~9.7 M from-scratch
+parameters and v11g's ~49 M training tokens, the run is at ~25% of
+the Chinchilla token budget for this subsystem. Both axes (frozen
+backbone, Chinchilla token budget) therefore admit clean single-knob
+tests.
+
+### v11 second-wave cells (replaces 4B mega; queued 2026-04-30 ~22:35 UTC)
+
+| cell | machine | corpus | step budget | trains | bias | special |
+|---|---|---|---:|---|---|---|
+| **v11l_ap_frozen_backbone** | GH200 | v11_lme_msc | 4 000 | memres-only | +4/0 | `--freeze_backbone`; otherwise IDENTICAL to v11g (single-knob ablation) |
+| **v11m_ap_chinchilla** | GH200 | v11_lme_msc | 16 000 | memres + backbone | +4/0 | k=4 / 12 (resample), carry_state; 4× more steps + deeper TBPTT; ~262 M tokens (1.35× Chinchilla for memres) |
+| **v11p_ap_frozen_chinchilla_mega** | GH200 | **v11_mega** (67 745 chains) | 25 000 | memres-only | +4/0 | `--freeze_backbone`, `--lr 1e-4` (2× v11g), k=4, carry_state, burn_in 12 resampled; ~410 M tokens (2.1× Chinchilla); the v11 HEADLINE replacement |
+
+All three: `attention_parity`, `--router_recent_bias_init 4
+--router_mem_bias_init 0`, `--memres_gate_init 0.0`,
+`--memres_readout_norm_init 0.05`, `--curriculum_competition_bias 1.0`,
+`--callback_loss_weight 3.0`, `--save_best_metric phase_aligned`. v11l
+mirrors v11g's lr / warmup / window_k for clean single-knob comparison;
+v11m and v11p apply the Chinchilla-budget axis (longer training, deeper
+recurrence) to test the "memres is from-scratch and token-starved"
+hypothesis.
+
+### v11l decision triggers (single-knob vs v11g)
+* step 200 — `α_mem_max > 0` AND `||m^t||/||embed|| ∈ [0.3, 50]`
+* step 500 — `α_mem_max > 5e-3` AND `pa_cb_dnm > +0.005` AND
+  `pa_cb_evidence_lift > +0.005`
+* step 1000 — `α_mem_max > 1e-2` (not decaying — vs v11g step 1000
+  which sat at 0.011 and was already declining from peak)
+* step 2000 — standard `Δ_sh-m > +0.005`
+* KILL: step 1000 with `α_mem_max < 1e-3`. Frozen backbone *and*
+  attention_parity collapsed → rules out (b) entirely; the decay is
+  internal to memres and the next move is readout-regularisation.
+
+### v11m decision triggers (Chinchilla budget on full training)
+* step 1000 — `α_mem_max > 5e-3` AND `pa_cb_dnm` not yet collapsed
+  (matches v11g step 600–800)
+* step 4000 — `pa_cb_dnm > +0.05` (4× more steps should give v9c-tier
+  gain by here; v9c step 1400 was +0.053)
+* step 8000 — `pa_cb_dsh > +0.010` (content-specific, not just
+  unconditional pull)
+* step 16000 — standard `Δ_sh-m > +0.005`
+* KILL: step 4000 with `pa_cb_dnm < 0` AND `α_mem_max < 5e-3` →
+  Chinchilla budget didn't fix the collapse; falsifies token-
+  starvation as the dominant mechanism.
+
+### v11p decision triggers (HEADLINE; frozen + Chinchilla + mega)
+* step 1500 (~1.5h) — `α_mem_max > 0` AND `||m^t||/||embed|| ∈ [0.3, 50]`
+* step 5000 (~5h) — `α_mem_max > 1e-2` AND `pa_cb_dnm > +0.05`
+* step 12500 (~12h) — `pa_cb_dsh > +0.020` AND `α_mem_max` stable or
+  growing (NOT decaying like v11g)
+* step 25000 (~24h) — standard `Δ_sh-m > +0.010`
+* KILL: step 5000 with `α_mem_max < 1e-3`. If frozen backbone +
+  Chinchilla budget + mega corpus + softer bias + readout rescale all
+  together cannot open the channel, the v11 architectural recipe is
+  falsified and a routing intervention is required before any further
+  scaling.
+
+### Why these three cells (decision-tree compactness)
+
+* If **v11l works (no decay) but v11m still decays** → mechanism (b)
+  dominates: backbone co-evolution drives the AP softmax to crowd memory
+  out. Forces a routing intervention (e.g., separate scalar gate that
+  doesn't enter the same softmax as `b_k`, or a stop-gradient on
+  block summaries during memory-update windows) before scaling.
+* If **v11l decays AND v11m decays the same way** → mechanism (a)
+  dominates: readout / writer overfit. The fix is regularisation /
+  contrastive aux on memory writes, not architecture.
+* If **v11m grows monotonically past step 8000 while v11g decayed by
+  step 1400** → memres was simply token-starved; v11p will likely
+  succeed too and the v11 recipe ships unchanged but with a 4×
+  longer step budget.
+* **v11p** is the cleanest configuration we can build with the
+  existing flags: from-scratch memres on a stable backbone target
+  (no co-evolution), 2.1× Chinchilla token budget, 10× larger corpus,
+  deeper recurrence, longer warmup. If this *still* shows the
+  grow-then-decay pattern, the v11 architectural recipe (with
+  attention_parity locked) is structurally broken and we need to
+  break the b_k vs m^t softmax competition before any further
+  scaling work is meaningful.
+
+### Removed: v11_4b_mega_gh200 (2026-04-30 ~22:30 UTC)
+
+* **Status:** REMOVED from queue, launcher deleted.
+* **Why:** died at startup with CUDA OOM (`model.to(device)` at the
+  4B preset's 52 GB peak collided with leftover allocations from the
+  watchdog launch race; even after the `gpu_is_busy` patch, the 4B
+  run is unstable on a 94 GB GH200 once activations + grad checkpoints
+  + AdamW state for the 4B backbone all land at once). The 4B was
+  itself a backoff from 8B for the same reason.
+* **Replaced by:** `v11p_ap_frozen_chinchilla_mega_gh200`. Same
+  headline question (does the recipe scale?) reframed under the
+  user-directed correction (frozen backbone, attention_parity
+  decided): instead of testing "deeper backbone" we test "biggest
+  from-scratch memres budget on a stable backbone target." The
+  Qwen3-4B backbone wasn't load-bearing for any v11 hypothesis —
+  every architectural lesson (P0–P5) was discovered on the 0.6B
+  preset.
+* **Spec file removed:** `paper_tools/cloud_watchdog/queue/1777585825_chain_v11_4b_mega_gh200.json`.
+* **Launcher removed:** `Scripts/train_v11_4b_mega_gh200.sh`.
+
+---
+
 ## v11 campaign — evidence-aware curriculum + bootstrap fix (2026-04-30 ~21:30 UTC)
 
 User directive 2026-04-30 ~21:00 UTC after the v10 audit:

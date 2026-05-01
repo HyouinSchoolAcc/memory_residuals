@@ -54,10 +54,10 @@ residuals reference is in [`atn_residuals.pdf`](atn_residuals.pdf).
 
 ## Currently running: v11
 
-v11 fixes P0/P1/P2 simultaneously and runs as a 7-cell ablation
-matrix. The decision triggers (step-200 / step-500 / step-1000 /
-KILL) for every cell are inlined in the launcher comments under
-`Scripts/train_v11*.sh`.
+v11 fixes P0/P1/P2 simultaneously and runs as an 11-cell ablation
+matrix (1 local + 10 GH200). The decision triggers (step-200 /
+step-500 / step-1000 / KILL) for every cell are inlined in the
+launcher comments under `Scripts/train_v11*.sh`.
 
 | cell | host | routing | knob change vs v9c | what it tests |
 |---|---|---|---|---|
@@ -67,7 +67,35 @@ KILL) for every cell are inlined in the launcher comments under
 | `train_v11i_ap_pm4_gh200` | GH200 | `attention_parity` +4 / **−4** | reverts to legacy v3/v10b bias | with P0 + P2 in place, can the v3 default still recover? |
 | `train_v11j_ap_carry_depth_gh200` | GH200 | `attention_parity` +4 / 0 | `window_k = 4`, `--carry_state`, `--burn_in_max 12 --burn_in_resample` | closes the train/eval depth gap (P5) — primary lever against the standard Δ_sh-m ≈ 0 problem |
 | `train_v11k_ap_no_evidence_gh200` | GH200 | `attention_parity` +4 / 0 | reverts P0 only (legacy `v6_lme_msc` corpus, uniform "evidence") | clean A/B isolating P0's contribution |
-| `train_v11_4b_mega_gh200` | GH200 | `attention_parity` +4 / 0 | 4 B backbone, `hidden_18`, L_E = 10, ~365 k-session mega-corpus | v11 headline run; queued *after* v11{g,h,i,j,k} validate the recipe |
+| **`train_v11r_ap_readout_warmup_gh200`** | GH200 | `attention_parity` +4 / 0 | **`--readout_warmup_steps 500 --readout_warmup_router_bias 4.0` + `--contrastive_infonce_weight 0.5`** | architectural fix A: targets the readout-router lock-in surfaced by D5 audit on v11g/best (writer encodes content; readout never converges because router closes early). Phase 1 trains readout in isolation under forced-open routing; phase 2 unfreezes and anneals. **Highest-leverage v11 cell — slot 3 in the queue.** |
+| `train_v11l_ap_frozen_backbone_gh200` | GH200 | `attention_parity` +4 / 0 | `--freeze_backbone`; otherwise IDENTICAL to v11g | single-knob ablation: is v11g's grow-then-decay caused by backbone co-evolution (block summaries crowding `m^t` out of the AP softmax)? |
+| `train_v11m_ap_chinchilla_gh200` | GH200 | `attention_parity` +4 / 0 | 16 000 steps, `window_k=4`, `--carry_state`, `--burn_in_max 12 --burn_in_resample`; ~262 M tokens | applies the Chinchilla budget to the from-scratch ~9.7 M-param memres subsystem (was at ~25 % of Chinchilla in v11g) |
+| `train_v11p_ap_frozen_chinchilla_mega_gh200` | GH200 | `attention_parity` +4 / 0 | `--freeze_backbone` + `v11_mega` corpus (67 745 chains) + 25 000 steps + `--lr 1e-4` + `window_k=4 --carry_state` | v11 HEADLINE replacement for the killed 4B mega: cleanest from-scratch memres training, stable backbone target, 2.1× Chinchilla token budget, 10× larger corpus |
+| `train_v11q_ap_contrastive_gh200` | GH200 | `attention_parity` +4 / 0 | `--contrastive_infonce_weight 0.5` (warmup 0.05 → 0.5 over 500 steps, callback-only scoring); otherwise IDENTICAL to v11g | dense supervision on Δ_sh-m: B-way InfoNCE over in-batch negatives directly pressures M_c to be chain-specific. Now also serves as the **InfoNCE-without-warmup ablation for v11r** (v11r combines warmup + InfoNCE; q isolates the supervision contribution). |
+
+### Diagnostic toolkit (D1-D5; 2026-05-01)
+
+Five mechanism-level audits that ship with the trainer (`--diagnose_grad_groups`,
+`--diagnose_memory_dynamics`) plus standalone scripts:
+
+- **D1** per-module gradient L2 norms (ratios to backbone). Surfaces gradient
+  starvation in the writer subsystem.
+- **D2** judge attention decisiveness (row-entropy, keep/write mass split,
+  effective rank). Detects decision-less judge softmax.
+- **D3** M_c stability + chain-distinguishability (per-step Frobenius drift,
+  pairwise distance between distinct chains). Detects content-blind writer.
+- **D4** synthetic gold-standard persona-callback corpus
+  (`tools/build_synthetic_persona_callback.py`; 5000 chains × 9 sessions,
+  256-item closed set; ground-truth callable CE → 0 only if memory works).
+- **D5** TTT-on-readout disambiguator
+  (`tools/d5_ttt_readout.py`; freeze writer + router + LM head, train ONLY
+  the readout for 300 steps). Distinguishes "writer broken" vs "readout
+  broken" vs "router locked".
+
+Audit on `v11g/best` (results in `v11g_diag_synth.json`, `v11g_d5_ttt.json`):
+the writer encodes chain-content, the **readout is the bottleneck**, and the
+router locked the memory pathway closed before the readout converged. v11r is
+the architectural response.
 
 The active run ledger (which cell is doing what right now) is in
 [`results/exp2_chain_recipe/runs.md`](results/exp2_chain_recipe/runs.md).

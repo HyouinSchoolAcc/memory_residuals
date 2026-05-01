@@ -334,6 +334,140 @@ def parse_args() -> argparse.Namespace:
                         "random_earlier (default): perturb a random "
                         "session in [0, window_k-2] each step, so "
                         "every position gets pressured over training.")
+
+    # Multi-negative InfoNCE contrastive loss.  A *batched* upgrade of
+    # the existing single-negative --neg_chain_weight hinge:
+    #
+    # - --neg_chain_weight: hinge `max(0, L_match - L_shuffle + margin)`
+    #   with ONE random out-of-batch chain as negative.  Hard-zero
+    #   gradient when the gap exceeds margin.
+    # - --contrastive_infonce_weight: for each batch element i, score
+    #   last session i under EVERY batch element j's M_c (B*B forward),
+    #   then cross-entropy with diagonal=positive.  Smooth gradient,
+    #   B-1 in-batch negatives per positive, gradient flows through
+    #   M_c[j] for all j (so off-diagonal pressure pushes M_c[j] AWAY
+    #   from chain i's content -- direct attack on Δ_sh-m ≈ 0).
+    p.add_argument("--contrastive_infonce_weight", type=float, default=0.0,
+                   help="Weight on multi-negative InfoNCE contrastive "
+                        "loss.  For each batch element i, scores last "
+                        "session i under all B in-batch M_c's "
+                        "(diagonal=positive, off-diagonal=negative) and "
+                        "minimises cross-entropy.  Cost is +B*B forwards "
+                        "on the last session only (the rest of the TBPTT "
+                        "chain is reused).  At B=4 ~ +30-100% per-step "
+                        "overhead.  0 disables.")
+    p.add_argument("--contrastive_infonce_temperature", type=float, default=1.0,
+                   help="Temperature for the InfoNCE softmax.  Larger = "
+                        "softer (weaker gradient on small NLL gaps); "
+                        "smaller = sharper.  NLL values are typically in "
+                        "[1, 4] nats so T=1.0 gives reasonable softmax "
+                        "dynamics; lower T (e.g. 0.5) when the gap is "
+                        "small and we want the contrast to bite harder.")
+    p.add_argument("--contrastive_infonce_initial_weight", type=float, default=None,
+                   help="Initial value of contrastive_infonce_weight at "
+                        "step 0; ramps linearly to "
+                        "--contrastive_infonce_weight over "
+                        "--contrastive_infonce_warmup_steps.  Default: "
+                        "equal to --contrastive_infonce_weight (no ramp).")
+    p.add_argument("--contrastive_infonce_warmup_steps", type=int, default=0,
+                   help="Linear warmup for contrastive_infonce_weight, "
+                        "ramping from initial -> final over this many "
+                        "steps.  Lets the LM-loss alone shape M_c for "
+                        "the first N steps before the contrastive "
+                        "objective starts pulling on the readout.")
+    p.add_argument("--contrastive_infonce_callback_only",
+                   action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="If true (default), score per-pair NLL only on "
+                        "callback-supervision tokens of the last "
+                        "session, falling back to all valid tokens "
+                        "when no callback span is present.  Concentrates "
+                        "the contrastive signal on the tokens that "
+                        "actually require memory.  Use "
+                        "--no-contrastive_infonce_callback_only to score "
+                        "all valid tokens.")
+
+    # ------------------------------------------------------------------
+    # Diagnostic toolkit (D1 / D2 / D3 from the architecture audit
+    # 2026-05-01).  All three are *lightweight* ablations that surface
+    # mechanism-level signal about whether the writer / judge / readout
+    # are doing their nominal jobs.  Off by default; CLI-flagged on for
+    # diagnostic runs.
+    # ------------------------------------------------------------------
+    p.add_argument("--diagnose_grad_groups",
+                   action="store_true", default=False,
+                   help="D1: log per-module gradient L2 norms each "
+                        "log_every step (extract / M_in / judge / "
+                        "M_judge / readout / router / backbone).  "
+                        "If a memory-subsystem group's norm is "
+                        "<<1%% of the backbone's, gradient is starving "
+                        "that module and the architecture cannot "
+                        "learn it from the LM loss alone -- which is "
+                        "exactly the failure mode we are auditing.")
+    p.add_argument("--diagnose_memory_dynamics",
+                   action="store_true", default=False,
+                   help="D2/D3: at every eval, run a no-grad "
+                        "diagnostic pass over a few held-out chains "
+                        "and log (a) per-row entropy of the judge "
+                        "softmax (D2 -- decision-less judge ~ flat), "
+                        "(b) keep/write mass split (D2), "
+                        "(c) effective rank of M_c (D3), "
+                        "(d) per-step ||M_c^t - M_c^{t-1}||_F (D3 "
+                        "stability) and (e) pairwise Frobenius "
+                        "distance between distinct chains' M_c "
+                        "(D3 distinguishability).")
+    p.add_argument("--diagnose_memory_dynamics_n_chains", type=int,
+                   default=8,
+                   help="Number of held-out chains to use for the "
+                        "D2/D3 diagnostic.  Up to chain_lengths[ci] "
+                        "session-boundary judge calls are made per "
+                        "chain so this is also the cost knob.")
+
+    # ------------------------------------------------------------------
+    # Architectural fix A: scaffolded readout warmup (2026-05-01).
+    # ------------------------------------------------------------------
+    # The D5 audit on chain_v11g_ap_baseline_gh200/best showed that
+    # the writer DOES encode chain-specific content -- with 300 steps
+    # of TTT on the readout alone (frozen writer + router + LM head),
+    # callback CE drops 48% on the synthetic D4 task.  But under the
+    # standard joint-optimisation training, the router closes the
+    # memory pathway (alpha_mem ~ 0.01) before the readout has a
+    # chance to learn to decode, locking in a memory-disabled
+    # solution.  The fix:
+    #
+    #   Phase 1 (steps 0 .. readout_warmup_steps):
+    #     - Force the routing toward memory (mem_bias raised) so the
+    #       readout's gradient is large.
+    #     - Freeze the writer, the router, the backbone, and the LM
+    #       head; only the readout (W_Q, W_K, W_V, out_norm) trains.
+    #     - The readout learns to decode whatever M_c the writer is
+    #       already producing, in isolation from co-optimisation
+    #       pressure to close routing.
+    #   Phase 2 (steps readout_warmup_steps .. end):
+    #     - Unfreeze everything.
+    #     - Anneal the routing bias back toward its natural init over
+    #       readout_warmup_anneal_steps; the LM and the writer can
+    #       now co-evolve, but the readout starts from a competent
+    #       state instead of from random projections.
+    p.add_argument("--readout_warmup_steps", type=int, default=0,
+                   help="Architectural fix A: initial steps where "
+                        "all parameters except the memory_readout "
+                        "are frozen and the router's mem_bias is "
+                        "force-set high.  0 disables the schedule "
+                        "(legacy training).  Recommended: "
+                        "200-500 for a 4000-step run.")
+    p.add_argument("--readout_warmup_router_bias", type=float, default=4.0,
+                   help="The mem_bias value held during phase 1.  "
+                        "softmax((+4, recent_init=4.0)) ~ uniform "
+                        "between memory and recent on a "
+                        "0.6B-attention_parity router; that is enough "
+                        "memory-channel routing to give the readout "
+                        "strong LM gradient.")
+    p.add_argument("--readout_warmup_anneal_steps", type=int, default=200,
+                   help="After phase 1, linearly anneal mem_bias "
+                        "from --readout_warmup_router_bias back to "
+                        "--router_mem_bias_init over this many steps.")
+
     p.add_argument("--burn_in_max", type=int, default=12,
                    help="Maximum number of sessions to unroll under "
                         "no_grad before the TBPTT window starts.  This lets "
@@ -1000,6 +1134,25 @@ class Trainer:
         self.best_eval_ce = float("inf")
         self.global_step = 0
 
+        # Telemetry for the InfoNCE contrastive loss.  Updated per step
+        # in _train_step when --contrastive_infonce_weight > 0; printed
+        # on the throttled training-step log line and pushed to wandb.
+        self._last_contrastive_loss = 0.0
+        self._last_contrastive_diag = 0.0
+        self._last_contrastive_offdiag = 0.0
+        self._last_contrastive_gap = 0.0
+
+        # D1 telemetry: pre-compute per-module gradient-group buckets
+        # once.  Buckets are mutually exclusive (each grad-tracked param
+        # lands in exactly one group), so the sum of squared norms equals
+        # the global ``grad_norm`` reported pre-clip.  See
+        # ``--diagnose_grad_groups`` in build_arg_parser for rationale.
+        if getattr(args, "diagnose_grad_groups", False):
+            self._param_groups_for_telemetry = self._build_telemetry_groups()
+        else:
+            self._param_groups_for_telemetry = {}
+        self._last_grad_norms: dict[str, float] = {}
+
         if args.init_from:
             if self.is_main:
                 print(f"  warm-start (memres params only) from {args.init_from}",
@@ -1207,6 +1360,94 @@ class Trainer:
 
     def _model(self) -> Qwen3MemResForCausalLM:
         return self.wrapped.module if hasattr(self.wrapped, "module") else self.wrapped
+
+    # ------------------------------------------------------------------
+    # D1: per-module gradient-norm telemetry
+    # ------------------------------------------------------------------
+    def _build_telemetry_groups(self) -> dict[str, list[torch.nn.Parameter]]:
+        """Bucket every grad-tracked parameter into one mutually-exclusive
+        named group.  Group names are diagnostic-stable (logged to wandb
+        under ``grad/<group>``) so cross-run comparisons line up.
+
+        Priority order matters: the *first* matching prefix wins.  This
+        is checked at init time (assert sum of group sizes == total
+        param count).  See _compute_grad_norms for the consumer.
+        """
+        groups: dict[str, list[torch.nn.Parameter]] = {
+            "M_in":       [],
+            "extract":    [],
+            "M_judge":    [],
+            "judge":      [],
+            "judge_norm": [],
+            "write_gate": [],
+            "readout":    [],
+            "router":     [],
+            "memres_gate": [],
+            "lm_head":    [],
+            "embed":      [],
+            "backbone":   [],
+            "other":      [],
+        }
+        n_total = 0
+        for name, p in self._model().named_parameters():
+            if not p.requires_grad:
+                continue
+            n_total += 1
+            if "memory_block.M_in" in name and ".extraction_layers" not in name:
+                bucket = "M_in"
+            elif "memory_block.extraction_layers" in name:
+                bucket = "extract"
+            elif "memory_block.M_judge" in name:
+                bucket = "M_judge"
+            elif "memory_block.judging" in name:
+                bucket = "judge"
+            elif "memory_block.judge_norm" in name:
+                bucket = "judge_norm"
+            elif "memory_block.write_gate" in name:
+                bucket = "write_gate"
+            elif "memory_readout" in name:
+                bucket = "readout"
+            elif "depth_router" in name:
+                bucket = "router"
+            elif "memory_gate" in name:
+                bucket = "memres_gate"
+            elif "lm_head" in name:
+                bucket = "lm_head"
+            elif "embed_tokens" in name:
+                bucket = "embed"
+            elif (".layers." in name or "model.norm" in name
+                  or "rotary_emb" in name):
+                bucket = "backbone"
+            else:
+                bucket = "other"
+            groups[bucket].append(p)
+        if self.is_main:
+            sizes = {k: len(v) for k, v in groups.items() if v}
+            n_grouped = sum(sizes.values())
+            print(f"  [D1] gradient-group telemetry: "
+                  f"{n_grouped}/{n_total} params bucketed "
+                  f"(sizes={sizes})", flush=True)
+        return groups
+
+    @torch.no_grad()
+    def _compute_grad_norms(self) -> dict[str, float]:
+        """L2 norm per group, computed AFTER backward and BEFORE
+        clip_grad_norm_ so the values reflect the raw learning signal
+        the optimiser would see in the absence of global clipping.
+
+        DDP handles all-reduce of grads on the underlying tensors, so
+        this is safe to call on any rank; we compute locally on rank 0
+        only (called from the main rank's logging branch).
+        """
+        out: dict[str, float] = {}
+        for name, params in self._param_groups_for_telemetry.items():
+            sq = 0.0
+            for p in params:
+                if p.grad is not None:
+                    sq += float(p.grad.detach().float().pow(2).sum().item())
+            if params:
+                out[name] = sq ** 0.5
+        return out
 
     def _build_optimizer(self):
         a = self.args
@@ -1447,6 +1688,12 @@ class Trainer:
         last_input_ids = None
         last_labels = None
         last_M_c_pre = None  # M_c BEFORE the last session's update, for contrast.
+        last_cb_mask: torch.Tensor | None = None  # last session's CB mask (B, S-1).
+        # Pre-update M_c snapshot for the InfoNCE contrastive forward.
+        # Distinct from last_M_c_pre (which carries memory-dropout
+        # zero-outs); we want the *un-dropped* M_c here so the
+        # diagonal of the B*B contrastive matrix is informative.
+        M_c_for_contrast: torch.Tensor | None = None
         for t in range(a.window_k):
             session = window[:, t]                         # (B, S)
             input_ids = session[:, :-1]
@@ -1508,6 +1755,10 @@ class Trainer:
                 last_input_ids = input_ids
                 last_labels = labels
                 last_M_c_pre = read_M  # what the loss above conditioned on
+                last_cb_mask = cb_mask_t
+                # Un-dropped M_c (reference, not clone -- keeps grad).
+                # Used by the InfoNCE contrastive forward below.
+                M_c_for_contrast = M_c
 
             # Recurrent memory update: M_c <- judge(M_c, extract(C_t)).
             # extract_source honours config.memres_extract_source: 'embed'
@@ -1606,10 +1857,16 @@ class Trainer:
             # 1. Pick the perturbation slot.  random_earlier rotates the
             #    pressure across all earlier slots so the model can't
             #    learn to "skip" a fixed position.
+            #
+            # NB: the slot index is named ``slot_idx`` (was ``F``); the
+            # latter shadowed the module-level ``import torch.nn.functional
+            # as F`` and silently broke any subsequent F.cross_entropy /
+            # F.softmax call inside _train_step.  The InfoNCE block below
+            # tripped this on the very first run.
             if a.in_chain_perturb_strategy == "session_zero":
-                F = 0
+                slot_idx = 0
             else:  # random_earlier
-                F = rng.randint(0, max(0, a.window_k - 2))
+                slot_idx = rng.randint(0, max(0, a.window_k - 2))
 
             # 2. Sample a distractor session per batch element by
             #    drawing a random other-chain window and taking its
@@ -1619,15 +1876,15 @@ class Trainer:
                 for _ in range(B):
                     _, _, dw, _, _ = self.train_sampler.sample_window()
                     distractor_list.append(dw[0])
-                distractor_F = torch.stack(distractor_list).to(self.device)
+                distractor_slot = torch.stack(distractor_list).to(self.device)
 
-            # 3. Re-build M_c through the window with session F swapped.
+            # 3. Re-build M_c through the window with session slot_idx swapped.
             #    WITH grad -- this is what carries the recall signal
             #    backwards into the intermediate judge / extract steps.
             M_c_pert = M_c_window_start.clone()
             for t in range(a.window_k - 1):
-                if t == F:
-                    sess_t = distractor_F
+                if t == slot_idx:
+                    sess_t = distractor_slot
                 else:
                     sess_t = window[:, t]
                 ids_t = sess_t[:, :-1]
@@ -1652,6 +1909,112 @@ class Trainer:
                 loss_recall - loss_pert + a.in_chain_contrast_margin
             ).clamp(min=0.0)
             total_loss = total_loss + cur_ic_weight * ic_margin
+
+        # ------------------------------------------------------------
+        # Multi-negative InfoNCE contrastive loss.
+        #
+        # For each batch element i, score the last session i under
+        # every batch element j's M_c, then cross-entropy with
+        # diagonal=positive.  Three things happen via gradient:
+        #
+        # 1) L[i,i] decreases: readout uses chain i's own M_c well.
+        # 2) L[i,j] increases for j != i: readout cannot fit chain
+        #    i's last session well using chain j's M_c.
+        # 3) Gradient through M_c[j] (j != i) pushes M_c[j] AWAY
+        #    from chain i's last-session content.
+        #
+        # Direct attack on Δ_sh-m ≈ 0: we _force_ the readout to be
+        # chain-discriminative on callback tokens by making
+        # cross-chain confusion an explicit loss.
+        if a.contrastive_infonce_warmup_steps > 0:
+            nce_init = a.contrastive_infonce_initial_weight
+            if nce_init is None:
+                nce_init = a.contrastive_infonce_weight
+            nce_ramp = min(
+                1.0,
+                self.global_step / max(1, a.contrastive_infonce_warmup_steps),
+            )
+            cur_nce_weight = nce_init + (a.contrastive_infonce_weight - nce_init) * nce_ramp
+        else:
+            cur_nce_weight = a.contrastive_infonce_weight
+
+        if (
+            cur_nce_weight > 0.0
+            and B >= 2
+            and last_input_ids is not None
+            and last_labels is not None
+            and last_cb_mask is not None
+            and M_c_for_contrast is not None
+        ):
+            # Cross product: row b*B + j is (chain b's input, chain j's M_c).
+            # repeat_interleave on inputs (each input row repeated B times)
+            # paired with repeat (cycles M_c B times) yields the (i, j)
+            # cross product in row-major order.
+            inputs_xy = last_input_ids.repeat_interleave(B, dim=0)        # (B*B, S-1)
+            labels_xy = last_labels.repeat_interleave(B, dim=0)            # (B*B, S-1)
+            cb_xy = last_cb_mask.repeat_interleave(B, dim=0)               # (B*B, S-1)
+            M_c_xy = M_c_for_contrast.repeat(B, 1, 1)                      # (B*B, K, d)
+
+            out_nce = self.wrapped(
+                input_ids=inputs_xy,
+                labels=None,
+                M_c=M_c_xy,
+                attention_mask=causal_mask_dict,
+            )
+            logits_nce = out_nce.logits
+
+            # Per-token NLL with the standard HF causal-LM shift.
+            shift_logits = logits_nce[..., :-1, :].contiguous()      # (B*B, S-2, V)
+            shift_labels = labels_xy[..., 1:].contiguous()            # (B*B, S-2)
+            shift_cb = cb_xy[..., 1:].contiguous().to(shift_logits.dtype)
+            nll_per_pos = F.cross_entropy(
+                shift_logits.flatten(0, 1),
+                shift_labels.flatten(),
+                reduction="none",
+                ignore_index=-100,
+            ).view_as(shift_labels)                                  # (B*B, S-2)
+            valid = (shift_labels != -100).to(shift_logits.dtype)
+
+            # Per-pair score: mean NLL on callback tokens (when present
+            # and callback_only is set), else mean NLL on all valid
+            # tokens.  Callback-only concentrates the contrastive
+            # gradient on tokens that actually require memory.
+            cb_mass = (shift_cb * valid).sum(dim=1)                  # (B*B,)
+            full_denom = valid.sum(dim=1).clamp_min(1.0)
+            full_mean = (nll_per_pos * valid).sum(dim=1) / full_denom
+            if a.contrastive_infonce_callback_only:
+                cb_denom = cb_mass.clamp_min(1.0)
+                cb_mean = (nll_per_pos * shift_cb * valid).sum(dim=1) / cb_denom
+                use_cb = cb_mass > 0
+                score_nll = torch.where(use_cb, cb_mean, full_mean)
+            else:
+                score_nll = full_mean
+
+            # Reshape into (B, B): row i = input chain i, col j = M_c chain j.
+            L = score_nll.view(B, B)                                 # (B, B)
+            T_nce = max(1e-3, float(a.contrastive_infonce_temperature))
+            nce_logits = -L / T_nce                                  # higher = lower NLL = better fit
+            targets = torch.arange(B, device=L.device)
+            loss_nce = F.cross_entropy(nce_logits, targets, reduction="mean")
+            total_loss = total_loss + cur_nce_weight * loss_nce
+
+            # Telemetry: diag (positive NLL), off-diag (negative NLL),
+            # gap (off - diag, want positive and growing over training).
+            with torch.no_grad():
+                diag = L.diagonal()
+                off = L.sum() - diag.sum()
+                n_off = max(1, B * B - B)
+                self._last_contrastive_loss = float(loss_nce.detach().item())
+                self._last_contrastive_diag = float(diag.mean().item())
+                self._last_contrastive_offdiag = float(off.item() / n_off)
+                self._last_contrastive_gap = (
+                    self._last_contrastive_offdiag - self._last_contrastive_diag
+                )
+        else:
+            self._last_contrastive_loss = 0.0
+            self._last_contrastive_diag = 0.0
+            self._last_contrastive_offdiag = 0.0
+            self._last_contrastive_gap = 0.0
 
         total_loss = total_loss / a.grad_accum
         total_loss.backward()
@@ -2030,6 +2393,177 @@ class Trainer:
             "mt_norm_ratio_max": float(max(ratios)),
         }
 
+    # ------------------------------------------------------------------
+    # D2 / D3: memory-dynamics diagnostic
+    # ------------------------------------------------------------------
+    @torch.no_grad()
+    def _memory_dynamics_eval(self) -> dict:
+        """Single-pass audit of the writer over a few held-out chains.
+
+        Returns a flat dict that goes through the same ``eval/<key>``
+        wandb namespace as everything else.  Cost: one extract_source +
+        one judge call per (chain, session); no LM forward, no readout.
+
+        Metrics produced:
+
+          D2 (judge decisiveness):
+            judge_row_entropy_mean  -- mean over (chains, sessions, K
+                rows) of -sum(p log p) of the judge softmax.  Floor:
+                0 (one-hot judge); ceiling: log(2K) (uniform; the
+                judge made no decision).
+            judge_keep_mass_mean    -- fraction of attention weight on
+                the [M_c^{t-1}] half across (chains, sessions, rows).
+                0.5 == prior and candidate are interchangeable; far
+                from 0.5 means the judge differentiates (good, but
+                doesn't say which direction is desired -- read in
+                conjunction with judge_keep_mass_var to detect
+                row-level switching behaviour).
+            judge_keep_mass_var     -- variance over rows.  Low var +
+                ~0.5 mean => uniform-collapsed judge (BAD).  High var
+                + middling mean => some rows keep, others write (GOOD).
+            judge_effective_rank    -- exp(H(s_norm)) where s are the
+                singular values of the average judge attention matrix
+                ((K, 2K) over the corpus).  Low rank => the judge has
+                learned a low-dimensional decision pattern.
+
+          D3 (M_c stability + chain-distinguishability):
+            Mc_step_delta_mean / max  -- mean / max
+                ||M_c^t - M_c^{t-1}||_F / ||M_c^{t-1}||_F over
+                sessions t>=1.  0 means the writer is a no-op; >>1
+                means it's overwriting wholesale.
+            Mc_pair_dist_mean / min   -- mean / min pairwise
+                ||M_c^T_chainA - M_c^T_chainB||_F / sqrt(K * d)
+                across all pairs of audited chains (T = final session
+                of each chain).  Near-zero ==> writer is producing
+                content-blind M_c (the SAME memory regardless of the
+                chain content); large + uniform ==> distinguishable.
+            Mc_self_dist_mean         -- ||M_c^T||_F / sqrt(K * d) for
+                each chain, averaged.  Sanity-check against the pair
+                distance: pair << self ==> chains DO collapse to
+                roughly the same M_c.
+        """
+        a = self.args
+        model = self._model()
+        model.eval()
+        ev = self.eval_corpus
+        n_chains = min(a.diagnose_memory_dynamics_n_chains, len(ev))
+        if n_chains < 1:
+            return {}
+
+        # extract_source / memory_block / write_gate live on the inner
+        # Qwen3MemResModel, not on the ForCausalLM wrapper.
+        inner = model.model
+        K = int(model.config.memres_num_vectors)
+        d = int(model.config.hidden_size)
+        log_2K = math.log(2.0 * K)
+        device = self.device
+
+        all_row_entropies: list[float] = []
+        all_keep_means: list[float] = []
+        all_keep_vars: list[float] = []
+        attn_running: torch.Tensor | None = None  # (K, 2K) accumulator
+        attn_n = 0
+
+        step_deltas: list[float] = []
+        Mc_finals: list[torch.Tensor] = []  # one per chain, on CPU.
+
+        for ci in range(n_chains):
+            length = int(ev.chain_lengths[ci])
+            if length < 2:
+                continue
+            M_c: torch.Tensor | None = None
+            for t in range(length):
+                sess = (ev.chain_session_at(ci, t)
+                        .to(device).unsqueeze(0))  # (1, S)
+                C = inner.extract_source(sess)  # (1, N, d)
+                M_new = inner.memory_block.extract(C)  # (1, K, d)
+                M_c_prev = (M_c if M_c is not None
+                            else torch.zeros_like(M_new))
+                attn = inner.memory_block.judge_attention(M_c_prev, M_new)
+                # attn: (1, K, 2K)
+                a_clipped = attn.clamp_min(1e-12)
+                row_ent = -(a_clipped * a_clipped.log()).sum(dim=-1)  # (1, K)
+                all_row_entropies.append(float(row_ent.mean().item()))
+                keep = attn[..., :K].sum(dim=-1)  # (1, K)
+                all_keep_means.append(float(keep.mean().item()))
+                all_keep_vars.append(float(keep.var(unbiased=False).item()))
+                # Running attention pattern for effective-rank.
+                if attn_running is None:
+                    attn_running = attn.squeeze(0).double().clone()
+                else:
+                    attn_running = attn_running + attn.squeeze(0).double()
+                attn_n += 1
+                # Now produce M_c^t through the gated/competitive path.
+                M_c_new = inner.memory_block.judge(M_c_prev, M_new)
+                if inner.memory_block.update_mode == "gated":
+                    gate_input = torch.cat([M_c_prev, M_new], dim=-1)
+                    g = torch.sigmoid(
+                        inner.memory_block.write_gate(gate_input)
+                    )
+                    M_c_new = (1 - g) * M_c_prev + g * M_c_new
+                if M_c is not None:
+                    delta = (M_c_new - M_c).norm(p="fro")
+                    base = M_c.norm(p="fro").clamp_min(1e-8)
+                    step_deltas.append(float((delta / base).item()))
+                M_c = M_c_new
+            if M_c is not None:
+                Mc_finals.append(M_c.squeeze(0).detach().cpu().float())
+
+        out: dict[str, float] = {}
+        if all_row_entropies:
+            out["judge_row_entropy_mean"] = float(
+                sum(all_row_entropies) / len(all_row_entropies)
+            )
+            out["judge_row_entropy_max_log_2K"] = log_2K
+            out["judge_row_entropy_norm"] = (
+                out["judge_row_entropy_mean"] / log_2K
+            )
+        if all_keep_means:
+            out["judge_keep_mass_mean"] = float(
+                sum(all_keep_means) / len(all_keep_means)
+            )
+            out["judge_keep_mass_var"] = float(
+                sum(all_keep_vars) / len(all_keep_vars)
+            )
+        if attn_running is not None and attn_n > 0:
+            avg_attn = (attn_running / attn_n).float()  # (K, 2K)
+            S = torch.linalg.svdvals(avg_attn).clamp_min(1e-12)
+            s_norm = S / S.sum()
+            entropy = -(s_norm * s_norm.log()).sum().item()
+            out["judge_effective_rank"] = float(math.exp(entropy))
+        if step_deltas:
+            out["Mc_step_delta_mean"] = float(
+                sum(step_deltas) / len(step_deltas)
+            )
+            out["Mc_step_delta_max"] = float(max(step_deltas))
+        if Mc_finals:
+            scale = math.sqrt(float(K * d))
+            self_norms = [float(m.norm(p="fro").item()) / scale
+                          for m in Mc_finals]
+            out["Mc_self_dist_mean"] = float(
+                sum(self_norms) / len(self_norms)
+            )
+            if len(Mc_finals) >= 2:
+                pair_dists: list[float] = []
+                for i in range(len(Mc_finals)):
+                    for j in range(i + 1, len(Mc_finals)):
+                        d_ij = float(
+                            (Mc_finals[i] - Mc_finals[j]).norm(p="fro").item()
+                        ) / scale
+                        pair_dists.append(d_ij)
+                out["Mc_pair_dist_mean"] = float(
+                    sum(pair_dists) / len(pair_dists)
+                )
+                out["Mc_pair_dist_min"] = float(min(pair_dists))
+                # Diagnostic ratio: if pair << self, chains collapse to
+                # the same M_c (writer is content-blind).
+                if out["Mc_self_dist_mean"] > 1e-8:
+                    out["Mc_pair_to_self_ratio"] = (
+                        out["Mc_pair_dist_mean"] / out["Mc_self_dist_mean"]
+                    )
+        out["n_dynamics_chains"] = float(len(Mc_finals))
+        return out
+
     @torch.no_grad()
     def evaluate(self) -> dict:
         a = self.args
@@ -2119,7 +2653,16 @@ class Trainer:
         pa = self._phase_aligned_eval()
         rec = self._routing_recruitment_summary()
         mt = self._readout_magnitude_diag()
-        out = {**legacy, **pa, **rec, **mt}
+        # D2/D3: only computed when explicitly requested (it pulls a
+        # mid-epoch checkpoint sample of judge attention + M_c
+        # trajectories, which is cheap but adds eval-time cost on a
+        # tight schedule).
+        dyn = (
+            self._memory_dynamics_eval()
+            if getattr(a, "diagnose_memory_dynamics", False)
+            else {}
+        )
+        out = {**legacy, **pa, **rec, **mt, **dyn}
         # Ensure model is back in train mode (the helpers above keep
         # it eval; the legacy block at the top of evaluate() also did).
         model.train()
@@ -2142,11 +2685,53 @@ class Trainer:
     # Main loop
     # ------------------------------------------------------------------
 
+    def _readout_warmup_freeze(self) -> None:
+        """Phase 1 of fix A: freeze everything except the readout."""
+        readout_params = set(id(p) for p in
+                             self._model().model.memory_readout.parameters())
+        for n, p in self._model().named_parameters():
+            p.requires_grad_(id(p) in readout_params)
+
+    def _readout_warmup_unfreeze(self) -> None:
+        """Phase 2 of fix A: unfreeze everything for joint training."""
+        for p in self._model().parameters():
+            p.requires_grad_(True)
+
+    def _set_mem_bias(self, value: float) -> None:
+        """Force-set the router's mem_bias parameter to ``value`` for
+        every routing step.  Operates in-place on the buffer; the
+        optimiser may attempt to update it in phase 2 -- that is
+        intended (we *want* the bias to be learnable post-warmup)."""
+        bias = self._model().model.depth_router.mem_bias
+        with torch.no_grad():
+            bias.data.fill_(float(value))
+
     def fit(self) -> None:
         a = self.args
         self.wrapped.train()
         rng = random.Random(a.seed + self.rank * 7919 + 13)
         carry = None
+
+        # Architectural fix A: scaffolded readout warmup.  Freeze the
+        # writer + router + backbone + LM head and force the routing
+        # toward memory before phase 2's joint optimisation can close
+        # the pathway.  See parser help for rationale.
+        if a.readout_warmup_steps > 0:
+            self._readout_warmup_freeze()
+            self._set_mem_bias(a.readout_warmup_router_bias)
+            if self.is_main:
+                n_train = sum(
+                    p.numel() for p in self._model().parameters()
+                    if p.requires_grad
+                )
+                print(
+                    f"  [fix A] readout warmup ENGAGED: phase 1 = "
+                    f"{a.readout_warmup_steps} steps, "
+                    f"router mem_bias forced to "
+                    f"{a.readout_warmup_router_bias}, "
+                    f"{n_train:,} trainable params (readout only).",
+                    flush=True,
+                )
 
         accum_loss = 0.0
         accum_step = 0
@@ -2158,6 +2743,38 @@ class Trainer:
 
         self.optimizer.zero_grad(set_to_none=True)
         while self.global_step < a.steps:
+            # Apply the warmup schedule each step.  Within phase 1 we
+            # also re-apply the bias each step because, even though
+            # the router parameters are frozen in this phase, the
+            # bias buffer can drift on rare numerical paths -- this
+            # makes the schedule explicit.
+            if a.readout_warmup_steps > 0:
+                if self.global_step < a.readout_warmup_steps:
+                    self._set_mem_bias(a.readout_warmup_router_bias)
+                elif self.global_step == a.readout_warmup_steps:
+                    self._readout_warmup_unfreeze()
+                    if self.is_main:
+                        print(
+                            f"  [fix A] readout warmup COMPLETE "
+                            f"@ step {self.global_step}: "
+                            f"unfreezing all params, annealing "
+                            f"mem_bias {a.readout_warmup_router_bias} "
+                            f"-> {a.router_mem_bias_init} over "
+                            f"{a.readout_warmup_anneal_steps} steps",
+                            flush=True,
+                        )
+                elif (self.global_step
+                      < a.readout_warmup_steps
+                      + a.readout_warmup_anneal_steps):
+                    progress = (
+                        (self.global_step - a.readout_warmup_steps)
+                        / max(1, a.readout_warmup_anneal_steps)
+                    )
+                    target = (
+                        a.readout_warmup_router_bias * (1.0 - progress)
+                        + a.router_mem_bias_init * progress
+                    )
+                    self._set_mem_bias(target)
             loss_val, carry = self._train_step(rng, carry)
             accum_loss += loss_val
             tokens_seen += a.window_k * a.session_len * a.batch_size
@@ -2165,6 +2782,17 @@ class Trainer:
             if accum_step < a.grad_accum:
                 continue
 
+            # D1: capture per-module gradient norms BEFORE clip so the
+            # values reflect the optimiser's raw signal, not whatever
+            # max_norm cropped them to.  Cheap (one .pow.sum per param),
+            # gated to log_every cadence so it doesn't burn budget.
+            # Note: self.global_step is incremented just below; check
+            # against (global_step + 1) so the log fires the same step
+            # the print/wandb logging branch picks it up.
+            if (a.diagnose_grad_groups
+                    and self.is_main
+                    and (self.global_step + 1) % a.log_every == 0):
+                self._last_grad_norms = self._compute_grad_norms()
             grad_norm = torch.nn.utils.clip_grad_norm_(
                 self.wrapped.parameters(), a.max_norm
             )
@@ -2185,16 +2813,48 @@ class Trainer:
                     lr_now = [g["lr"] for g in self.optimizer.param_groups]
                     gate_mean = self._model().model.memory_gate.gate.float().mean().item()
                     gate_max = self._model().model.memory_gate.gate.float().abs().max().item()
+                    nce_str = ""
+                    if a.contrastive_infonce_weight > 0.0:
+                        nce_str = (
+                            f"nce {self._last_contrastive_loss:.3f} "
+                            f"diag {self._last_contrastive_diag:.3f} "
+                            f"off {self._last_contrastive_offdiag:.3f} "
+                            f"gap {self._last_contrastive_gap:+.3f} | "
+                        )
                     print(
                         f"step {self.global_step:6d} | loss {loss_t.item():.4f} | "
                         f"lrs {lr_now} | grad_norm {float(grad_norm):.3f} | "
                         f"gate_mean {gate_mean:+.4f} max {gate_max:.4f} | "
+                        f"{nce_str}"
                         f"{tok_sec/1e3:.1f}k tok/s",
                         flush=True,
                     )
+                    # D1: per-module gradient-norm summary.  Format
+                    # focuses on the memres subsystem first, then the
+                    # backbone reference, so a pathological starvation
+                    # signal (memres << backbone) is visually obvious.
+                    if a.diagnose_grad_groups and self._last_grad_norms:
+                        g = self._last_grad_norms
+                        bb = max(g.get("backbone", 0.0), 1e-12)
+                        ratios = {
+                            k: g.get(k, 0.0) / bb
+                            for k in ("M_in", "extract", "M_judge",
+                                      "judge", "readout", "router",
+                                      "memres_gate", "write_gate")
+                            if k in g
+                        }
+                        ratios_str = " ".join(
+                            f"{k}={v:.2e}" for k, v in ratios.items()
+                        )
+                        print(
+                            f"  GRAD @ step {self.global_step}: "
+                            f"backbone {g.get('backbone', 0.0):.3e} | "
+                            f"|g|/|g_bb|: {ratios_str}",
+                            flush=True,
+                        )
                     if self.use_wandb:
                         import wandb
-                        wandb.log({
+                        wandb_payload = {
                             "train/loss": loss_t.item(),
                             "train/lr_memres": lr_now[0],
                             "train/lr_backbone": lr_now[-1],
@@ -2202,7 +2862,21 @@ class Trainer:
                             "train/tok_per_s": tok_sec,
                             "train/gate_mean": gate_mean,
                             "train/gate_abs_max": gate_max,
-                        }, step=self.global_step)
+                        }
+                        if a.contrastive_infonce_weight > 0.0:
+                            wandb_payload["train/contrast_loss"] = self._last_contrastive_loss
+                            wandb_payload["train/contrast_diag"] = self._last_contrastive_diag
+                            wandb_payload["train/contrast_offdiag"] = self._last_contrastive_offdiag
+                            wandb_payload["train/contrast_gap"] = self._last_contrastive_gap
+                        if a.diagnose_grad_groups and self._last_grad_norms:
+                            for k, v in self._last_grad_norms.items():
+                                wandb_payload[f"grad/{k}"] = v
+                            bb = max(self._last_grad_norms.get("backbone", 0.0),
+                                     1e-12)
+                            for k, v in self._last_grad_norms.items():
+                                if k != "backbone":
+                                    wandb_payload[f"grad_ratio/{k}"] = v / bb
+                        wandb.log(wandb_payload, step=self.global_step)
                 t0 = time.time()
                 tokens_seen = 0
             accum_loss = 0.0
@@ -2289,6 +2963,33 @@ class Trainer:
                             f"||m^t|| / ||embed|| mean="
                             f"{metrics['mt_norm_ratio_mean']:.3f} "
                             f"max={metrics.get('mt_norm_ratio_max', float('nan')):.3f}",
+                            flush=True,
+                        )
+                    # D2/D3: writer / judge dynamics summary.  Only
+                    # printed when --diagnose_memory_dynamics is set
+                    # (otherwise the eval dict never contains these
+                    # keys).  Three lines: judge decisiveness, M_c
+                    # step-stability, M_c chain-distinguishability.
+                    if "judge_row_entropy_mean" in metrics:
+                        print(
+                            f"  D2-JUDGE @ step {self.global_step}: "
+                            f"row_entropy={metrics['judge_row_entropy_mean']:.3f} "
+                            f"(uniform={metrics['judge_row_entropy_max_log_2K']:.3f}; "
+                            f"norm={metrics['judge_row_entropy_norm']:.3f}) | "
+                            f"keep_mean={metrics.get('judge_keep_mass_mean', 0.0):.3f} "
+                            f"keep_var={metrics.get('judge_keep_mass_var', 0.0):.4f} | "
+                            f"eff_rank={metrics.get('judge_effective_rank', float('nan')):.2f}",
+                            flush=True,
+                        )
+                    if "Mc_step_delta_mean" in metrics:
+                        print(
+                            f"  D3-MC    @ step {self.global_step}: "
+                            f"Δ_step mean={metrics['Mc_step_delta_mean']:.3f} "
+                            f"max={metrics.get('Mc_step_delta_max', 0.0):.3f} | "
+                            f"self||M||={metrics.get('Mc_self_dist_mean', 0.0):.3f} | "
+                            f"pair={metrics.get('Mc_pair_dist_mean', 0.0):.3f} "
+                            f"min={metrics.get('Mc_pair_dist_min', 0.0):.3f} "
+                            f"(pair/self={metrics.get('Mc_pair_to_self_ratio', float('nan')):.3f})",
                             flush=True,
                         )
                     if self.use_wandb:
@@ -2399,12 +3100,21 @@ def _eval_only_run(trainer: "Trainer") -> dict:
     # Routing + readout are deterministic given the model; sample once.
     rec = trainer._routing_recruitment_summary()
     mt = trainer._readout_magnitude_diag()
+    # D2/D3: also deterministic per checkpoint; sampled once.  Empty
+    # dict when --diagnose_memory_dynamics is not set, which is the
+    # legacy behaviour.
+    dyn = (
+        trainer._memory_dynamics_eval()
+        if getattr(a, "diagnose_memory_dynamics", False)
+        else {}
+    )
     return {
         "pa_n_chains": a.phase_aligned_eval_n_chains,
         "n_seeds": a.eval_seeds,
         "pa": agg,
         "routing": rec,
         "readout": mt,
+        "memory_dynamics": dyn,
     }
 
 
@@ -2449,6 +3159,30 @@ def main() -> None:
                 f"{mt.get('mt_norm_ratio_mean', 0.0):.2f}",
                 flush=True,
             )
+            # D2/D3 summary -- only fires when the diagnostic was
+            # requested (otherwise out["memory_dynamics"] == {}).
+            dyn = out.get("memory_dynamics", {})
+            if dyn:
+                if "judge_row_entropy_mean" in dyn:
+                    print(
+                        f"  D2-JUDGE: row_entropy={dyn['judge_row_entropy_mean']:.3f}"
+                        f" (uniform={dyn.get('judge_row_entropy_max_log_2K', 0.0):.3f}; "
+                        f"norm={dyn.get('judge_row_entropy_norm', 0.0):.3f}) "
+                        f"keep_mean={dyn.get('judge_keep_mass_mean', 0.0):.3f} "
+                        f"keep_var={dyn.get('judge_keep_mass_var', 0.0):.4f} "
+                        f"eff_rank={dyn.get('judge_effective_rank', float('nan')):.2f}",
+                        flush=True,
+                    )
+                if "Mc_step_delta_mean" in dyn:
+                    print(
+                        f"  D3-MC   : Δ_step mean={dyn['Mc_step_delta_mean']:.3f} "
+                        f"max={dyn.get('Mc_step_delta_max', 0.0):.3f} "
+                        f"self||M||={dyn.get('Mc_self_dist_mean', 0.0):.3f} "
+                        f"pair={dyn.get('Mc_pair_dist_mean', 0.0):.3f} "
+                        f"min={dyn.get('Mc_pair_dist_min', 0.0):.3f} "
+                        f"(pair/self={dyn.get('Mc_pair_to_self_ratio', float('nan')):.3f})",
+                        flush=True,
+                    )
             if args.eval_out:
                 import json as _json
                 Path(args.eval_out).parent.mkdir(parents=True, exist_ok=True)

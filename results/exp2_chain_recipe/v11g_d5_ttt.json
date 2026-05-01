@@ -1,0 +1,67 @@
+{
+  "ckpt": "output/chain_v11g_ap_baseline_gh200/best",
+  "train_corpus": "paper_artifacts/chains/synthd4_persona_callback_train_s512.pt",
+  "eval_corpus": "paper_artifacts/chains/synthd4_persona_callback_val_s512.pt",
+  "steps": 300,
+  "batch_size": 4,
+  "lr": 0.001,
+  "max_burn_in": 8,
+  "history": [
+    {
+      "step": 0,
+      "callback_ce": 8.198868885953376,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 50,
+      "callback_ce": 6.1429653193088285,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 100,
+      "callback_ce": 4.940466676620727,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 150,
+      "callback_ce": 4.659683406352997,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 200,
+      "callback_ce": 4.4576365110722,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 250,
+      "callback_ce": 4.30496513082626,
+      "n_chains": 64,
+      "n_tokens": 94
+    },
+    {
+      "step": 300,
+      "callback_ce": 4.262923807539838,
+      "n_chains": 64,
+      "n_tokens": 94
+    }
+  ],
+  "baseline": {
+    "callback_ce": 8.198868885953376,
+    "n_chains": 64,
+    "n_tokens": 94
+  },
+  "final": {
+    "step": 300,
+    "callback_ce": 4.262923807539838,
+    "n_chains": 64,
+    "n_tokens": 94
+  },
+  "delta": -3.9359450784135372,
+  "delta_pct": -48.0059522010012,
+  "verdict": "LIKELY R: the writer encoded the information; the readout was the bottleneck."
+}

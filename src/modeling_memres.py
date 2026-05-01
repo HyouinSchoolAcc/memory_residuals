@@ -523,6 +523,31 @@ class MemoryBlock(nn.Module):
         # RMSNorm bounds the recurrent state.  See __init__ for rationale.
         return self.judge_norm(out)
 
+    @torch.no_grad()
+    def judge_attention(
+        self, M_c_prev: torch.Tensor, M_new: torch.Tensor
+    ) -> torch.Tensor:
+        """Diagnostic: return raw (B, K, 2K) judge softmax weights.
+
+        Mirrors ``judge`` but returns the attention probabilities rather
+        than the projected output.  Used by the D2 audit:
+
+            attn[:, :, :K] -> mass put on the prior memory  (KEEP)
+            attn[:, :, K:] -> mass put on the new candidate (WRITE)
+
+        Per-row entropy answers "did the judge make a decision at all?":
+        log(2K) means uniform attention (no judging).  Mean keep mass
+        answers "did the writer overwrite or preserve?".
+        """
+        judge = self.judging
+        B, K, d = M_new.shape
+        P = torch.cat([M_c_prev, M_new], dim=1)  # (B, 2K, d)
+        M_judge = self.M_judge.unsqueeze(0).expand(B, -1, -1)
+        Q = judge.W_Q(M_judge)
+        Kk = judge.W_K(P)
+        scores = (Q @ Kk.transpose(-2, -1)) * judge.scale
+        return F.softmax(scores, dim=-1)
+
     def forward(
         self,
         C: torch.Tensor,
