@@ -1,0 +1,49 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: draft.aux
+The style file: plain.bst
+Database file #1: references.bib
+Warning--I didn't find a database entry for "duan2025memres"
+Warning--I didn't find a database entry for "liu2025drop"
+You've used 5 entries,
+            2118 wiz_defined-function locations,
+            524 strings with 4778 characters,
+and the built_in function-call counts, 1278 in all, are:
+= -- 118
+> -- 57
+< -- 0
++ -- 23
+- -- 18
+* -- 68
+:= -- 226
+add.period$ -- 15
+call.type$ -- 5
+change.case$ -- 24
+chr.to.int$ -- 0
+cite$ -- 5
+duplicate$ -- 49
+empty$ -- 114
+format.name$ -- 18
+if$ -- 264
+int.to.chr$ -- 0
+int.to.str$ -- 5
+missing$ -- 3
+newline$ -- 28
+num.names$ -- 10
+pop$ -- 35
+preamble$ -- 1
+purify$ -- 19
+quote$ -- 0
+skip$ -- 35
+stack$ -- 0
+substring$ -- 41
+swap$ -- 6
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 20
+warning$ -- 0
+while$ -- 12
+width$ -- 6
+write$ -- 53
+(There were 2 warnings)

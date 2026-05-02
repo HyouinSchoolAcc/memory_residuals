@@ -57,6 +57,8 @@ Two key architectural advances over standard Qwen3:
 
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -133,6 +135,9 @@ MEMRES_MODES: tuple[str, ...] = (
     # sources.
     "attention_parity",
 )
+
+
+_VALID_WRITER_KINDS = ("original", "slot_attention", "slot_attention_full")
 
 
 def _normalise_memres_mode(
@@ -255,6 +260,70 @@ class Qwen3MemResConfig(Qwen3Config):
         # regime for the optimizer.
         memres_gate_init: float = 0.0,
         memres_readout_norm_init: float = 1.0,
+        # v12 (2026-05-01): writer-subsystem architectural switch.
+        # Controls the implementation of MemoryBlock.judge (and
+        # optionally MemoryBlock.extract).
+        #   "original"            -- Eq. 1-2/5 single-pass cross-attention
+        #                            judge (v1-v11 baseline).
+        #   "slot_attention"      -- Stage 2 judge replaced by an
+        #                            iterative SlotAttentionWriter (softmax
+        #                            over slots + GRU keep/write per slot).
+        #                            Targets the v11g D2 finding that the
+        #                            original judge is decision-less
+        #                            (row_entropy/log(2K) = 0.999).
+        #   "slot_attention_full" -- Both Stage 1 (extraction) and Stage 2
+        #                            (judging) use SlotAttentionWriter.
+        # ``memres_slot_attention_iters`` is the number of iterations
+        # inside the Stage-2 SlotAttentionWriter (canonical Slot Attention
+        # default is 3).  Stage 1 uses 1 + memres_extraction_depth
+        # iterations to subsume Eq. 3-4 layer count.
+        memres_writer_kind: str = "original",
+        memres_slot_attention_iters: int = 3,
+        # v13 (2026-05-01): explicit symmetry-breaking in the writer's
+        # learnable query seeds to escape the D2-confirmed permutation-
+        # equivariant uniform fixed point (see problems.md §2b).
+        #
+        # ``memres_queries_init``:
+        #   "normal"     -- i.i.d. N(0, d^{-1/2}). Rows are permutation-
+        #                   equivariant under identity; with the judge
+        #                   softmax permutation-invariant in its output,
+        #                   the loss is itself permutation-symmetric in
+        #                   M_judge and any uniform configuration is a
+        #                   gradient fixed point. Default, preserves
+        #                   v1-v12 behaviour.
+        #   "orthogonal" -- rows of M_in and M_judge are mutually
+        #                   orthogonal (nn.init.orthogonal_). Slot i's
+        #                   projection q_i is orthogonal to slot j's
+        #                   q_j at init, so attn[:,i,:] and attn[:,j,:]
+        #                   are structurally distinct. The permutation
+        #                   symmetry is broken at t=0; once broken,
+        #                   distinct per-slot gradients maintain the
+        #                   break.
+        #
+        # ``memres_slot_positional``: when True, add a fixed per-slot
+        # index embedding (learnable, but initialised to a deterministic
+        # Fourier pattern) to M_in and M_judge at forward time.  This
+        # gives every slot a non-shared, non-random "address" that
+        # survives adversarial parameter drift.  Zero-cost at parity
+        # because the addition is followed by the existing W_Q/W_K/W_V
+        # projections.
+        memres_queries_init: str = "normal",
+        memres_slot_positional: bool = False,
+        # v14 (2026-05-02): attention-entropy-collapse stabiliser on the
+        # Stage-2 judge.  Diagnostic evidence: v13r D2-JUDGE @ step 10000
+        # had row_entropy / log(2K) = 0.988 (near-uniform judge), which
+        # is the exact attention-entropy-collapse pathology identified
+        # in Zhai et al. 2023.  QK-LayerNorm (post-projection RMSNorm on
+        # Q and K) decouples attention-logit magnitude from W_Q/W_K
+        # spectral norm so the softmax can find sharper distributions
+        # without spectral-norm regularisation.  Standard in Qwen,
+        # Gemma, DeepSeek-V3.  Applied only to the judge (writer_kind-
+        # agnostic -- both ``original`` and ``slot_attention`` paths
+        # pick it up via the ``judging`` sub-module).  Extraction is
+        # left untouched because the D1 / D3 diagnostics do NOT show
+        # entropy collapse in extraction; keeping the intervention
+        # targeted reduces the risk surface of the v14 campaign.
+        memres_judge_qk_layernorm: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -299,6 +368,23 @@ class Qwen3MemResConfig(Qwen3Config):
         # v11 bootstrap-fix knobs (see __init__ docstring above).
         self.memres_gate_init = float(memres_gate_init)
         self.memres_readout_norm_init = float(memres_readout_norm_init)
+        # v12 writer-kind switch (see __init__ docstring above).
+        if memres_writer_kind not in _VALID_WRITER_KINDS:
+            raise ValueError(
+                f"memres_writer_kind must be one of {_VALID_WRITER_KINDS}; "
+                f"got {memres_writer_kind!r}"
+            )
+        self.memres_writer_kind = memres_writer_kind
+        self.memres_slot_attention_iters = int(memres_slot_attention_iters)
+        if memres_queries_init not in ("normal", "orthogonal"):
+            raise ValueError(
+                f"memres_queries_init must be 'normal' or 'orthogonal'; "
+                f"got {memres_queries_init!r}"
+            )
+        self.memres_queries_init = memres_queries_init
+        self.memres_slot_positional = bool(memres_slot_positional)
+        # v14 judge stabiliser (see __init__ docstring above).
+        self.memres_judge_qk_layernorm = bool(memres_judge_qk_layernorm)
 
 
 # ---------------------------------------------------------------------------
@@ -353,8 +439,49 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
     """
     std = hidden_size**-0.5
     if isinstance(module, MemoryBlock):
-        nn.init.normal_(module.M_in, std=std)
-        nn.init.normal_(module.M_judge, std=std)
+        kind = getattr(module, "_queries_init_kind", "normal")
+        if kind == "orthogonal":
+            # Orthogonal rows -> slots are structurally distinct from
+            # step 0.  `nn.init.orthogonal_` uses QR decomposition
+            # internally, which is not implemented for bfloat16; compute
+            # in float32 and cast back to preserve model dtype.
+            with torch.no_grad():
+                for p in (module.M_in, module.M_judge):
+                    buf = torch.empty(
+                        p.shape, dtype=torch.float32, device=p.device
+                    )
+                    nn.init.orthogonal_(buf)
+                    # Rescale to match the normal init's typical row
+                    # norm (~1.0) so downstream W_Q/W_K/W_V see the
+                    # same activation scale.  orthogonal_ already gives
+                    # unit row norms, so this is a no-op for shape
+                    # K <= d; kept explicit for clarity.
+                    p.data.copy_(buf.to(p.dtype))
+        else:
+            nn.init.normal_(module.M_in, std=std)
+            nn.init.normal_(module.M_judge, std=std)
+        # Per-slot positional address.  Fourier pattern indexed by slot
+        # position: pos[k, 2i] = sin(k / 10000^(2i/d)),
+        # pos[k, 2i+1] = cos(...).  Small magnitude (scaled by std) so
+        # it survives gradient updates but doesn't dominate M_in/M_judge
+        # initially.  Learnable, so the model can refine it.
+        if (getattr(module, "_slot_positional", False)
+                and module.M_in_pos is not None
+                and module.M_judge_pos is not None):
+            K = module.num_vectors
+            d = hidden_size
+            with torch.no_grad():
+                pos = torch.zeros(K, d)
+                positions = torch.arange(K, dtype=torch.float32).unsqueeze(1)
+                div = torch.exp(
+                    torch.arange(0, d, 2, dtype=torch.float32)
+                    * (-math.log(10000.0) / d)
+                )
+                pos[:, 0::2] = torch.sin(positions * div)
+                pos[:, 1::2] = torch.cos(positions * div)
+                pos.mul_(std)  # downscale to match M_in/M_judge magnitude
+                module.M_in_pos.data.copy_(pos)
+                module.M_judge_pos.data.copy_(pos)
         # In gated mode, override HF's generic Linear init with the
         # zero-weight + -1 bias init that gives g ~ 0.27 at step 0.
         if getattr(module, "update_mode", "competitive") == "gated":
@@ -394,6 +521,16 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
         nn.init.constant_(module.recent_bias, module._recent_bias_init)
     elif isinstance(module, MemoryGate):
         nn.init.constant_(module.gate, module._init)
+    elif isinstance(module, SlotAttentionWriter):
+        # HuggingFace's generic ``_init_weights`` only matches Linear /
+        # Embedding / Norm / RotaryEmbedding submodules, so the GRUCell
+        # inside the SlotAttentionWriter is left at the meta-device
+        # NaN values that ``from_pretrained`` allocates -- the model
+        # then produces NaN logits at the first forward pass.  We call
+        # ``reset_parameters()`` on the GRUCell to apply PyTorch's
+        # standard uniform_(-sqrt(1/h), sqrt(1/h)) init to all four
+        # GRUCell tensors (weight_ih, weight_hh, bias_ih, bias_hh).
+        module.gru.reset_parameters()
 
 
 # ---------------------------------------------------------------------------
@@ -402,21 +539,231 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
 
 
 class CrossAttention(nn.Module):
-    """Single cross-attention: queries attend to context key-values."""
+    """Single cross-attention: queries attend to context key-values.
 
-    def __init__(self, hidden_size: int):
+    ``qk_layernorm`` (v14): when True, insert an RMSNorm on the Q and K
+    projections' outputs before the inner product.  Motivated by the
+    D2-JUDGE diagnostic in v13 showing row_entropy / log(2K) > 0.95
+    (near-uniform judge attention), which corresponds to the
+    low-spectral-norm / low-logit-magnitude attention-entropy pathology
+    identified in Zhai et al. 2023 ("Stabilizing Transformer Training
+    by Preventing Attention Entropy Collapse").  QK-LayerNorm
+    decouples the attention-logit magnitude from the W_Q / W_K weight
+    norm: logits become  d^{-1/2} * <rmsnorm(W_Q q), rmsnorm(W_K k)>
+    which is insensitive to the spectral norm of the projections and
+    lets the softmax find sharper distributions without requiring
+    carefully tuned weight decay or spectral constraints on W_Q/W_K.
+    Cheaper than full σReparam and has become the standard fix (used
+    in Qwen, Gemma, DeepSeek-V3 attention blocks).
+    """
+
+    def __init__(self, hidden_size: int, qk_layernorm: bool = False):
         super().__init__()
         self.scale = hidden_size**-0.5
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
+        if qk_layernorm:
+            self.q_norm: nn.Module = Qwen3RMSNorm(hidden_size, eps=1e-6)
+            self.k_norm: nn.Module = Qwen3RMSNorm(hidden_size, eps=1e-6)
+        else:
+            self.q_norm = nn.Identity()
+            self.k_norm = nn.Identity()
 
     def forward(self, queries: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        Q = self.W_Q(queries)
-        K = self.W_K(context)
+        Q = self.q_norm(self.W_Q(queries))
+        K = self.k_norm(self.W_K(context))
         V = self.W_V(context)
         attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
         return attn @ V
+
+
+# ---------------------------------------------------------------------------
+# Slot-Attention writer (v12)  --  iterative slot-competitive attention.
+# ---------------------------------------------------------------------------
+
+
+class SlotAttentionWriter(nn.Module):
+    """Iterative slot-competitive attention (Locatello et al. 2020).
+
+    Used by the v12 writer subsystem in two places:
+      * MemoryBlock.judging  (Stage 2 / Eq. 5):
+            slots^(0) = M_judge,          P = [M_c^{t-1} || M_new]   (B, 2K, d)
+      * MemoryBlock.extract  (Stage 1 / Eq. 3-4) when writer_kind is
+        ``slot_attention_full``:
+            slots^(0) = M_in,             P = C_t                    (B, N, d)
+
+    Why this replaces the plain cross-attention judge
+    --------------------------------------------------
+    The PDF's Section 2.1 ("Forgetting Defense Insight") promises a
+    "zero-sum semantic competition" between M_c^{t-1} and the newly
+    extracted candidate.  The original ``CrossAttention`` judge takes
+    softmax over the *inputs* axis, so each of the K query slots
+    independently averages over the 2K inputs.  At init, every query is
+    a randomly-projected vector and the softmax is near-uniform, which
+    means every slot tends to the same content-blind average -- there
+    is no architectural pressure for slots to specialise on disjoint
+    pieces of the input.  This is the symmetric uniform fixed point
+    that the v11g D2 audit measured at row_entropy / log(2K) = 0.999
+    and effective rank 1.02 across 4000 training steps.
+
+    Slot Attention restructures the softmax to be over the *slots* axis
+    (i.e., across K).  The competition is then explicit: if two slots
+    project similarly under W_Q, they share each input's softmax mass --
+    but as soon as either slot's projection drifts, the other loses
+    that mass.  After the per-row weighted-mean normalisation each slot
+    receives a proper convex combination of the inputs that selected it,
+    so the K slots tile the input pool into K disjoint factors.  Five
+    years of object-centric / set-prediction literature have validated
+    this primitive on exactly this problem.
+
+    Init parity with the bare backbone is preserved at the *model* level
+    by the downstream gate / router init (memory_gate=0 in simple_gate
+    mode, alpha_mem ~ exp(-32)/N in attention_parity), which zeros m^t's
+    contribution to h regardless of what the writer outputs at init.
+    See ``tools/init_parity_test.py`` for the slot-attention case.
+
+    Parameter accounting (per writer instance, hidden_size=d, K slots):
+      * W_Q, W_K, W_V  (nn.Linear no-bias)  -- same as CrossAttention
+      * GRUCell        (3 d^2 + 3 d^2 = 6 d^2 + 6 d, vs CrossAttention's 3 d^2)
+      * 2 RMSNorms     (slot_norm + input_norm; d each)
+    Roughly 3x the parameters of one CrossAttention pass; comparable to
+    a single transformer layer at the same hidden size.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        num_iters: int = 3,
+        eps: float = 1e-6,
+        qk_layernorm: bool = False,
+    ):
+        super().__init__()
+        if num_iters < 1:
+            raise ValueError(
+                f"num_iters must be >= 1; got {num_iters!r}"
+            )
+        self.hidden_size = hidden_size
+        self.num_iters = int(num_iters)
+        self.scale = hidden_size**-0.5
+        self.eps = eps
+        # Same Q/K/V projection budget as a CrossAttention judge.
+        self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
+        # Per-slot recurrent update.  GRUCell is the canonical Slot
+        # Attention update (Locatello 2020); it weight-ties across slots
+        # but maintains independent hidden state per slot through the
+        # iterations.
+        self.gru = nn.GRUCell(hidden_size, hidden_size)
+        # Pre-projection normalisations (canonical SA places LayerNorm
+        # before W_Q on slots and before W_K/V on inputs).  We use
+        # RMSNorm to stay consistent with the rest of the architecture.
+        self.slot_norm = Qwen3RMSNorm(hidden_size, eps=eps)
+        self.input_norm = Qwen3RMSNorm(hidden_size, eps=eps)
+        # v14 QK-LayerNorm: post-projection RMSNorm on Q/K.  See
+        # CrossAttention.__init__ for motivation.  Note the slot_norm /
+        # input_norm above are PRE-projection norms on the slot state
+        # and input pool; qk_layernorm is POST-projection, on the Q and
+        # K images, which is where the attention-entropy-collapse
+        # literature places it.  Cheap and orthogonal.
+        if qk_layernorm:
+            self.q_norm: nn.Module = Qwen3RMSNorm(hidden_size, eps=eps)
+            self.k_norm: nn.Module = Qwen3RMSNorm(hidden_size, eps=eps)
+        else:
+            self.q_norm = nn.Identity()
+            self.k_norm = nn.Identity()
+
+    def _attention(
+        self,
+        slots: torch.Tensor,
+        k: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the (B, K, M) slot-axis-normalised attention weights.
+
+        Two normalisations:
+          1. ``softmax(scores, dim=-2)``: softmax along the SLOTS axis
+             (K), so each input column j has its mass distributed across
+             slots with sum 1.  This is what makes the slots compete:
+             any input row can only contribute total mass 1, split among
+             slots according to their query-key alignment.
+          2. ``attn / attn.sum(dim=-1, keepdim=True)``: per-slot weighted-
+             mean normalisation -- guarantees each slot's row sums to
+             exactly 1, so attn @ v is a proper convex combination of
+             the inputs (and is shape-compatible with the original
+             D2 keep-vs-write diagnostic).
+        """
+        scores = (slots @ k.transpose(-2, -1)) * self.scale  # (B, K, M)
+        # Softmax over SLOTS axis (this is the architectural pivot).
+        attn = F.softmax(scores, dim=-2)
+        # Per-slot weighted-mean renormalisation.
+        attn = attn / (attn.sum(dim=-1, keepdim=True) + self.eps)
+        return attn
+
+    def forward(
+        self,
+        slots: torch.Tensor,
+        P: torch.Tensor,
+    ) -> torch.Tensor:
+        """Iterative slot-competitive attention.
+
+        Args:
+            slots: (B, K, d) initial slot state -- typically the
+                   broadcast of a learnable parameter (M_judge or M_in).
+            P:     (B, M, d) input pool to attend over.
+
+        Returns:
+            slots_final: (B, K, d) updated slot state after num_iters
+            iterations.
+        """
+        B, K, d = slots.shape
+        Pn = self.input_norm(P)
+        k_proj = self.k_norm(self.W_K(Pn))
+        v_proj = self.W_V(Pn)
+        for _ in range(self.num_iters):
+            sn = self.slot_norm(slots)
+            q_proj = self.q_norm(self.W_Q(sn))
+            attn = self._attention(q_proj, k_proj)  # (B, K, M)
+            updates = attn @ v_proj                 # (B, K, d)
+            # Per-slot GRU update (slots and updates flatten to (B*K, d);
+            # K independent recurrent states share the same gating weights).
+            slots = self.gru(
+                updates.reshape(B * K, d),
+                slots.reshape(B * K, d),
+            ).reshape(B, K, d)
+        return slots
+
+    @torch.no_grad()
+    def attention(
+        self,
+        slots: torch.Tensor,
+        P: torch.Tensor,
+    ) -> torch.Tensor:
+        """Diagnostic: final-iteration normalised attention (B, K, M).
+
+        Used by the D2 audit to measure judge decisiveness.  Returned in
+        the same (B, K, 2K) shape convention as
+        ``MemoryBlock.judge_attention`` for the original writer, so the
+        keep/write split (attn[:, :, :K] vs attn[:, :, K:]) and the
+        per-row entropy reductions in the audit code apply unchanged.
+        """
+        B, K, d = slots.shape
+        Pn = self.input_norm(P)
+        k_proj = self.k_norm(self.W_K(Pn))
+        v_proj = self.W_V(Pn)
+        attn: torch.Tensor | None = None
+        for it in range(self.num_iters):
+            sn = self.slot_norm(slots)
+            q_proj = self.q_norm(self.W_Q(sn))
+            attn = self._attention(q_proj, k_proj)
+            if it < self.num_iters - 1:
+                updates = attn @ v_proj
+                slots = self.gru(
+                    updates.reshape(B * K, d),
+                    slots.reshape(B * K, d),
+                ).reshape(B, K, d)
+        assert attn is not None
+        return attn
 
 
 # ---------------------------------------------------------------------------
@@ -445,6 +792,22 @@ class MemoryBlock(nn.Module):
         queries M_judge (K x d) attend over P_judge so old and new
         compete in a zero-sum softmax.  Single round — the heavy lifting
         has already happened in the extraction stack.
+
+    Writer kinds (v12)
+    ------------------
+    ``writer_kind`` selects the implementation of Stage 1 / Stage 2:
+
+      * ``original`` (default): Stage 1 is a stack of plain
+        ``CrossAttention`` layers (paper Eq. 3-4); Stage 2 is a single
+        ``CrossAttention`` competition (Eq. 5).  This is the v1-v11
+        baseline.
+      * ``slot_attention``: Stage 1 unchanged; Stage 2 replaced by an
+        iterative ``SlotAttentionWriter`` (softmax over slots, GRU
+        keep/write gate per slot).  Targets the D2-confirmed
+        decision-less judge (v11g row_entropy/log(2K) = 0.999).
+      * ``slot_attention_full``: both Stage 1 and Stage 2 use
+        ``SlotAttentionWriter``.  Tests whether the extraction stage
+        also benefits from the slot-axis-softmax inductive bias.
     """
 
     def __init__(
@@ -454,6 +817,11 @@ class MemoryBlock(nn.Module):
         extraction_depth: int = 0,
         eps: float = 1e-6,
         update_mode: str = "competitive",
+        writer_kind: str = "original",
+        slot_attention_iters: int = 3,
+        queries_init: str = "normal",
+        slot_positional: bool = False,
+        judge_qk_layernorm: bool = False,
     ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -463,21 +831,83 @@ class MemoryBlock(nn.Module):
             raise ValueError(
                 f"update_mode must be 'competitive' or 'gated'; got {update_mode!r}"
             )
+        if writer_kind not in _VALID_WRITER_KINDS:
+            raise ValueError(
+                f"writer_kind must be one of {_VALID_WRITER_KINDS}; "
+                f"got {writer_kind!r}"
+            )
+        if queries_init not in ("normal", "orthogonal"):
+            raise ValueError(
+                f"queries_init must be 'normal' or 'orthogonal'; "
+                f"got {queries_init!r}"
+            )
         self.update_mode = update_mode
+        self.writer_kind = writer_kind
+        self.slot_attention_iters = int(slot_attention_iters)
+        # v13 symmetry-break knobs.  Threaded here so that
+        # _init_memres_params (called by HF from_pretrained after
+        # construction) can see them on the module.
+        self._queries_init_kind = queries_init
+        self._slot_positional = bool(slot_positional)
 
         # Stage 1: learnable extraction queries M_in  (K x d)
         self.M_in = nn.Parameter(torch.empty(num_vectors, hidden_size))
         nn.init.normal_(self.M_in, std=hidden_size**-0.5)
-        # Initial compression + L_E refinement layers (Eq. 3-4).
-        # All share the same (K, d) -> (K, d) latent shape.
-        self.extraction_layers = nn.ModuleList(
-            [CrossAttention(hidden_size) for _ in range(1 + extraction_depth)]
-        )
+        # v13: optional per-slot positional address.  Applied additively
+        # before the W_Q/W_K/W_V projections in extract() / judge().
+        # Initialised in _init_memres_params to a deterministic per-slot
+        # Fourier pattern with small magnitude (~d^{-0.5}), so parity
+        # with the bare backbone is preserved (M_in/M_judge remain
+        # unused at step 0 because gate/router init zeros their
+        # downstream contribution).
+        if slot_positional:
+            self.M_in_pos = nn.Parameter(
+                torch.empty(num_vectors, hidden_size)
+            )
+        else:
+            self.register_parameter("M_in_pos", None)
+        if writer_kind == "slot_attention_full":
+            # A single SlotAttentionWriter does (1 + L_E) iterations of
+            # slot-competitive refinement over C_t, replacing the stack
+            # of CrossAttention layers.  Iterations subsume the Eq. 3-4
+            # residual refinement (the GRU IS the residual update on the
+            # slot state), so we collapse the L_E layer stack into one
+            # iterative module.  ``extraction_layers`` is left as None
+            # for type-symmetry with the original path.
+            self.extract_block = SlotAttentionWriter(
+                hidden_size,
+                num_iters=1 + extraction_depth,
+                eps=eps,
+            )
+            self.extraction_layers: nn.ModuleList | None = None
+        else:
+            # Initial compression + L_E refinement layers (Eq. 3-4).
+            # All share the same (K, d) -> (K, d) latent shape.
+            self.extraction_layers = nn.ModuleList(
+                [CrossAttention(hidden_size) for _ in range(1 + extraction_depth)]
+            )
+            self.extract_block: SlotAttentionWriter | None = None
 
         # Stage 2: learnable judging queries M_judge  (K x d)
         self.M_judge = nn.Parameter(torch.empty(num_vectors, hidden_size))
         nn.init.normal_(self.M_judge, std=hidden_size**-0.5)
-        self.judging = CrossAttention(hidden_size)
+        if slot_positional:
+            self.M_judge_pos = nn.Parameter(
+                torch.empty(num_vectors, hidden_size)
+            )
+        else:
+            self.register_parameter("M_judge_pos", None)
+        if writer_kind in ("slot_attention", "slot_attention_full"):
+            self.judging: nn.Module = SlotAttentionWriter(
+                hidden_size,
+                num_iters=self.slot_attention_iters,
+                eps=eps,
+                qk_layernorm=bool(judge_qk_layernorm),
+            )
+        else:
+            self.judging = CrossAttention(
+                hidden_size, qk_layernorm=bool(judge_qk_layernorm)
+            )
         # Per PITFALLS §2 and TRAINING_PLAYBOOK §"RMSNorm placement", apply
         # RMSNorm to M_c after the judge step so that repeated application
         # over many sessions does not let the recurrent state drift out of
@@ -506,9 +936,21 @@ class MemoryBlock(nn.Module):
         Initial layer compresses N -> K via M_in queries (Eq. 1 / 3).
         Subsequent layers refine the (K, d) state by letting it re-query
         C_t with a residual connection (Eq. 4).
+
+        For ``writer_kind == "slot_attention_full"`` the L_E + 1
+        CrossAttention layers are collapsed into a single
+        ``SlotAttentionWriter`` whose internal iteration count plays
+        the role of the layer count -- Eq. 4's residual refinement is
+        absorbed into the per-slot GRU update.
         """
         B = C.size(0)
-        M_in = self.M_in.unsqueeze(0).expand(B, -1, -1)
+        q_seed = self.M_in
+        if self.M_in_pos is not None:
+            q_seed = q_seed + self.M_in_pos
+        M_in = q_seed.unsqueeze(0).expand(B, -1, -1)
+        if self.extract_block is not None:
+            return self.extract_block(M_in, C)
+        assert self.extraction_layers is not None
         E = self.extraction_layers[0](M_in, C)  # (B, K, d)
         for layer in self.extraction_layers[1:]:
             E = E + layer(E, C)
@@ -518,8 +960,17 @@ class MemoryBlock(nn.Module):
         """Stage 2: single-round competition over [M_c^{t-1} || M_new]."""
         B = M_new.size(0)
         P_judge = torch.cat([M_c_prev, M_new], dim=1)  # (B, 2K, d)
-        M_judge = self.M_judge.unsqueeze(0).expand(B, -1, -1)
-        out = self.judging(M_judge, P_judge)
+        q_seed = self.M_judge
+        if self.M_judge_pos is not None:
+            q_seed = q_seed + self.M_judge_pos
+        M_judge = q_seed.unsqueeze(0).expand(B, -1, -1)
+        if isinstance(self.judging, SlotAttentionWriter):
+            # Slot-competitive iterative judge (v12).  M_judge serves as
+            # the initial slot state; the GRUCell takes care of the
+            # keep-vs-write gating across iterations.
+            out = self.judging(M_judge, P_judge)
+        else:
+            out = self.judging(M_judge, P_judge)
         # RMSNorm bounds the recurrent state.  See __init__ for rationale.
         return self.judge_norm(out)
 
@@ -527,7 +978,7 @@ class MemoryBlock(nn.Module):
     def judge_attention(
         self, M_c_prev: torch.Tensor, M_new: torch.Tensor
     ) -> torch.Tensor:
-        """Diagnostic: return raw (B, K, 2K) judge softmax weights.
+        """Diagnostic: return raw (B, K, 2K) judge attention weights.
 
         Mirrors ``judge`` but returns the attention probabilities rather
         than the projected output.  Used by the D2 audit:
@@ -538,11 +989,21 @@ class MemoryBlock(nn.Module):
         Per-row entropy answers "did the judge make a decision at all?":
         log(2K) means uniform attention (no judging).  Mean keep mass
         answers "did the writer overwrite or preserve?".
+
+        For both writer kinds the returned tensor has each row summing
+        to 1, so ``keep_mean = attn[:, :, :K].sum(dim=-1).mean()`` and
+        per-row entropy reductions in the audit code apply uniformly.
         """
-        judge = self.judging
         B, K, d = M_new.shape
         P = torch.cat([M_c_prev, M_new], dim=1)  # (B, 2K, d)
-        M_judge = self.M_judge.unsqueeze(0).expand(B, -1, -1)
+        q_seed = self.M_judge
+        if self.M_judge_pos is not None:
+            q_seed = q_seed + self.M_judge_pos
+        M_judge = q_seed.unsqueeze(0).expand(B, -1, -1)
+        if isinstance(self.judging, SlotAttentionWriter):
+            return self.judging.attention(M_judge, P)
+        # Original judge: softmax over the *inputs* axis.
+        judge = self.judging
         Q = judge.W_Q(M_judge)
         Kk = judge.W_K(P)
         scores = (Q @ Kk.transpose(-2, -1)) * judge.scale
@@ -890,6 +1351,15 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             config.memres_num_vectors,
             config.memres_extraction_depth,
             update_mode=getattr(config, "memres_update_mode", "competitive"),
+            writer_kind=getattr(config, "memres_writer_kind", "original"),
+            slot_attention_iters=getattr(
+                config, "memres_slot_attention_iters", 3
+            ),
+            queries_init=getattr(config, "memres_queries_init", "normal"),
+            slot_positional=getattr(config, "memres_slot_positional", False),
+            judge_qk_layernorm=getattr(
+                config, "memres_judge_qk_layernorm", False
+            ),
         )
         self.memory_readout = MemoryReadout(
             config.hidden_size,

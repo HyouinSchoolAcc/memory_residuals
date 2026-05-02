@@ -1,0 +1,28 @@
+\begin{thebibliography}{1}
+
+\bibitem{du2025blockattnres}
+Anonymous Du.
+\newblock Block attention residuals: A depth-wise routing primitive for transformers.
+\newblock {\em arXiv preprint}, 2025.
+
+\bibitem{fedus2021switch}
+William Fedus, Barret Zoph, and Noam Shazeer.
+\newblock Switch {T}ransformers: Scaling to trillion parameter models with simple and efficient sparsity.
+\newblock {\em Journal of Machine Learning Research}, 23(120):1--39, 2022.
+
+\bibitem{liu2025memres}
+Yueze Liu.
+\newblock Memory residuals: Innate working memory for large language models, 2025.
+\newblock Position paper; see \texttt{memory\_residuals.pdf}.
+
+\bibitem{qwen3}
+{Qwen Team}.
+\newblock {Qwen3}: A new generation of {Qwen} large language models.
+\newblock \url{https://huggingface.co/Qwen/Qwen3-0.6B}, 2025.
+
+\bibitem{xu2022msc}
+Jing Xu, Arthur Szlam, and Jason Weston.
+\newblock Beyond goldfish memory: Long-term open-domain conversation.
+\newblock In {\em Annual Meeting of the Association for Computational Linguistics}, 2022.
+
+\end{thebibliography}

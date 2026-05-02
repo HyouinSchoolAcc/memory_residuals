@@ -1341,3 +1341,476 @@ v6 already addresses items 1-3 and partly 4 (window_k=8, no
 dropouts, no contrastive, but carry_state still True). v6 PURIST
 tests the remaining items (carry_state, burn_in, lr) by running
 v3's training knobs on the LME callback corpus.
+
+---
+
+# Part V — Historical run ledger (v7 → v10, was runs.md)
+
+The `runs.md` ledger now contains only the active v11+ cells. The
+v7 / v8 / v9 / v10 entries — all KILLED, SUPERSEDED, or audited —
+are preserved here so the v3 → v6 → v7 → v8 → v9 → v10 → v11
+narrative stays auditable end-to-end. Each subsection mirrors the
+original `runs.md` entry with the planning prose dropped and the
+verdicts, result tables, and mechanism statements retained. Date
+order is oldest → newest within Part V.
+
+## v7 P0 runs (2026-04-29) — compression curriculum + bias relaxation
+
+User directive 2026-04-29 ~14:30 CDT after the v6 architectural
+diagnosis: the depth router is the real bottleneck, not the writer.
+v3 standalone routing trace
+(`paper_artifacts/eval/routing_v3sp_*.json`) showed α_mem ≈ 4.7e-4
+averaged across 55 sublayers AND α_mem essentially identical
+between true-chain and shuffled-chain memory at every sublayer —
+i.e. the router was content-blind. v6 GATED/COMPETITIVE reproduced
+the v3 failure mode with a more severe collapse.
+
+### v7 pivot summary (vs v6)
+
+| axis | v6 | v7 P0 |
+|---|---|---|
+| credit-assignment path | full chain TBPTT through ~8 sessions of mostly-irrelevant filler | **compression curriculum P0**: every training window is `[evidence_session, callback_session]` (window_k=2); fresh M_c |
+| router bias | `recent=+4, mem=−4` (v3 default; ≈ 3e-5 mass at init) | A/B: SOFTERBIAS uses `mem=−2` (~70× lift); V3BIAS keeps `−4` |
+| burn-in | `burn_in_max=24` with resample | **0** |
+| carry_state | True | **False** |
+| callback alignment | `callback_window_bias=0.7` | superseded by `curriculum_evidence_bias=1.0` |
+
+### v7 cells & verdicts
+
+| cell | machine | routing | bias | first non-zero gate_max | gate_max @ 400 | killed |
+|---|---|---|---|---|---:|---|
+| `chain_v7_p0_softerbias` | local H100 GPU 0 | attention_parity | mem=−2 | never (0.0000 through step 1400) | 0.0000 | step ~2000, `‖m^t‖≈1.7e-10` |
+| `chain_v7_p0_v3bias` | local H100 GPU 1 | attention_parity | mem=−4 | never | 0.0000 | step ~2000; std Δ_nm-m=−0.147 by step 1200 |
+| `chain_v7_p0_simplegate` | GH200 | **simple_gate** | n/a | **step 20 (0.0004)** | **0.0074** | once v8a passed step 1000 trigger |
+
+Eval trajectory of `chain_v7_p0_softerbias` (n=256, eval_window=8):
+
+| step | mem CE | nomem CE | shuffle CE | Δ_nm-m | Δ_sh-m | gate_max |
+|---:|---:|---:|---:|---:|---:|---:|
+| 200 | 1.5322 | 1.5269 | 1.5321 | −0.0052 | −0.0001 | 0.0000 |
+| 400 | 1.4866 | 1.4805 | 1.4866 | −0.0060 | +0.0001 | 0.0000 |
+| 600 | 1.4727 | 1.4649 | 1.4727 | −0.0078 | +0.0000 | 0.0000 |
+| 800 | 1.4390 | 1.4365 | 1.4390 | −0.0025 | −0.0000 | 0.0000 |
+| 1000 | 1.4254 | 1.4237 | 1.4254 | −0.0018 | +0.0000 | 0.0000 |
+| 1200 | 1.4178 | 1.4159 | 1.4178 | −0.0019 | +0.0000 | 0.0000 |
+
+Eval trajectory of `chain_v7_p0_v3bias` (worst of the trio):
+
+| step | mem CE | nomem CE | shuffle CE | Δ_nm-m | Δ_sh-m | gate_max |
+|---:|---:|---:|---:|---:|---:|---:|
+| 200 | 1.5435 | 1.5393 | 1.5436 | −0.0042 | +0.0001 | 0.0000 |
+| 400 | 1.5066 | 1.4807 | 1.5059 | −0.0259 | −0.0007 | 0.0000 |
+| 600 | 1.5135 | 1.4609 | 1.5135 | −0.0526 | −0.0000 | 0.0000 |
+| 800 | 1.5444 | 1.4271 | 1.5438 | −0.1173 | −0.0006 | 0.0000 |
+| 1000 | 1.5086 | 1.4140 | 1.5086 | −0.0945 | +0.0000 | 0.0000 |
+| 1200 | 1.5526 | 1.4057 | 1.5524 | −0.1470 | −0.0003 | 0.0000 |
+
+`chain_v7_p0_simplegate` per-step gate (every 20 steps):
+
+| step | gate_mean | gate_max | loss |
+|---:|---:|---:|---:|
+| 20 | −0.0000 | 0.0004 | 2.74 |
+| 100 | −0.0023 | 0.0055 | 1.74 |
+| 200 | −0.0019 | 0.0051 | 1.56 |
+| 300 | −0.0023 | 0.0065 | 1.16 |
+| 400 | −0.0024 | 0.0074 | 1.07 |
+
+Step-200 eval: `Δ_nm-m=−0.044`, `Δ_sh-m=−0.0001`, `gate_max=0.0051`.
+The gate opens but the readout produces noise on the eval
+distribution (curriculum-mismatch failure inherited from the other
+cells).
+
+### Two findings the v7 trio nailed down
+
+1. **simple_gate opens the memory channel where attention_parity
+   cannot.** Same corpus, writer, curriculum, extract source. The
+   `+4` recent-source bias in `attention_parity` saturates the
+   depth softmax against memory and the gradient signal needed to
+   relax it is overwhelmed by gradient that wants to keep recent.
+   simple_gate has a direct gradient path to its scalar gate (no
+   softmax competition) and gradient finds it within 20 steps.
+   This was the empirical refutation of the paper's "block AttnRes
+   routing pool over delta sources" choice as the canonical
+   primitive on the chain trainer.
+2. **Pure-P0 curriculum (`curriculum_evidence_bias=1.0`) is a
+   train/eval distribution mismatch trap.** All three cells learn
+   the train task aggressively (loss 3 → <1 in 800 steps) but show
+   negative Δ_nm-m on the standard eval (eval_window=8, sequential
+   M_c through ~40 prior sessions). v3-default V3BIAS is the worst
+   (−0.147 by step 1200). Mechanism: training builds M_c from one
+   fresh evidence session; eval builds it sequentially through 40+
+   sessions of compounding judge updates — completely different
+   statistics.
+
+### v7 sampler implementation (kept)
+
+`--curriculum_evidence_bias <float>` (default 0.0). Picks a random
+evidence position in `[0, cb_pos)`, then `window_k − 2` random
+intermediate positions strictly between evidence and callback,
+stacks `[evidence, ...intermediates, callback]` chronologically.
+Falls back to `callback_window_bias` when no callback annotation
+exists; falls all the way through to contiguous sampling for
+non-callback corpora (PG-19 / TV / REALTALK). Phase implied by
+window_k: P0=2, P1=3, P2=5, P3=8. Code lives in
+[`src/train_chain.py`](../src/train_chain.py)
+(`ChainCorpus.chain_curriculum_window` +
+`ChainSampler.sample_window` curriculum branch).
+
+### Watchdog patch landed alongside v7
+
+`paper_tools/cloud_watchdog/watchdog.sh` got a `gpu_is_busy()`
+precheck (defers spec launch if another CUDA process holds
+> `GPU_BUSY_MIB` MiB on the target GPU; default 2048). Fixes the
+silent first-step OOM that killed v6 PURIST on 2026-04-29 18:30 UTC.
+
+## v8 (2026-04-29) — diagnostic lens-change + readout-norm fix
+
+User directive 2026-04-29 ~22:00 UTC: "I somehow think there's a
+problem with the way we are evaluating; the system is learning a
+hard task; it needs to first learn to summarize and use the
+memory… we have to be more wary of other guidance metrics
+though." This single observation triggered an evaluation-methodology
+redesign and downstream of it an architectural diagnosis the v7 P0
+cells could not have surfaced.
+
+### v8 evaluation-methodology rewrite
+
+Four diagnostics added to `Trainer.evaluate()` and exposed as a
+standalone tool
+([`paper_tools/diagnose_recruitment.py`](../paper_tools/diagnose_recruitment.py)):
+
+1. **Phase-aligned eval (`pa_*`).** For each LME chain with
+   `cb_pos ≥ 1`, pick a random evidence position
+   `e ∈ [0, cb_pos)`, build M_c from session `e` alone (single
+   judge step — exactly what P0 trains on), then score the callback
+   session under three M_c regimes: `mem`, `nomem`, `shuffle`.
+   Reduce two ways: whole-session (`pa_ws_*`) and callback-only
+   (`pa_cb_*`) using `session_callback_mask`.
+2. **Per-sublayer routing recruitment (`rec_*`).** Replaces coarse
+   `gate_max`. For `simple_gate` it snapshots top-3 sublayer gates
+   with sign and the fraction with `|gate| > 1e-3`. For
+   `attention_parity` / `attention_base` it runs an eval batch
+   with `collect_alpha_trace=True` and reports per-sublayer α_mem
+   (the actual realised mass; `mem_bias` alone is misleading).
+3. **Readout magnitude (`mt_norm_ratio_*`).** Pulse check:
+   `mean(‖m^t‖) / mean(‖embed‖)` on the phase-aligned setup.
+   ≈0 means V projection collapsed; ≫1 means m^t dominates.
+4. **`save_best` switched to `phase_aligned`** with composite
+   `−(pa_cb_dsh + 0.5 · pa_ws_dsh)`. Standard eval becomes a
+   sanity check, not a checkpoint-selection signal.
+
+### Lens-change finding 1 — `attention_parity` is *causally* collapsed
+
+`paper_tools/diagnose_recruitment.py` against
+`chain_v7_p0_softerbias/step-2000`
+([`paper_artifacts/eval/diag_v7_softerbias_step2000.json`](../paper_artifacts/eval/diag_v7_softerbias_step2000.json)):
+
+| metric | value | reading |
+|---|---:|---|
+| α_mem_max | 0.00092 | depth router uniformly content-blind |
+| α_mem_mean | 0.00037 | below uniform-prior floor 1/(N+2) |
+| frac_open (α > 0.05) | 0.00 | zero sublayers above threshold |
+| **‖m^t‖/‖embed‖** | **1.66 × 10⁻¹⁰** | **readout output is fp-zero** |
+| pa_cb_dsh | **0.0 exactly** | mem and shuffle produce identical logits |
+| pa_cb_dnm | −0.057 | memory mildly hurts callback CE |
+
+Mechanism. attention_parity with `mem=−2/recent=+4` initialises α_mem
+at ~exp(−2)/exp(+4) ≈ 4×10⁻⁴ per sublayer; gradient on
+`MemoryReadout.W_V` flows through `α_mem · (...)` so it is ~1000×
+weaker than backbone gradient; AdamW with `weight_decay=0.1` consumes
+this weak gradient each step and steadily drives `‖W_V^read‖` toward
+zero. Once `‖W_V^read‖ ≈ 0`, `‖m^t‖ ≈ 0`, and the architecture is
+*causally* equivalent to "no memory" regardless of M_c.
+
+This explains every `attention_parity` cell in the v3-v7 lineage —
+they were not failing to learn, they were learning to *delete* the
+memory channel.
+
+### Lens-change finding 2 — `simple_gate` is *exploded*
+
+Same diagnostic on `chain_v7_p0_simplegate/step-500`
+([`paper_artifacts/eval/diag_v7_simplegate_step500.json`](../paper_artifacts/eval/diag_v7_simplegate_step500.json)):
+
+| metric | value | reading |
+|---|---:|---|
+| gate_max_abs / frac_open | 0.0085 / **0.86** | 86% of sublayers active |
+| **‖m^t‖/‖embed‖** | **164.5** | readout swamps residual stream |
+| pa_cb_dsh | −0.0059 | shuffle slightly better than mem |
+| pa_cb_dnm | **−0.66** | memory destroys callback CE |
+
+Opposite failure mode: scalar gate gives `W_V^read` direct LM
+gradient, so it grows without bound. After 500 steps `gate · m^t`
+per sublayer adds ~1.3× ‖embed‖ to the residual; across 56 sublayers
+the perturbation swamps the LM signal. Gate IS opening, the readout
+it gates is unbounded.
+
+### v8 architecture fix — RMSNorm on `MemoryReadout` output
+
+Single line change in [`src/modeling_memres.py`](../src/modeling_memres.py):
+`MemoryReadout.__init__` adds `self.out_norm = Qwen3RMSNorm(...)`
+and `forward` returns `self.out_norm(attn @ V)`. Init parity
+preserved across all six cases of
+[`paper_tools/init_parity_test.py`](../paper_tools/init_parity_test.py)
+(both simple_gate and attention_parity-with-mem hit 0.000e+00).
+
+### v8 cells & outcomes
+
+| cell | corpus | curriculum | result | killed |
+|---|---|---|---|---|
+| `chain_v8a_p0_simplegate_rmsnorm` | LME-only | pure P0 | step 200 PA CB Δ_nm-m = +0.029, then collapsed monotonically to −1.30 by step 1000 | step ~880 (catastrophic overfit on narrow distribution) |
+| `chain_v8b_mixed_simplegate_rmsnorm` | LME-only | mixed-bias 0.5, k=8 | step 1200 PA CB Δ_sh-m = +0.0067 (peak), then collapsed to −0.032 by step 2400 | step ~2460 (delayed v8a trap by ~1000 steps but didn't escape it) |
+| `chain_v8c_diverse_simplegate_rmsnorm` | v6_lme_msc (diverse) + heavy regularisation | mixed-bias | flat ±0.007 for 2000 steps; gate stuck at ~0.004 / frac_open 0.30 | step ~2000 (over-regularisation prevents both learning and overfitting) |
+
+`chain_v8a` full eval trajectory (the canonical "good then collapse"):
+
+| step | std Δ_nm-m | std Δ_sh-m | PA WS Δ_nm-m | PA CB Δ_nm-m | PA CB Δ_sh-m | gate_max | loss |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 200 | −0.0162 | −0.0001 | +0.0668 | **+0.0288** | **+0.0035** | 0.0069 | 1.27 |
+| 400 | −0.0576 | −0.0003 | −0.1248 | −0.6512 | +0.0136 | 0.0085 | 1.05 |
+| 600 | −0.0709 | +0.0002 | −0.1001 | −0.6350 | +0.0197 | 0.0107 | 0.85 |
+| 800 | −0.1164 | −0.0003 | −0.4202 | −1.0071 | +0.0056 | 0.0119 | 0.78 |
+| 1000 | −0.1756 | −0.0002 | −0.5958 | −1.2978 | −0.0041 | 0.0134 | 0.75 |
+
+`chain_v8b` step-200 sanity check (the qualitatively-different
+"sparse late-layer" pattern that hinted at the v9 fix):
+
+| lens | reading |
+|---|---|
+| Standard Δ_nm-m | +0.0020 (memory helps long-chain) |
+| PA-EVAL CB Δ_nm-m | +0.0076 |
+| PA-EVAL CB Δ_sh-m | +0.0033 |
+| gate_max / frac_open | 0.0050 / **0.46** (sparser than v8a) |
+| top sublayers | 52, 55, 53 (positive) |
+| ‖m^t‖/‖embed‖ | 73.5 (RMSNorm holding) |
+
+`chain_v8b` later trajectory through collapse:
+
+| step | std Δ_nm-m | PA CB Δ_nm-m | PA CB Δ_sh-m | gate_max | frac_open |
+|---:|---:|---:|---:|---:|---:|
+| 1000 | −0.0004 | +0.0046 | −0.0002 | 0.0054 | 0.39 |
+| 1200 | +0.0010 | +0.0073 | **+0.0067** | 0.0054 | 0.54 |
+| 1400 | −0.0003 | +0.0118 | +0.0038 | 0.0074 | 0.52 |
+| 1600 | −0.0025 | +0.0052 | −0.0027 | 0.0087 | 0.62 |
+| 2200 | −0.0005 | **−0.0418** | **−0.0133** | 0.0088 | 0.59 |
+| 2400 | −0.0002 | −0.0340 | **−0.0320** | 0.0085 | 0.68 |
+
+### Why the standard eval was misleading us for 2k steps
+
+Both v3-v7 failure modes (attention_parity collapse, simple_gate
+explosion) produce `Δ_sh-m ≈ 0` on the standard eval. That standard
+`Δ_sh-m ≈ 0` was being read as "memory channel is not yet
+content-aware, keep training" — both reads miss that the architecture
+has reached a *terminal* state. The phase-aligned callback diagnostic
+discriminates cleanly:
+
+- Collapsed (attention_parity): `pa_cb_dsh = 0.0` exactly, `‖m^t‖ ≈ 0`.
+- Exploded (simple_gate w/o RMSNorm): `pa_cb_dsh ≈ 0` but
+  `pa_cb_dnm ≪ 0` and `‖m^t‖ ≫ ‖embed‖`.
+- Healthy (v8a step 200): `pa_cb_dsh > 0`, `pa_cb_dnm > 0`,
+  `‖m^t‖` of the same order as `‖embed‖`, gate growing.
+
+## v9 (2026-04-30) — judge-competition curriculum (the breakthrough)
+
+User directive 2026-04-30 ~00:00 UTC after v8a/b/c oscillated
+around the same noisy minimum on PA CB Δ_sh-m: "we separately learn
+the summarizer and the competition; the individual problems then
+can generalize."
+
+### Problem v9 isolated
+
+The v8 mixed-bias curriculum trains writer + readout but **never
+explicitly trains the judge layer's keep-vs-write decision**: the
+P0 sub-window `[evidence, callback]` has `M_c_prev = 0` at the
+judge step, so `compress_session(extract(evidence), 0)` degenerates
+to a no-competition aggregation. Every v8 cell oscillated around
+`pa_cb_dsh ≈ 0` ±0.005 with no monotone improvement on judge
+behaviour.
+
+### Curriculum design (new)
+
+`--curriculum_competition_bias <float>` builds 3-session windows
+that ISOLATE the judge subproblem. Two paired structures sampled
+50/50, both scoring the same callback:
+
+| sample | window | judge step at session 1 | correct gate | label |
+|---|---|---|---:|---|
+| **A: KEEP-PREV** | `[evidence, distractor, callback]` | prev_M = M_after(evidence) (relevant), C_t = extract(distractor) | small | "keep" |
+| **B: WRITE-NEW** | `[noise, evidence, callback]` | prev_M = M_after(noise) (irrelevant), C_t = extract(evidence) | large | "write" |
+
+Both samples score the same callback ⇒ gradient from callback CE
+directly trains `write_gate` / judge weights to be content-aware.
+Implementation: new `ChainSampler` Branch 0 in
+[`src/train_chain.py`](../src/train_chain.py) ahead of the existing
+curriculum + alignment branches.
+
+**Label noise is intentional.** LME does not annotate which earlier
+session contains the actual referenced fact. The "evidence" in
+Sample A and "noise" in Sample B are uniform random picks from
+`[0, cb_pos)`. This mirrors the deployment regime — at inference
+the model also has no oracle evidence signal — so the writer + judge
+are forced to compact and decide using only content cues.
+
+### v9 baseline result — `chain_v9_compete_lme_gh200`
+
+The strongest signal of the entire experiment-2 trajectory in its
+first 1400 steps:
+
+| metric (PA-aligned) | v8b PEAK (step 1200) | v9 step 1400 | factor |
+|---|---:|---:|---:|
+| CB Δ_nm-m | +0.0073 | **+0.178** | **24.4×** |
+| CB Δ_sh-m | +0.0067 | **+0.0152** | 2.3× |
+| WS Δ_nm-m | ~0 | +0.094 | n/a |
+| frac_open | 0.54 | **0.89** | 1.6× |
+| train loss (LME) | ~1.27 | **~1.0** | −0.27 |
+
+v9 trajectory (PA, 48 chains):
+
+| step | train loss | CB Δ_nm-m | CB Δ_sh-m | WS Δ_nm-m | gate_max | frac_open | top sublayers |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 1000 | 1.15 | −0.045 | +0.016 | −0.056 | 0.0045 | 0.88 | l54+, l55+, l49+ |
+| 1200 | 0.99 | +0.023 | −0.004 | +0.017 | 0.0049 | 0.86 | l55+, l54+, l49+ |
+| 1400 | 1.13 | **+0.178** | **+0.015** | **+0.094** | 0.0052 | 0.89 | l55+, l41+, l54+ |
+
+What's structurally different vs v8b/v8c: `frac_open ≈ 0.89` (almost
+every sublayer using memory; v8b at 0.54). Top sublayers shifted
+from l48/l49 (v8b) to l54/l55 + l41 (v9) — different layers light
+up when training tells the gate "memory really does matter."
+Standard `Δ_nm-m` is negative on the 8-session contiguous eval as
+expected (7/8 sessions have no callback; aggressive callback writing
+hurts non-callback CE) — this is the deployment-faithful trade-off.
+
+`chain_v9_compete_lme_gh200/best` (saved at step 1400) was the
+leading checkpoint of the program at v9 time.
+
+### v9 ablation queue (4 cells, GH200 watchdog)
+
+| order | cell | knob varied vs v9 | what it answered |
+|---:|---|---|---|
+| 1 | `chain_v9a_abl_cbw1_gh200` | `callback_loss_weight` 3.0 → **1.0** | is v9's win from competition curriculum or from upweighted callback supervision? |
+| 2 | `chain_v9b_abl_mixed_gh200` | `competition_bias` 1.0 → 0.5 + `evidence_bias` 0.0 → 0.5 + `window_k` 3 → 8 | is *pure* competition necessary, or is half competition + half mixed-bias enough? |
+| 3 | `chain_v9c_abl_diverse_gh200` | corpus LME-only → **v6_lme_msc_train** (LME+MSC+PG-19+TV) | does v9 survive data diversity? |
+| 4 | `chain_v9d_abl_attnparity_gh200` | `memres_mode` simple_gate → **attention_parity** (with RMSNorm fix retained) | now that readout magnitude is bounded, is paper-spec attention_parity viable under the v9 curriculum? |
+
+Outcome that fed the v10 directive: `v9c` matched `v9` baseline peak
+performance on the diverse corpus. `v9d` stayed architecturally
+collapsed (α_mem=0) on LME-only even with the competition curriculum
+and RMSNorm fix — but that signal was confounded with the LME-only
+data axis, motivating v10b as the cleaner test.
+
+### v8b/v8c verdict (in the v9 light)
+
+| recipe | curriculum | cb-token benefit | content discr. | gate openness | verdict |
+|---|---|---:|---:|---:|---|
+| v8a | pure-P0 | overfit @ step 800 | overfit @ 800 | 0.4 (negative-signed) | killed |
+| v8b | mixed-bias | +0.012 then collapse @ 2200 | +0.007 peak then collapse | 0.6 | killed |
+| v8c | mixed + diverse + heavy reg | flat ~0 | flat ~0 | 0.30 stuck | killed |
+| **v9** | **pure-competition** | **+0.178** @ 1400 | **+0.015** @ 1400 | **0.89** | **HEADLINE** |
+
+The v8 cohort comprehensively bracketed the failure modes —
+overfitting at one extreme (v8a/v8b), stalling at the other (v8c).
+Both extremes were about training writer + readout + judge *together*
+through generic LM loss on a callback-token mix; the competition
+curriculum (v9) is the structural fix that decomposes the problem
+into trainable subparts.
+
+## v10 (2026-04-30) — data diversity is the load-bearing axis
+
+User directive 2026-04-30 ~19:00 UTC after reviewing the v9 results:
+> "something tells me it has a lot to do with the LME dataset being
+> bad; notice how out of all the v9's, only the v9c diverse dataset
+> had a really good survivability. … This tells me that constructing
+> a SUPER diverse dataset with MANY MANY memory-using data is useful."
+
+Hypothesis: the v3–v9 failure modes (router collapse, readout drift,
+peak-then-decay) were not primarily architectural — they were
+manifestations of training on a narrow, callback-only distribution.
+v9c matched the v9 peak on the diverse corpus despite the same
+recipe; the v10 campaign reframes diversity of memory-requiring
+training distributions as the load-bearing axis.
+
+### Campaign design
+
+| cell | machine | backbone | L_E | routing | corpus |
+|---|---|---|---:|---|---|
+| **v10a composed_diverse** | local H100 GPU 0 | Qwen3-0.6B-large | 4 | simple_gate | v6_lme_msc (6378 chains) |
+| **v10b attnparity_pm4_diverse** | local H100 GPU 1 | Qwen3-0.6B-large | 4 | attention_parity (+4/−4) | v6_lme_msc |
+| **v10 4b_mega_attnparity** | GH200 | **Qwen3-4B-xlarge (L_E=10)** | **10** | **attention_parity (+4/−4)** | **mega (~150-300k chains)** |
+
+Routing rationale: v10b (0.6B + attention_parity + diverse) was the
+cheap proxy that told us in ~6 h whether attention_parity could work
+*at all* on diverse data; v10 4b_mega pursued the headline recipe
+independently on GH200. 4B (not 8B) because qwen3-8b-xlarge peaks at
+~106 GB HBM under full AdamW (>96 GB GH200) and the user directive
+was "if it can't fit, make the model smaller" (no frozen-backbone
+hack, no bitsandbytes dependency).
+
+### Mega corpus (target ~200-300k chains)
+
+Build pipeline: `Scripts/build_mega_corpus_gh200.sh` plus
+`paper_tools/build_synthetic_dialogue_chains.py`. Sources:
+
+- v6_lme_msc_train (existing 6378 chains; preserved base)
+- ultrachat (HuggingFaceH4/ultrachat_200k, ~25k chains capped)
+- pippa (PygmalionAI/PIPPA, persona chats)
+- soda (allenai/soda, ~25k synthetic social dialogues)
+- oasst1 (OpenAssistant/oasst1, tree-flattened assistant chats)
+- no_robots (HuggingFaceH4/no_robots, multi-turn)
+- narrativeqa (deepmind/narrativeqa, doc-grounded Q/A)
+- writingprompts (euclaise/writingprompts, long narrative
+  continuation — PG-19-like)
+
+Optional sources gated behind `EXTRA_SOURCES=hh_rlhf lmsys`. Source-
+bucket weights:
+`{"longmemeval":4.0, "msc":3.0, "ultrachat":2.0, "pippa":2.5,
+"soda":1.5, "synthdlg":1.5, "pg19":1.0, "tv":3.0, "realtalk":2.0,
+"lmsys":1.5}` — preserves the v9c LME-heavy mix while giving
+dialogue / narrative non-trivial weight. New synthetic-dialogue
+chains are emitted without `session_callback_mask` so the
+competition / evidence curriculum branches still only fire on the
+450 LongMemEval chains in the base corpus; the rest contributes
+contiguous-window LM gradient that regularises the readout against
+over-injection on callback-less distributions.
+
+### v10 4B MEGA architecture & schedule
+
+`qwen3-4b-xlarge` preset: Qwen3-4B (d=2560, 36 layers) backbone +
+**L_E=10** eleven-layer Perceiver extraction + K=128 slots + N=8
+AttnRes blocks. ~4.3 B total params, ~52 GB peak HBM under full
+AdamW. Routing: `attention_parity` `+4/−4`. Extract source:
+`hidden_18` (middle of 36-layer backbone). Schedule: window_k=4,
+carry_state=True, bs=2 ga=4 (effective 8), lr_memres=3e-5,
+lr_backbone=5e-6, steps=30000, warmup=500, cosine decay. Curriculum:
+`competition=0.5, evidence=0.3, callback_window=0.3, callback_w=3.0`
+(composed). `save_best=phase_aligned`. ntfy: `memres-e6ebdc70`.
+
+### v10 outcome (the trigger for v11)
+
+The v10 campaign was killed mid-training and audited (see
+[`README.md`](../README.md#stop-everything) "Stop everything and
+read this first" / post-v10 audit). The audit revealed five
+compounding causally-independent failures, each sufficient on its
+own:
+
+- **P0 (data, ~100× leverage).** The corpus builder threw away the
+  `answer_session_ids` annotations LongMemEval-S ships with, so 96 %
+  of training windows had M_c built from sessions that demonstrably
+  did *not* contain the answer. The LM-loss-optimal policy under
+  that distribution is "ignore memory."
+- **P1 (chicken-and-egg).** Gate, readout, and writer all multiply
+  each other in the forward path (`h += g · m^t`). With `g = 0` and
+  `W_V^read = randn(d⁻¹ᐟ²)` at init, no parameter sees gradient at
+  step 0 and they all stay at zero forever.
+- **P2 (magnitude).** The readout RMSNorm pinned `‖m^t‖/‖embed‖ ≈ 73`,
+  so the useful gate range was `[0, ~0.014]` — too narrow for AdamW's
+  natural step size to land in stably.
+- **P3 (PA-eval misalignment).** The phase-aligned eval picked the
+  "evidence" session uniformly, matching the broken curriculum and
+  making honest measurement impossible.
+- **P5 (recurrent-depth mismatch).** Standard-eval ran at recurrent
+  depths the model had never seen during training.
+
+All three v10 cell launchers and the mega corpus pipeline survive in
+the repo; the v10 4B mega launcher itself was deleted as part of the
+2026-04-30 cleanup (replaced by v11p in spirit). The v11 campaign in
+[`results/exp2_chain_recipe/runs.md`](../results/exp2_chain_recipe/runs.md)
+addresses P0/P2/P3 in code and P5 in two of its ablation cells.

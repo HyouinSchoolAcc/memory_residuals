@@ -9,6 +9,75 @@ heuristic. Architectural spec is in
 [`memory_residuals.pdf`](memory_residuals.pdf); the block-attention
 residuals reference is in [`atn_residuals.pdf`](atn_residuals.pdf).
 
+## Architectural priors (READ FIRST — these are settled)
+
+Future agents: these are baked-in findings from the paper line of
+evidence. Do NOT re-derive them from scratch and do NOT silently swap
+them out of a run without reading the citation.
+
+- **AP (`attention_parity`) > SG (`simple_gate`) on the routing side.**
+  Per `results/exp1_pair_recipe/manuscript.tex` Table 2 (v3 pair-recipe
+  headline, matched seed, matched compute, PG-19 pairs): AP (soft ±4
+  bias init) beats SG on Δ_sh-m by **1.6× to 3.8× at every step** of
+  the head-to-head trajectory, with AP @ step 2000 (+0.0272) already
+  **surpassing SG's full-budget asymptote at step 5200 (+0.0249)**.
+  The manuscript's exact phrasing: *"the routing-pool variant achieves
+  the scalar-gate's asymptote in 2/5 the steps and is still improving
+  when stopped."* Standalone PG-19 val agrees: AP Δ_nm-m = +0.0113
+  vs SG = +0.0098; capture ratio 0.15 vs 0.13. This is the strongest
+  routing-side prior we have. The headline paper run (v13p and
+  successors) should default to `--memres_mode attention_parity` unless
+  a chain-trainer cell explicitly demonstrates AP collapse the v13+
+  interventions can't break.
+
+- **Caveat — AP has historically collapsed on the CHAIN trainer.**
+  v5 softparity, v7 softerbias + v3bias, and every v8/9/11/v12a AP
+  cell sat at `alpha_mem ~ 4e-4` indefinitely because the router
+  closes early → writer gets attenuated gradient → writer stays
+  random → router sees noisy m^t → router closes harder. This is the
+  "collapse cycle" COMPREHENSIVE.md §v7 diagnosed as *"causally
+  equivalent to no memory regardless of M_c."* The v13 stack
+  (`writer_warmup`, `memres_queries_init=orthogonal`,
+  `memres_slot_positional`, `memres_writer_kind=slot_attention`) is
+  designed specifically to break that cycle so AP's pair-trainer
+  advantage can transfer. If you're staring at an AP cell that
+  collapsed at step ~500, check whether the full v13 stack was
+  actually active (see next point).
+
+- **Config-merge bug (fixed 2026-05-01).** `Qwen3MemResConfig` is a
+  subclass of `Qwen3Config`, so `from_pretrained("Qwen/Qwen3-0.6B")`
+  succeeds and the old `from_memres_ckpt = True` detector in
+  `train_chain.py::_build_model` produced a false positive on every
+  Qwen3 base backbone. The subsequent `overridable`-subset merge
+  silently DROPPED CLI overrides for `--memres_mode`,
+  `--memres_writer_kind`, `--memres_slot_positional`,
+  `--memres_extraction_depth`, `--memres_update_mode`,
+  `--memres_num_vectors`, etc. Fixed by detecting memres checkpoints
+  via `base_cfg.model_type == "qwen3_memres"` (the raw JSON field).
+  **If you see a v11 / v12 / v13 run whose `ROUTE @ step` diagnostic
+  reports a mode different from what the launch script requested, or
+  a load report whose MISSING-list doesn't include `M_in_pos` /
+  `write_gate` / `extraction_layers.{0..4}` despite the launch flags,
+  the bug is back — bisect against the `BUGFIX 2026-05-01` comment.**
+
+- **`simple_gate` needs memory_gate force-open during writer_warmup,
+  not router mem_bias.** In `simple_gate` the depth router is not on
+  the forward path; `memory_gate.gate` is. `_set_mem_bias` therefore
+  forces `gate = 0.5 * tanh(bias/2) ≈ 0.48` when mode is simple_gate,
+  in addition to setting `depth_router.mem_bias`. Without this, SG
+  writer_warmup trains the writer with zero gradient through the
+  forward path because `h + 0 * m^t = h` regardless of router bias.
+  See `_set_mem_bias` in `src/train_chain.py`.
+
+- **The uniform-softmax fixed point is structural, not data-starved.**
+  More data alone does not break it (v11p, v11m_chinchilla, v12c all
+  collapsed on larger corpora). It is the permutation-invariant fixed
+  point of a symmetric softmax with i.i.d.-initialised slot queries.
+  The v13 `memres_queries_init=orthogonal` + `memres_slot_positional`
+  levers are the structural fix; `writer_warmup` + `slot_attention`
+  are the objective/writer-side accelerants that keep the system from
+  re-collapsing during joint training.
+
 ## Progress & lessons
 
 - **#v3b** — We can drop MemRes onto any backbone with the augmented
@@ -181,7 +250,10 @@ ssh ubuntu@192.222.50.225 \
 
 ## Reading order
 
-1. **This README.**
+1. **This README — and specifically the "Architectural priors" block
+   at the top.** If you catch yourself proposing a change that
+   contradicts one of those bullets, STOP and read the citation
+   before proceeding.
 2. [`memory_residuals.pdf`](memory_residuals.pdf) — the position
    paper / architectural spec (Eqs. 1–10, two-stage QKV competition,
    off-sequence depth-wise injection).

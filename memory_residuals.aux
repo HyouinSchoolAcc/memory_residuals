@@ -1,0 +1,50 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{vaswani2017attention}
+\citation{lewis2020retrieval}
+\citation{du2026attention}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {From Depth-Wise Routing to Persistent Memory.} Attention Residuals enable depth-wise competition between intermediate representations, allowing each layer to dynamically route information from prior layers instead of relying on uniform residual addition. Memory Residuals extend this routing view by registering long-term memory as an additional source in the same pool. Each layer can therefore decide whether to use current-session computation or cross-session memory, unifying local reasoning and historical recall under one attention mechanism.}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:unified_memory}{{1}{2}{\textbf {From Depth-Wise Routing to Persistent Memory.} Attention Residuals enable depth-wise competition between intermediate representations, allowing each layer to dynamically route information from prior layers instead of relying on uniform residual addition. Memory Residuals extend this routing view by registering long-term memory as an additional source in the same pool. Each layer can therefore decide whether to use current-session computation or cross-session memory, unifying local reasoning and historical recall under one attention mechanism}{figure.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}The Core Paradigm: Memory Residuals}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Key Advance 1: Recurrent Updates via Two-Stage QKV Competition}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Two-stage memory update pipeline.} \textbf  {Left:} The extraction block compresses the finished session $C_t$ into a fixed-width candidate state $E_t$ using learnable extraction queries $M_{\text  {in}}$. \textbf  {Right:} The judging block compares the prior memory $M_{\text  {c}}^{t-1}$ against the candidate state $E_t$ using learnable judging queries $M_{\text  {judge}}$, producing the updated memory $M_{\text  {c}}^t$.}}{3}{figure.2}\protected@file@percent }
+\newlabel{fig:two_stage_memory_update}{{2}{3}{\textbf {Two-stage memory update pipeline.} \textbf {Left:} The extraction block compresses the finished session $C_t$ into a fixed-width candidate state $E_t$ using learnable extraction queries $M_{\text {in}}$. \textbf {Right:} The judging block compares the prior memory $M_{\text {c}}^{t-1}$ against the candidate state $E_t$ using learnable judging queries $M_{\text {judge}}$, producing the updated memory $M_{\text {c}}^t$}{figure.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Stage 1: The Extraction Layer (Compression)}{3}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stage 2: The Judging Layer (QKV Competition)}{3}{figure.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.1}On Extraction Depth: Multi-Layer Distillation as an Ablation Axis}{4}{subsubsection.2.1.1}\protected@file@percent }
+\newlabel{sec:extraction_depth}{{2.1.1}{4}{On Extraction Depth: Multi-Layer Distillation as an Ablation Axis}{subsubsection.2.1.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.2}The Competition Axis: Specialists, Not Candidates}{4}{subsubsection.2.1.2}\protected@file@percent }
+\newlabel{sec:competition_axis}{{2.1.2}{4}{The Competition Axis: Specialists, Not Candidates}{subsubsection.2.1.2}{}}
+\citation{locatello2020slot}
+\citation{zhai2023sigmareparam}
+\citation{zhai2023sigmareparam}
+\citation{du2026attention}
+\newlabel{eq:slot_axis_softmax}{{6}{5}{The Competition Axis: Specialists, Not Candidates}{equation.6}{}}
+\newlabel{eq:slot_axis_update}{{7}{5}{The Competition Axis: Specialists, Not Candidates}{equation.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Stabilising the competition: QK-LayerNorm.}{5}{equation.7}\protected@file@percent }
+\newlabel{eq:qk_layernorm}{{8}{5}{Stabilising the competition: QK-LayerNorm}{equation.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Net effect on the two-stage pipeline.}{5}{equation.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Key Advance 2: Implicit Retrieval via the Depth-Wise Residual Stream}{5}{subsection.2.2}\protected@file@percent }
+\citation{du2026attention}
+\@writefile{toc}{\contentsline {paragraph}{Reading Memory as a Source Stream.}{6}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Registering Memory as the Foundational Layer.}{6}{equation.9}\protected@file@percent }
+\newlabel{eq:memres_attn}{{11}{6}{Registering Memory as the Foundational Layer}{equation.11}{}}
+\@writefile{toc}{\contentsline {paragraph}{Implicit Cognitive Routing.}{6}{equation.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Distinction from Existing Paradigms}{6}{section.3}\protected@file@percent }
+\citation{jaegle2021perceiver}
+\citation{bulatov2022recurrent}
+\bibcite{vaswani2017attention}{1}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Empirical Roadmap: Training via Episodic TV Scripts}{7}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Conclusion and Call for Collaboration}{7}{section.5}\protected@file@percent }
+\bibcite{liu2024lost}{2}
+\bibcite{lewis2020retrieval}{3}
+\bibcite{du2026attention}{4}
+\bibcite{jaegle2021perceiver}{5}
+\bibcite{bulatov2022recurrent}{6}
+\bibcite{chevalier2023adapting}{7}
+\bibcite{locatello2020slot}{8}
+\bibcite{zhai2023sigmareparam}{9}
+\gdef \@abspage@last{8}

@@ -4,21 +4,35 @@ Init-parity diagnostic for Memory Residuals.
 Verifies, on a fixed Qwen3 backbone, that attaching MemRes does (or does
 not) leave the forward pass bit-equivalent to the bare backbone at step 0.
 
-Six cases are measured:
+Ten cases are measured (six original + four v12 slot-attention):
 
-    case                                                  | expected
-    ------------------------------------------------------+----------
-    memres_mode="simple_gate",       no memory injection  | parity (0 backbone perturbation)
-    memres_mode="simple_gate",       memory injection on  | parity (gate g_l = 0)
-    memres_mode="attention_base",    no memory            | broken (1/N uniform mix)
-    memres_mode="attention_base",    memory on            | broken
-    memres_mode="attention_parity",  no memory            | parity (one-hot recent + cumulative pool)
-    memres_mode="attention_parity",  memory on            | parity (mem_bias -> -inf)
+    case                                                       | expected
+    -----------------------------------------------------------+----------
+    memres_mode="simple_gate",      writer="original",  no mem | parity (gate g_l = 0)
+    memres_mode="simple_gate",      writer="original",  mem on | parity (gate g_l = 0)
+    memres_mode="attention_base",   writer="original",  no mem | broken (1/N uniform mix)
+    memres_mode="attention_base",   writer="original",  mem on | broken
+    memres_mode="attention_parity", writer="original",  no mem | parity (one-hot recent)
+    memres_mode="attention_parity", writer="original",  mem on | parity (mem_bias -> -inf)
+    memres_mode="simple_gate",      writer="slot_attention",  mem on | parity (gate g_l = 0)
+    memres_mode="attention_parity", writer="slot_attention",  mem on | parity (mem_bias -> -inf)
+    memres_mode="simple_gate",      writer="slot_attention_full", mem on | parity (gate g_l = 0)
+    memres_mode="attention_parity", writer="slot_attention_full", mem on | parity (mem_bias -> -inf)
 
 For each case we report the max absolute logit difference vs the bare
 backbone on a fixed text prompt, and a pass/fail at a 1e-3 tolerance
 (loose enough to absorb bf16 rounding from intermediate reductions
 through the depth router).
+
+The v12 slot-attention writer kinds replace MemoryBlock.judge (and
+optionally MemoryBlock.extract) with iterative slot-competitive
+attention.  They produce different M_c (and therefore different m^t)
+than the original writer at init, but the *forward parity* is enforced
+at the gate / router level (memory_gate.gate=0 for simple_gate;
+alpha_mem ~ exp(-32)/N for attention_parity).  So m^t's contribution
+to h is zero regardless of the writer kind, and the augmented model is
+still bit-exactly equal to the bare backbone -- which is what these
+cases verify.
 
 Run:
     python tools/init_parity_test.py \\
@@ -59,6 +73,7 @@ def build_memres(
     memres_mode: str,
     device: torch.device,
     dtype: torch.dtype,
+    writer_kind: str = "original",
 ) -> Qwen3MemResForCausalLM:
     """Build a fresh MemRes model on top of the pretrained Qwen3 weights.
 
@@ -74,6 +89,7 @@ def build_memres(
         memres_extraction_depth=0,
         memres_num_blocks=8,
         memres_mode=memres_mode,
+        memres_writer_kind=writer_kind,
     )
     model = Qwen3MemResForCausalLM.from_pretrained(
         pretrained, config=cfg, dtype=dtype
@@ -163,19 +179,40 @@ def main() -> None:
           f"dtype={base_out.dtype}")
 
     cases = [
-        # (label, memres_mode, attach_memory, expect_parity)
-        ("simple_gate_no_mem",          "simple_gate",      False, True),
-        ("simple_gate_with_mem",        "simple_gate",      True,  True),
-        ("attention_base_no_mem",       "attention_base",   False, False),
-        ("attention_base_with_mem",     "attention_base",   True,  False),
-        ("attention_parity_no_mem",     "attention_parity", False, True),
-        ("attention_parity_with_mem",   "attention_parity", True,  True),
+        # (label, memres_mode, writer_kind, attach_memory, expect_parity)
+        ("simple_gate_no_mem",
+         "simple_gate",      "original",            False, True),
+        ("simple_gate_with_mem",
+         "simple_gate",      "original",            True,  True),
+        ("attention_base_no_mem",
+         "attention_base",   "original",            False, False),
+        ("attention_base_with_mem",
+         "attention_base",   "original",            True,  False),
+        ("attention_parity_no_mem",
+         "attention_parity", "original",            False, True),
+        ("attention_parity_with_mem",
+         "attention_parity", "original",            True,  True),
+        # v12 slot-attention writer cases.  The writer changes M_c at
+        # init but the gate / router still zeros out m^t's contribution,
+        # so forward parity must hold for both routing modes that have
+        # the parity property in the original-writer case.
+        ("simple_gate_slot_attention",
+         "simple_gate",      "slot_attention",      True,  True),
+        ("attention_parity_slot_attention",
+         "attention_parity", "slot_attention",      True,  True),
+        ("simple_gate_slot_attention_full",
+         "simple_gate",      "slot_attention_full", True,  True),
+        ("attention_parity_slot_attention_full",
+         "attention_parity", "slot_attention_full", True,  True),
     ]
 
     results: list[dict] = []
-    for label, mode, attach_mem, expect_parity in cases:
+    for label, mode, writer_kind, attach_mem, expect_parity in cases:
         torch.manual_seed(0)  # MemoryReadout.W_V is normal-init -- pin RNG.
-        model = build_memres(a.pretrained, base_sd, mode, device, dtype)
+        model = build_memres(
+            a.pretrained, base_sd, mode, device, dtype,
+            writer_kind=writer_kind,
+        )
         h = history_ids if attach_mem else None
         # Probe the router's per-step bias and gate inits (helps diagnose
         # why parity does or doesn't hold).
@@ -188,6 +225,9 @@ def main() -> None:
             ),
             "depth_router.w[0].abs.max": float(router.w[0].detach().abs().max().item()),
             "memory_gate.gate[0]": float(gate.gate[0].detach().item()),
+            "memory_block.writer_kind": str(
+                getattr(model.model.memory_block, "writer_kind", "original")
+            ),
         }
         out = memres_logits(model, ids, h)
         stats = diff_stats(out, base_out)
@@ -195,7 +235,8 @@ def main() -> None:
         verdict = "PARITY" if passed else "PERTURBED"
         ok = "OK " if passed == expect_parity else "MISMATCH"
         print(
-            f"[parity] {label:<32s}  mode={mode:<18s} mem={attach_mem}  "
+            f"[parity] {label:<40s}  mode={mode:<18s} "
+            f"writer={writer_kind:<22s} mem={attach_mem}  "
             f"max|Δ|={stats['max_abs']:.3e}  "
             f"mean|Δ|={stats['mean_abs']:.3e}  -> {verdict:<9s} ({ok})"
         )
@@ -203,6 +244,7 @@ def main() -> None:
             {
                 "label": label,
                 "memres_mode": mode,
+                "writer_kind": writer_kind,
                 "memory_attached": attach_mem,
                 "expect_parity": expect_parity,
                 "logit_diff_vs_base": stats,

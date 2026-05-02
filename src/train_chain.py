@@ -159,6 +159,36 @@ def parse_args() -> argparse.Namespace:
              "so the model can still grow the readout magnitude during "
              "training as needed.",
     )
+    # v12 (2026-05-01) writer-subsystem architectural switch.
+    p.add_argument(
+        "--memres_writer_kind", default="original",
+        choices=["original", "slot_attention", "slot_attention_full"],
+        help="Implementation of the writer subsystem (MemoryBlock). "
+             "'original' (default, v1-v11) uses Eq. 1-2/5 with a "
+             "single-pass cross-attention judge whose softmax is over "
+             "the *inputs* axis -- D2 audit on v11g showed this "
+             "degenerates to row_entropy/log(2K) = 0.999 (uniform) and "
+             "effective rank 1.02 across 4000 steps, i.e. the judge "
+             "never actually competes. "
+             "'slot_attention' (v12a) replaces the Stage-2 judge with "
+             "an iterative Slot Attention writer (Locatello et al. 2020): "
+             "softmax over SLOTS, weighted-mean renormalisation, GRU "
+             "keep/write per slot. The slot-axis softmax forces slots "
+             "to specialise on disjoint pieces of the input -- the "
+             "PDF's 'zero-sum competition' realised structurally. "
+             "'slot_attention_full' (v12b) additionally replaces the "
+             "Stage-1 extraction stack with the same primitive over "
+             "raw session tokens C_t.",
+    )
+    p.add_argument(
+        "--memres_slot_attention_iters", type=int, default=3,
+        help="Number of iterations inside the Stage-2 SlotAttentionWriter "
+             "(when --memres_writer_kind != original). Canonical Slot "
+             "Attention default is 3. Stage 1 (when "
+             "writer_kind=slot_attention_full) uses 1 + "
+             "--memres_extraction_depth iterations to subsume the L_E "
+             "Perceiver-refinement layer count.",
+    )
 
     # Callback supervision (v6+ long-horizon recipe)
     p.add_argument(
@@ -467,6 +497,99 @@ def parse_args() -> argparse.Namespace:
                    help="After phase 1, linearly anneal mem_bias "
                         "from --readout_warmup_router_bias back to "
                         "--router_mem_bias_init over this many steps.")
+
+    # v13 (2026-05-01): writer warmup.  Extends the readout_warmup
+    # idea to the writer: during phase 1, freeze ONLY the backbone
+    # and LM head/embed; train the FULL memory subsystem (M_in,
+    # extract, M_judge, judge, judge_norm, write_gate, readout,
+    # router, memres_gate) under forced-open routing.  The backbone
+    # produces stable hidden states for C_t, and the memory
+    # subsystem receives the full LM gradient signal with every
+    # softmax multiplier already at a useful operating point.
+    # This is the single highest-leverage fix identified by the
+    # 2026-05-01 audit (problems.md §5): it directly attacks
+    # §2a (gradient starvation of M_in/M_judge: 10^-8 of backbone)
+    # and §2b (permutation-equivariant uniform fixed point of the
+    # judge softmax) by giving the writer 5+ orders of magnitude
+    # more effective gradient than it receives under joint LM-only
+    # training.
+    p.add_argument("--writer_warmup_steps", type=int, default=0,
+                   help="v13 architectural fix: phase 1 length where "
+                        "backbone + LM head + embed are frozen and the "
+                        "entire memres subsystem (writer + readout + "
+                        "router + gate) trains under forced-open "
+                        "routing (see --writer_warmup_router_bias). 0 "
+                        "disables the schedule (legacy training). "
+                        "Recommended: 500-1000 for a 4000-step run. "
+                        "Supersedes --readout_warmup_steps if both are "
+                        "set (writer_warmup trains a strict superset of "
+                        "parameters).")
+    p.add_argument("--writer_warmup_router_bias", type=float, default=4.0,
+                   help="The mem_bias value held during writer warmup "
+                        "phase 1. With recent_bias_init=4.0 the router "
+                        "softmax gives memory ~50% mass on "
+                        "attention_parity, so LM gradient through m^t "
+                        "is dominant.")
+    p.add_argument("--writer_warmup_anneal_steps", type=int, default=200,
+                   help="After writer warmup phase 1, linearly anneal "
+                        "mem_bias back to --router_mem_bias_init over "
+                        "this many steps. Backbone also unfreezes at "
+                        "the end of phase 1 (unless --freeze_backbone "
+                        "is also set).")
+    p.add_argument("--writer_warmup_keep_backbone_frozen",
+                   action="store_true",
+                   help="If set, the backbone stays frozen even after "
+                        "writer warmup phase 1 ends.  Equivalent to "
+                        "--freeze_backbone.  Useful when composing "
+                        "writer warmup with a frozen-backbone recipe "
+                        "(v11l / v12d_frozen / v13 headline).")
+    # v13 symmetry-break init knobs (threaded to Qwen3MemResConfig).
+    p.add_argument("--memres_queries_init",
+                   choices=("normal", "orthogonal"),
+                   default="normal",
+                   help="Init for M_in and M_judge writer-query seeds. "
+                        "'orthogonal' breaks the permutation-"
+                        "equivariant uniform fixed point observed in "
+                        "v11g/v12a D2 audits (row_entropy/log(2K)="
+                        "0.999, eff_rank=1.02).")
+    p.add_argument("--memres_slot_positional", action="store_true",
+                   help="Add a learnable Fourier per-slot positional "
+                        "embedding to M_in and M_judge before the "
+                        "Q/K/V projections.  Gives each slot a "
+                        "permanent address the symmetry-break survives "
+                        "adversarial drift.")
+    # v14 architectural knobs (threaded to Qwen3MemResConfig).
+    p.add_argument("--memres_judge_qk_layernorm", action="store_true",
+                   help="Apply post-projection RMSNorm to the Q and K "
+                        "of the Stage-2 judge (MemoryBlock.judging).  "
+                        "Decouples attention-logit magnitude from "
+                        "W_Q/W_K spectral norm so the judge softmax "
+                        "can find sharper distributions.  v14 fix for "
+                        "the D2-JUDGE row_entropy / log(2K) > 0.95 "
+                        "uniform-attention pathology measured on v13r "
+                        "@ step 10000 (Zhai et al. 2023 entropy-"
+                        "collapse direction; inverse pathology here).")
+    # v14 auxiliary-loss knobs.  These are read during fit() and
+    # applied only when their weight is > 0; defaults preserve
+    # pre-v14 behaviour exactly.
+    p.add_argument("--alpha_mem_floor_aux_weight", type=float, default=0.0,
+                   help="Weight on an MoE-style load-balance auxiliary "
+                        "loss that penalises the depth router's "
+                        "per-sublayer alpha_mem dropping below "
+                        "--alpha_mem_floor_target.  Computed as "
+                        "mean_l relu(target - mean(alpha_mem_l)) "
+                        "over all routed sublayers l, averaged over "
+                        "positions.  Targets the v13 finding that the "
+                        "router actively collapses memory usage to "
+                        "alpha_mem_mean ~ 0.001 (textbook MoE expert "
+                        "collapse).  0.0 disables.")
+    p.add_argument("--alpha_mem_floor_target", type=float, default=0.05,
+                   help="Target floor for per-sublayer mean(alpha_mem). "
+                        "0.05 matches the manuscript's empirical "
+                        "'mild' recruitment band and leaves plenty of "
+                        "mass on the non-memory sources during content-"
+                        "rich turns.  Only active when "
+                        "--alpha_mem_floor_aux_weight > 0.")
 
     p.add_argument("--burn_in_max", type=int, default=12,
                    help="Maximum number of sessions to unroll under "
@@ -1236,16 +1359,40 @@ class Trainer:
             memres_update_mode=a.memres_update_mode,
             memres_gate_init=a.memres_gate_init,
             memres_readout_norm_init=a.memres_readout_norm_init,
+            memres_writer_kind=a.memres_writer_kind,
+            memres_slot_attention_iters=a.memres_slot_attention_iters,
+            memres_queries_init=a.memres_queries_init,
+            memres_slot_positional=a.memres_slot_positional,
+            memres_judge_qk_layernorm=a.memres_judge_qk_layernorm,
         )
         if a.pretrained:
             # A memres checkpoint saves model_type="qwen3_memres", which
             # AutoConfig does not know about; try loading it directly
             # before falling back to AutoConfig (which handles the base
             # Qwen3 / HF preset path).
+            #
+            # BUGFIX 2026-05-01 (v13 campaign): ``Qwen3MemResConfig`` is a
+            # subclass of ``Qwen3Config``, so ``.from_pretrained`` ALSO
+            # succeeds on a plain Qwen3 config.json.  Using the try/except
+            # success as the "is this a memres checkpoint?" detector is
+            # therefore a false-positive on every non-memres base model
+            # (e.g. ``Qwen/Qwen3-0.6B``), which silently falls through to
+            # the overridable-subset restriction below and DROPS CLI
+            # overrides of ``--memres_mode``, ``--memres_writer_kind``,
+            # ``--memres_slot_positional``, ``--memres_update_mode``,
+            # ``--memres_extract_source``, ``--memres_num_vectors``,
+            # ``--memres_extraction_depth``, ``--memres_num_blocks``,
+            # ``--memres_slot_attention_iters``.  Root cause of v13a/b/c
+            # running in ``attention_parity`` + ``original`` writer mode
+            # despite requesting ``simple_gate`` + ``slot_attention`` in
+            # the launch script.  Fix: detect by the raw ``model_type``
+            # field loaded from config.json -- a real memres checkpoint
+            # has ``"qwen3_memres"``, a plain Qwen3 base has ``"qwen3"``.
             from_memres_ckpt = False
             try:
                 base_cfg = Qwen3MemResConfig.from_pretrained(a.pretrained)
-                from_memres_ckpt = True
+                if getattr(base_cfg, "model_type", None) == "qwen3_memres":
+                    from_memres_ckpt = True
             except Exception:
                 base_cfg = AutoConfig.from_pretrained(a.pretrained)
             # When loading from a memres checkpoint, preserve the
@@ -1271,6 +1418,18 @@ class Trainer:
                     # of the v11 first-launch smoke-test failure.
                     "memres_gate_init",
                     "memres_readout_norm_init",
+                    # v13 symmetry-break knobs: also architecture-shape
+                    # (they only affect the init values of M_in, M_judge,
+                    # and add / don't add M_in_pos / M_judge_pos
+                    # parameters).  When warm-starting from a memres
+                    # checkpoint, shape-changing flags must match the
+                    # checkpoint, so ``memres_slot_positional`` is NOT
+                    # in this overridable set — changing it would
+                    # silently drop or create parameters.  The init
+                    # kind IS overridable because it only affects
+                    # values at construction time, which are immediately
+                    # overwritten by the loaded checkpoint anyway.
+                    "memres_queries_init",
                 }
                 merged = dict(base_cfg.to_dict())
                 for k, v in memres_kwargs.items():
@@ -1694,6 +1853,14 @@ class Trainer:
         # zero-outs); we want the *un-dropped* M_c here so the
         # diagonal of the B*B contrastive matrix is informative.
         M_c_for_contrast: torch.Tensor | None = None
+        # v14 alpha_mem floor aux loss: we collect per-layer alpha_mem
+        # from every forward that has non-zero memory (drop_mem=False)
+        # and compute a per-sublayer mean-over-positions floor
+        # penalty.  Keeping the tensors (with grad) in this list and
+        # reducing at the bottom of the loss-construction block keeps
+        # the forward graph small.
+        alpha_floor_traces: list[list[torch.Tensor]] = []
+        want_alpha_floor = a.alpha_mem_floor_aux_weight > 0.0
         for t in range(a.window_k):
             session = window[:, t]                         # (B, S)
             input_ids = session[:, :-1]
@@ -1728,12 +1895,18 @@ class Trainer:
                 a.callback_loss_weight > 0.0
                 and bool(cb_mask_t.any().item())
             )
+            # v14: collect alpha_trace only on forwards that carried
+            # memory (drop_mem=False); on dropped-memory forwards the
+            # router has no memory source to route to so the floor is
+            # not well-defined.
+            collect_alpha = want_alpha_floor and not drop_mem
             if use_cb_loss:
                 out = self.wrapped(
                     input_ids=input_ids,
                     labels=None,
                     M_c=read_M,
                     attention_mask=attn_mask,
+                    collect_alpha_trace=collect_alpha,
                 )
                 logits = out.logits  # (B, S-1, V)
                 loss_t = self._weighted_lm_loss(
@@ -1746,8 +1919,13 @@ class Trainer:
                     labels=labels,
                     M_c=read_M,
                     attention_mask=attn_mask,
+                    collect_alpha_trace=collect_alpha,
                 )
                 losses.append(out.loss)
+            if collect_alpha:
+                tr = getattr(out, "alpha_trace", None)
+                if tr is not None and len(tr) > 0:
+                    alpha_floor_traces.append(tr)
 
             # Snapshot M_c right before the *last* session's update so we can
             # use it (and a paired shuffle M_c) for the negative-chain loss.
@@ -1769,6 +1947,45 @@ class Trainer:
 
         loss_match = torch.stack(losses).mean()
         total_loss = loss_match
+
+        # v14 alpha_mem floor auxiliary loss.  MoE-style load-balance:
+        # penalise per-sublayer mean(alpha_mem) dropping below
+        # ``alpha_mem_floor_target``.  The router is then obligated to
+        # keep sampling the memory source even when local features
+        # would dominate -- giving the writer / readout a persistent
+        # downstream gradient signal during joint training.  Motivated
+        # by v13r ROUTE @ step 10000: alpha_mem_mean=0.0011, top l5=
+        # 0.0136 (router collapsed to effectively ignoring memory),
+        # which is textbook MoE expert collapse and the standard fix
+        # is a load-balance auxiliary loss (Switch Transformer, Fedus
+        # et al. 2021).  Zero-cost when weight=0 because the
+        # alpha_floor_traces list stays empty.
+        if want_alpha_floor and alpha_floor_traces:
+            target = float(a.alpha_mem_floor_target)
+            aux_terms = []
+            for trace in alpha_floor_traces:
+                for a_mem in trace:
+                    # a_mem: (B, S) depth-wise attention mass on b_{-1}.
+                    # Mean over batch & position for this sublayer.
+                    m = a_mem.float().mean()
+                    # relu(target - m): penalises only the downward
+                    # violation; when mean(alpha_mem) >= target the aux
+                    # gradient is zero and the main loss is unimpeded.
+                    aux_terms.append(F.relu(target - m))
+            loss_alpha_floor = torch.stack(aux_terms).mean()
+            total_loss = total_loss + a.alpha_mem_floor_aux_weight * loss_alpha_floor
+            self._last_alpha_floor_loss = float(loss_alpha_floor.detach().item())
+            with torch.no_grad():
+                all_means = [
+                    a_mem.float().mean().detach().item()
+                    for trace in alpha_floor_traces for a_mem in trace
+                ]
+                self._last_alpha_mem_batch_mean = (
+                    sum(all_means) / max(1, len(all_means))
+                )
+        else:
+            self._last_alpha_floor_loss = 0.0
+            self._last_alpha_mem_batch_mean = 0.0
 
         # Negative-chain contrastive auxiliary loss (PITFALLS §3).  Build a
         # shuffle M_c from a randomly-chosen *different* chain (any chain,
@@ -2697,14 +2914,83 @@ class Trainer:
         for p in self._model().parameters():
             p.requires_grad_(True)
 
+    def _writer_warmup_freeze(self) -> None:
+        """v13 phase 1: freeze backbone + LM head + embed.  Train the
+        full memres subsystem.
+
+        Motivation (problems.md §5, recommendation 2): M_in and M_judge
+        under joint LM-only training receive 10^-8-10^-9 of the
+        backbone's gradient, which is below the optimiser's effective
+        update scale -- the writer is effectively frozen at its init
+        for the entire run.  Freezing the backbone / LM head / embed
+        removes the 99% of parameters that dominate the loss landscape
+        and concentrates gradient onto the memres subsystem.  Combined
+        with ``_set_mem_bias(writer_warmup_router_bias)`` to force the
+        depth softmax open, the writer receives direct LM gradient
+        that is 5+ orders of magnitude larger than in joint training,
+        over a stable backbone target.
+        """
+        markers = (
+            "memory_block",
+            "memory_readout",
+            "depth_router",
+            "memory_gate",
+        )
+        for n, p in self._model().named_parameters():
+            keep = any(m in n for m in markers)
+            p.requires_grad_(keep)
+
+    def _writer_warmup_unfreeze(self, *, keep_backbone_frozen: bool) -> None:
+        """v13 phase 2: unfreeze everything (or keep backbone frozen).
+
+        When ``keep_backbone_frozen`` is True, the memres subsystem
+        continues to train but the backbone stays frozen -- this mirrors
+        the v12d_frozen regime (which produced the campaign's first
+        positive ``evidence_lift``).
+        """
+        if keep_backbone_frozen:
+            self._writer_warmup_freeze()
+        else:
+            for p in self._model().parameters():
+                p.requires_grad_(True)
+
     def _set_mem_bias(self, value: float) -> None:
         """Force-set the router's mem_bias parameter to ``value`` for
         every routing step.  Operates in-place on the buffer; the
         optimiser may attempt to update it in phase 2 -- that is
-        intended (we *want* the bias to be learnable post-warmup)."""
+        intended (we *want* the bias to be learnable post-warmup).
+
+        In ``attention_parity`` routing this controls the memory
+        column of the depth softmax (Eq. 9).  In ``simple_gate``
+        routing depth_router is NOT on the forward path; the memory
+        injection is controlled by ``memory_gate.gate`` (a per-
+        sublayer scalar added to h via ``h + gate * m^t``).  This
+        function therefore also force-sets the memory_gate to a
+        value that gives ~50% memory contribution at the effective
+        readout norm init (norm=0.05 -> ||m^t||/||embed|| ~3.9, so
+        gate=0.5 gives gate*||m^t|| ~ 2 which is comparable to
+        ||h|| magnitudes after a layer).  Without this, writer
+        warmup in simple_gate mode leaves m^t disconnected from h
+        and the writer receives zero LM gradient through the
+        forward path -- defeating the entire purpose of the warmup.
+        """
         bias = self._model().model.depth_router.mem_bias
         with torch.no_grad():
             bias.data.fill_(float(value))
+        # simple_gate forward-path force-open.  Map mem_bias in
+        # [0, 4] to gate in [0, ~0.5] via a saturating function
+        # (tanh scaled); mem_bias = 4 -> gate ~ 0.50.  This gives
+        # a reasonable memory contribution without crushing
+        # backbone signal under a saturating gate.
+        mode = getattr(self._model().config, "memres_mode", None)
+        if mode == "simple_gate":
+            gate = self._model().model.memory_gate.gate
+            # Smooth map: gate_target = 0.5 * tanh(bias/2) for bias
+            # in [0, inf).  bias=4 -> 0.5 * tanh(2) = ~0.482.
+            import math as _m
+            target = 0.5 * _m.tanh(float(value) / 2.0)
+            with torch.no_grad():
+                gate.data.fill_(target)
 
     def fit(self) -> None:
         a = self.args
@@ -2712,11 +2998,33 @@ class Trainer:
         rng = random.Random(a.seed + self.rank * 7919 + 13)
         carry = None
 
-        # Architectural fix A: scaffolded readout warmup.  Freeze the
-        # writer + router + backbone + LM head and force the routing
-        # toward memory before phase 2's joint optimisation can close
-        # the pathway.  See parser help for rationale.
-        if a.readout_warmup_steps > 0:
+        # v13 architectural fix (writer warmup) takes precedence over
+        # the v11r readout warmup when both are set -- writer warmup
+        # trains a strict superset of parameters.
+        if a.writer_warmup_steps > 0:
+            self._writer_warmup_freeze()
+            self._set_mem_bias(a.writer_warmup_router_bias)
+            if self.is_main:
+                n_train = sum(
+                    p.numel() for p in self._model().parameters()
+                    if p.requires_grad
+                )
+                print(
+                    f"  [v13] writer warmup ENGAGED: phase 1 = "
+                    f"{a.writer_warmup_steps} steps, "
+                    f"router mem_bias forced to "
+                    f"{a.writer_warmup_router_bias}, "
+                    f"{n_train:,} trainable params (memres subsystem "
+                    f"only: M_in, extract, M_judge, judge, readout, "
+                    f"router, memres_gate).",
+                    flush=True,
+                )
+        # Architectural fix A (v11r): scaffolded readout warmup.  Freeze
+        # the writer + router + backbone + LM head and force the
+        # routing toward memory before phase 2's joint optimisation can
+        # close the pathway.  See parser help for rationale.  Skipped
+        # if writer_warmup_steps > 0 (the superset training).
+        elif a.readout_warmup_steps > 0:
             self._readout_warmup_freeze()
             self._set_mem_bias(a.readout_warmup_router_bias)
             if self.is_main:
@@ -2748,7 +3056,45 @@ class Trainer:
             # the router parameters are frozen in this phase, the
             # bias buffer can drift on rare numerical paths -- this
             # makes the schedule explicit.
-            if a.readout_warmup_steps > 0:
+            if a.writer_warmup_steps > 0:
+                if self.global_step < a.writer_warmup_steps:
+                    self._set_mem_bias(a.writer_warmup_router_bias)
+                elif self.global_step == a.writer_warmup_steps:
+                    self._writer_warmup_unfreeze(
+                        keep_backbone_frozen=(
+                            a.writer_warmup_keep_backbone_frozen
+                            or getattr(a, "freeze_backbone", False)
+                        )
+                    )
+                    if self.is_main:
+                        bb_note = (
+                            "backbone STAYS FROZEN"
+                            if a.writer_warmup_keep_backbone_frozen
+                               or getattr(a, "freeze_backbone", False)
+                            else "backbone unfreezes"
+                        )
+                        print(
+                            f"  [v13] writer warmup COMPLETE "
+                            f"@ step {self.global_step}: "
+                            f"{bb_note}, annealing "
+                            f"mem_bias {a.writer_warmup_router_bias} "
+                            f"-> {a.router_mem_bias_init} over "
+                            f"{a.writer_warmup_anneal_steps} steps",
+                            flush=True,
+                        )
+                elif (self.global_step
+                      < a.writer_warmup_steps
+                      + a.writer_warmup_anneal_steps):
+                    progress = (
+                        (self.global_step - a.writer_warmup_steps)
+                        / max(1, a.writer_warmup_anneal_steps)
+                    )
+                    target = (
+                        a.writer_warmup_router_bias * (1.0 - progress)
+                        + a.router_mem_bias_init * progress
+                    )
+                    self._set_mem_bias(target)
+            elif a.readout_warmup_steps > 0:
                 if self.global_step < a.readout_warmup_steps:
                     self._set_mem_bias(a.readout_warmup_router_bias)
                 elif self.global_step == a.readout_warmup_steps:
@@ -2821,11 +3167,18 @@ class Trainer:
                             f"off {self._last_contrastive_offdiag:.3f} "
                             f"gap {self._last_contrastive_gap:+.3f} | "
                         )
+                    floor_str = ""
+                    if a.alpha_mem_floor_aux_weight > 0.0:
+                        floor_str = (
+                            f"a_floor {getattr(self, '_last_alpha_floor_loss', 0.0):.4f} "
+                            f"a_mean {getattr(self, '_last_alpha_mem_batch_mean', 0.0):.4f} | "
+                        )
                     print(
                         f"step {self.global_step:6d} | loss {loss_t.item():.4f} | "
                         f"lrs {lr_now} | grad_norm {float(grad_norm):.3f} | "
                         f"gate_mean {gate_mean:+.4f} max {gate_max:.4f} | "
                         f"{nce_str}"
+                        f"{floor_str}"
                         f"{tok_sec/1e3:.1f}k tok/s",
                         flush=True,
                     )
@@ -2868,6 +3221,13 @@ class Trainer:
                             wandb_payload["train/contrast_diag"] = self._last_contrastive_diag
                             wandb_payload["train/contrast_offdiag"] = self._last_contrastive_offdiag
                             wandb_payload["train/contrast_gap"] = self._last_contrastive_gap
+                        if a.alpha_mem_floor_aux_weight > 0.0:
+                            wandb_payload["train/alpha_floor_loss"] = getattr(
+                                self, "_last_alpha_floor_loss", 0.0
+                            )
+                            wandb_payload["train/alpha_mem_batch_mean"] = getattr(
+                                self, "_last_alpha_mem_batch_mean", 0.0
+                            )
                         if a.diagnose_grad_groups and self._last_grad_norms:
                             for k, v in self._last_grad_norms.items():
                                 wandb_payload[f"grad/{k}"] = v

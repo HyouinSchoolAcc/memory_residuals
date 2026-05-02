@@ -1,0 +1,98 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{liu2025memres}
+\citation{liu2025memres,duan2025memres}
+\citation{liu2025drop}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
+\citation{liu2025drop}
+\citation{liu2025memres}
+\@writefile{toc}{\contentsline {paragraph}{What this paper contributes.}{2}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scope and non-scope.}{2}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Roadmap.}{2}{section*.3}\protected@file@percent }
+\citation{liu2025drop}
+\citation{du2025blockattnres}
+\citation{liu2025drop}
+\citation{liu2025drop}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background: the architectural primitive}{3}{section.2}\protected@file@percent }
+\newlabel{sec:primitive}{{2}{3}{Background: the architectural primitive}{section.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Memory state.}{3}{section*.4}\protected@file@percent }
+\newlabel{eq:extract}{{1}{3}{Memory state}{equation.1}{}}
+\newlabel{eq:judge}{{2}{3}{Memory state}{equation.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Off-sequence read.}{3}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Routing primitive (\textsc  {attention\_parity}).}{3}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Recurrent training loop.}{3}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Empirical baseline (book-only, from \cite  {liu2025drop}).}{3}{section*.8}\protected@file@percent }
+\citation{xu2022msc}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Book-only baseline trajectory of \textsc  {attention\_parity} (soft init, $\pm 4$) on the legacy chain corpus (PG-19 train: $4995$ books cut into $218$k sessions, plus $30$ TV transcripts; $\sim 113$M Qwen tokens). In-trainer eval, $n{=}92$ score positions per row, eval window $4$. Run name \texttt  {chain\_v3\_softparity\_full}; killed at step $4425$ for the recipe rerun, so the listed step-$4400$ row is the best persisted checkpoint.}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:v3_baseline}{{1}{4}{Book-only baseline trajectory of \textsc {attention\_parity} (soft init, $\pm 4$) on the legacy chain corpus (PG-19 train: $4995$ books cut into $218$k sessions, plus $30$ TV transcripts; $\sim 113$M Qwen tokens). In-trainer eval, $n{=}92$ score positions per row, eval window $4$. Run name \texttt {chain\_v3\_softparity\_full}; killed at step $4425$ for the recipe rerun, so the listed step-$4400$ row is the best persisted checkpoint}{table.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}The four-piece training recipe}{4}{section.3}\protected@file@percent }
+\newlabel{sec:recipe}{{3}{4}{The four-piece training recipe}{section.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Piece 1: contextual extract source.}{4}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Piece 2: mixed conversational corpus.}{4}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Piece 3: negative-chain contrastive loss.}{4}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Piece 4: soft (not strict) parity router init.}{4}{section*.12}\protected@file@percent }
+\citation{qwen3}
+\citation{liu2025drop}
+\@writefile{toc}{\contentsline {paragraph}{Putting them together.}{5}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Setup}{5}{section.4}\protected@file@percent }
+\newlabel{sec:setup}{{4}{5}{Setup}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Backbone and parameter groups.}{5}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Corpus.}{5}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Training.}{5}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Evaluation.}{5}{section*.17}\protected@file@percent }
+\citation{liu2025drop}
+\citation{liu2025drop}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Headline ablation matrix. Rows: extract source; columns: training corpus mix. Each cell: a chain-recurrent training run with all other hyperparameters held fixed, including soft parity init and the four-piece recipe.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:headline_grid}{{2}{6}{Headline ablation matrix. Rows: extract source; columns: training corpus mix. Each cell: a chain-recurrent training run with all other hyperparameters held fixed, including soft parity init and the four-piece recipe}{table.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Headline cell results. \textcolor {red}{\textbf  {[TODO: To be filled by \texttt  {paper\_tools/post\_train\_pipeline.sh} after each cell finishes.]}}}}{6}{table.3}\protected@file@percent }
+\newlabel{tab:headline_results}{{3}{6}{Headline cell results. \todo {To be filled by \texttt {paper\_tools/post\_train\_pipeline.sh} after each cell finishes.}}{table.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Mechanistic probes.}{6}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Experiments}{6}{section.5}\protected@file@percent }
+\newlabel{sec:experiments}{{5}{6}{Experiments}{section.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{Headline ablation.}{6}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Per-cell numbers (planned).}{6}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RAG baselines.}{6}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Negative result: strict $\pm 32$ init is operationally untrainable}{6}{section.6}\protected@file@percent }
+\newlabel{sec:negative_result}{{6}{6}{Negative result: strict $\pm 32$ init is operationally untrainable}{section.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{Setup.}{6}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Empirical observation.}{6}{section*.23}\protected@file@percent }
+\citation{liu2025drop}
+\citation{fedus2021switch}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Strict-init headline run \texttt  {chain\_v4\_hidden14\_msc}: in-trainer eval trajectory ($n{=}124$ scored positions). \textbf  {$\Delta _{\text  {nm-m}}$ and $\Delta _{\text  {sh-m}}$ are $+0.0000$ to four decimals at every single eval step}, despite the contrastive ramp from $w_{\text  {init}}{=}0.05$ to $w_{\text  {final}}{=}0.5$ over the first $1000$ steps. Train NLL is decreasing as a backbone-only fit artefact.}}{7}{table.4}\protected@file@percent }
+\newlabel{tab:strict_eval}{{4}{7}{Strict-init headline run \texttt {chain\_v4\_hidden14\_msc}: in-trainer eval trajectory ($n{=}124$ scored positions). \textbf {$\dnm $ and $\dsh $ are $+0.0000$ to four decimals at every single eval step}, despite the contrastive ramp from $w_{\text {init}}{=}0.05$ to $w_{\text {final}}{=}0.5$ over the first $1000$ steps. Train NLL is decreasing as a backbone-only fit artefact}{table.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Bf16 saturation argument.}{7}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Comparison to the soft-init book-only baseline.}{7}{section*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reading.}{7}{section*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Second iteration: three training-dynamics signatures and three fixes}{7}{section.7}\protected@file@percent }
+\newlabel{sec:second_iteration}{{7}{7}{Second iteration: three training-dynamics signatures and three fixes}{section.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Signature 1: router collapses memory under joint training.}{7}{section*.27}\protected@file@percent }
+\citation{liu2025memres}
+\citation{liu2025memres}
+\@writefile{toc}{\contentsline {paragraph}{Signature 2: writer receives no discriminative signal.}{8}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature 3: writer receives near-zero gradient at joint-training init.}{8}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Putting them together.}{8}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Non-orthogonality of the seven pieces.}{8}{section*.31}\protected@file@percent }
+\citation{liu2025drop}
+\bibstyle{plain}
+\bibdata{references}
+\bibcite{du2025blockattnres}{{1}{}{{}}{{}}}
+\bibcite{fedus2021switch}{{2}{}{{}}{{}}}
+\bibcite{liu2025memres}{{3}{}{{}}{{}}}
+\bibcite{qwen3}{{4}{}{{}}{{}}}
+\bibcite{xu2022msc}{{5}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {paragraph}{Planned headline cell (\texttt  {chain\_v14a\_ap\_mega\_fullfix}).}{9}{section*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Discussion and limitations}{9}{section.8}\protected@file@percent }
+\newlabel{sec:discussion}{{8}{9}{Discussion and limitations}{section.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{What the recipe is and is not.}{9}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why the four pieces are not orthogonal.}{9}{section*.34}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{9}{section*.35}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Conclusion.}{9}{section*.36}\protected@file@percent }
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\@writefile{toc}{\contentsline {section}{\numberline {A}Per-step diagnostics from the strict-init run}{10}{appendix.A}\protected@file@percent }
+\newlabel{app:strict_logs}{{A}{10}{Per-step diagnostics from the strict-init run}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Mixed-corpus build}{10}{appendix.B}\protected@file@percent }
+\newlabel{app:corpus}{{B}{10}{Mixed-corpus build}{appendix.B}{}}
+\gdef \@abspage@last{10}

@@ -78,10 +78,25 @@ $2\!\times\!2$ ablation (contextual extract $\times$ mixed corpus)
 trained under that recipe, and on a key negative result: the strict
 parity-preserving init ($\pm 32$) produces a literal numerical-zero
 gradient through the router softmax, so the contrastive ramp cannot
-escape it. The empirical headline is therefore the slightly weaker
-\emph{soft} parity init ($\pm 4$) plus the rest of the recipe; we
-demonstrate that this configuration is necessary to make the
-primitive perform on dialogue at all.
+escape it.
+
+A second iteration of the recipe, informed by three diagnostic
+signatures surfaced during the first-iteration runs, adds three
+further training-time pieces on top of the architectural writer
+refinement introduced in the position paper~\cite{liu2025memres}:
+a supervised writer warmup that decouples the two-stage QKV
+subsystem's optimisation from the joint LM objective, a
+load-balance auxiliary loss on the router's per-sublayer memory
+mass $\amem$ to prevent MoE-style expert collapse of the memory
+source under joint training, and a multi-negative InfoNCE
+contrastive term that gives the writer a direct discriminative
+target beyond the margin-style negative-chain loss of Piece~3.
+We establish that each is necessary on dialogue corpora at
+$0.6$B scale, and that the combined seven-piece recipe is what
+finally yields a router that recruits memory above a target
+floor throughout joint training, a writer whose slots remain
+orthogonal across the full run, and a judge that makes non-uniform
+decisions.
 \end{abstract}
 
 \section{Introduction}
@@ -179,8 +194,16 @@ counterfactual diagnostics. \S\ref{sec:negative_result} pins down
 the strict-vs-soft init failure mode in detail, including a
 bf16-arithmetic argument for why the strict $\pm 32$ init is
 operationally untrainable under a contrastive ramp.
-\S\ref{sec:discussion} discusses limitations and the interaction
-of architectural and training-recipe interventions.
+\S\ref{sec:second_iteration} presents the diagnostic findings that
+the first-iteration recipe, while sufficient to move $\dsh$ off zero
+on dialogue, leaves three well-defined training-dynamics failure
+signatures standing; and it introduces three additional recipe
+pieces (writer warmup, $\amem$ load-balance aux loss, multi-negative
+InfoNCE contrastive) that target those signatures individually,
+paired with the architectural judge refinement of the position
+paper~\cite{liu2025memres}. \S\ref{sec:discussion} discusses
+limitations and the interaction of architectural and training-recipe
+interventions.
 
 \section{Background: the architectural primitive}
 \label{sec:primitive}
@@ -621,6 +644,139 @@ in this regime should be calibrated such that the backward gradient
 through the routing softmax stays inside the float-format's
 representable range; for bf16 this places an upper bound of
 $|\!\texttt{bias}| \lesssim 8$.
+
+\section{Second iteration: three training-dynamics signatures and three fixes}
+\label{sec:second_iteration}
+
+The first-iteration recipe (\S\ref{sec:recipe}) establishes that
+dialogue chains can move $\dsh$ off zero under the soft parity
+init. Running the full recipe on a larger mixed corpus
+(v11\_mega: $67$k chains across $5$ sources, PG-19 + MSC +
+LongMemEval + TV + RealTalk) and instrumenting the writer
+subsystem with three new diagnostic probes (D2-JUDGE:
+judge attention entropy; D3-MC: inter-slot distance and per-step
+memory drift; and a load-balance trace on the router's
+per-sublayer $\amem$) reveals three new failure signatures that
+the original four-piece recipe does not address. We name each
+signature, state the diagnostic that surfaced it, and propose one
+additional recipe piece per signature.
+
+\paragraph{Signature 1: router collapses memory under joint training.}
+During joint training (i.e.\ after any LR warmup, once the backbone
+is unfrozen and $\texttt{mem\_bias}$ is at its soft-init value of
+$-4$), the per-sublayer measured $\amem^{\text{mean}}$ across the
+$8$ routed sublayers drops from its init floor of $\exp(-4)/N
+\approx 2.3\!\times\!10^{-3}$ down to $1.1\!\times\!10^{-3}$ at
+step $10{,}000$ and stays there. Every sublayer's maximum
+$\amem^{\text{max}}$ is below $0.015$. This is textbook MoE-style
+expert collapse~\cite{fedus2021switch}: the memory source is one
+of $N\!+\!2$ sources in the depth router's softmax pool, and
+nothing in the objective obligates the router to sample it.
+\emph{Piece~5 --- $\amem$ load-balance auxiliary loss.} We add
+\[
+\mathcal{L}_{\text{floor}}
+ \;=\; \frac{1}{|\mathcal{R}|}\sum_{\ell \in \mathcal{R}}
+        \mathrm{ReLU}\!\bigl(\tau - \overline{\amem^{(\ell)}}\bigr),
+\qquad \tau = 0.05,
+\]
+where $\mathcal{R}$ enumerates the routed sublayers and
+$\overline{\amem^{(\ell)}}$ is the batch-and-position mean of the
+per-sublayer memory mass. The aux term activates only when the
+router is below the floor and is identically zero otherwise, so it
+does not distort the LM gradient once $\amem$ is recruited. Total
+loss weight: $\lambda_{\text{floor}} = 0.01$.
+
+\paragraph{Signature 2: writer receives no discriminative signal.}
+The margin-style negative-chain contrastive loss of Piece~3 is
+a pairwise comparison at the scoring session only: it penalises
+the match-NLL for not beating a single shuffle-NLL by margin
+$m_{\text{neg}}{=}0.05$. This is under-powered on mixed
+conversational corpora where natural within-chain variance on
+callback-tolerant positions often exceeds $m_{\text{neg}}$. The
+D2-JUDGE diagnostic shows the judge row-entropy relative to
+$\log(2K)$ staying above $0.95$ under the first-iteration recipe
+on dialogue --- the judge is making near-uniform decisions, which
+is consistent with the writer never being asked to make its
+candidate $M_{\text{new}}$ \emph{quantitatively} distinguishable
+from non-matched chains. \emph{Piece~6 --- multi-negative
+InfoNCE over $B$-way batches.} For a batch of $B$ chains we
+construct the cross-product of \{chain-$i$'s scoring-session
+input\} $\times$ \{chain-$j$'s memory\} for $j \in \{1, \dots, B\}$,
+score the per-pair NLL on callback tokens only, and apply a
+temperature-scaled cross-entropy over the $B \times B$ grid with
+the diagonal as targets:
+\[
+\mathcal{L}_{\text{NCE}}
+ \;=\; \frac{1}{B}\sum_{i=1}^{B}
+        -\log\frac{\exp(-\mathrm{NLL}_{ii}/\mathcal{T})}
+                  {\sum_{j=1}^{B}\exp(-\mathrm{NLL}_{ij}/\mathcal{T})},
+\quad \mathcal{T} = 1.0.
+\]
+With $B=4$ this gives the writer $B-1=3$ contrastive negatives per
+match instead of one, with a ramp from $\lambda_{\text{NCE}}=0$ at
+step $0$ to $\lambda_{\text{NCE}}=0.5$ at step $500$.
+
+\paragraph{Signature 3: writer receives near-zero gradient at
+joint-training init.} A D1 gradient-group probe on the first
+$500$ steps of joint training shows $\|\nabla_{M_{\text{in}}}\| /
+\|\nabla_{\text{backbone}}\| \approx 10^{-8}$ --- the extraction
+queries are below the optimiser's effective update scale against
+a backbone that is simultaneously moving under the LM objective.
+Consequently $M_{\text{in}}$ is effectively frozen at its
+random-normal init and the downstream two-stage QKV subsystem
+never receives a useful distillation target. \emph{Piece~7 ---
+supervised writer warmup.} For the first $T_{\text{w}}$ steps we
+(i)~freeze the backbone, LM head, and embeddings and (ii)~force
+the router's $\texttt{mem\_bias}$ to $+4$ so that $\amem$ is held
+at $\approx 0.5$ and the LM gradient on callback tokens flows
+back through the readout into the entire memory subsystem. After
+step $T_{\text{w}}$ the backbone unfreezes and $\texttt{mem\_bias}$
+anneals linearly from $+4$ back to its soft-init value of $0$
+over $T_{\text{a}}$ steps. Concrete schedule in the headline run:
+$T_{\text{w}}{=}500$, $T_{\text{a}}{=}200$. During phase~1 the
+measured per-module gradient ratios on the memory subsystem are
+$10^{5}$--$10^{6}\times$ those of joint training, which is the
+order-of-magnitude boost the writer needs to settle into a
+content-specific basin before the joint optimisation begins to
+move the backbone against it.
+
+\paragraph{Putting them together.} The seven-piece recipe is
+the four pieces of \S\ref{sec:recipe} plus the three pieces of
+this section. The flags added in the launch command are
+\texttt{--alpha\_mem\_floor\_aux\_weight 0.01 --alpha\_mem\_floor\_target 0.05},
+\texttt{--contrastive\_infonce\_weight 0.5 --contrastive\_infonce\_callback\_only},
+and \texttt{--writer\_warmup\_steps 500 --writer\_warmup\_router\_bias 4.0 --writer\_warmup\_anneal\_steps 200};
+plus the architectural refinement of the judge (\S3.1.2 of the
+companion position paper~\cite{liu2025memres}) controlled via
+\texttt{--memres\_writer\_kind slot\_attention --memres\_judge\_qk\_layernorm}.
+All other hyper-parameters are unchanged from the
+\texttt{chain\_v5\_softhidden14\_msc} launch in \S\ref{sec:recipe}.
+
+\paragraph{Non-orthogonality of the seven pieces.} Pieces $5$--$7$
+are non-orthogonal to pieces $1$--$4$ in the same sense those four
+were non-orthogonal to each other (\S\ref{sec:discussion}):
+\emph{removing $\amem$ load-balance} makes the router re-collapse
+and nullifies Pieces~$1$--$4$; \emph{removing InfoNCE} leaves the
+writer without a discriminative target and the judge at near-uniform
+row entropy; \emph{removing writer warmup} leaves the extraction
+queries at their random-normal init for the entire run, because
+$10^{-8}$-ratio gradients cannot move them against the backbone's
+joint-training dynamics. The seven-piece recipe's claim is therefore
+that four training-recipe pieces (corpus, extract source, negative
+chain, soft init), three training-dynamics pieces (load-balance,
+InfoNCE, writer warmup), and one architectural piece (the
+slot-attention judge of \cite{liu2025memres}) each address a
+\emph{different} failure mode, and that the combined recipe is
+what makes dialogue callback mechanistically active.
+
+\paragraph{Planned headline cell (\texttt{chain\_v14a\_ap\_mega\_fullfix}).}
+The planned cell under the seven-piece recipe is AP-routing, mega
+corpus, $8000$ steps, writer warmup $500$ + anneal $200$,
+$\lambda_{\text{floor}}=0.01$, $\lambda_{\text{NCE}}=0.5$
+callback-only, judge QK-LayerNorm on, slot-attention writer on.
+\todo{Fill in the step-$\{700, 2000, 4000, 8000\}$ in-trainer
+trajectory and bootstrap CIs from the run, plus the held-out
+$\amem$ trace vs the $\tau{=}0.05$ floor.}
 
 \section{Discussion and limitations}
 \label{sec:discussion}
