@@ -1,0 +1,1815 @@
+{
+  "d4v2_val": {
+    "n_chains_scored": 200,
+    "ce_mem": 4.981473518013954,
+    "ce_nomem": 6.4214620888233185,
+    "ce_shuffle": 5.035266061425209,
+    "ce_mem_floor": 5.052348449230194,
+    "pa_cb_dnm": 1.4399885708093647,
+    "pa_cb_dsh": 0.05379254341125517,
+    "pa_cb_dnm_floor": 1.3691136395931247,
+    "pa_cb_evidence_lift": 0.07087493121624,
+    "per_chain": [
+      {
+        "chain_id": "synthetic_persona_callback_00000_fruit_apricot_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.3873584270477295,
+        "ce_nomem": 3.2587387561798096,
+        "ce_shuffle": 2.3034708499908447,
+        "ce_mem_floor": 2.5720529556274414
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00001_animal_dolphin_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.244182586669922,
+        "ce_nomem": 4.7200927734375,
+        "ce_shuffle": 4.113822937011719,
+        "ce_mem_floor": 4.046989440917969
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00002_hobby_filmmaking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.8473966121673584,
+        "ce_nomem": 3.676628351211548,
+        "ce_shuffle": 3.9933462142944336,
+        "ce_mem_floor": 3.882261037826538
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00003_animal_fox_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.8767237663269043,
+        "ce_nomem": 6.2200927734375,
+        "ce_shuffle": 3.736478567123413,
+        "ce_mem_floor": 3.5867056846618652
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00004_animal_dolphin_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.111478805541992,
+        "ce_nomem": 4.7200927734375,
+        "ce_shuffle": 4.206951141357422,
+        "ce_mem_floor": 4.1933441162109375
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00005_sport_skating_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.3206892013549805,
+        "ce_nomem": 6.170239448547363,
+        "ce_shuffle": 6.086024761199951,
+        "ce_mem_floor": 6.2727155685424805
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00006_sport_hockey_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.273524761199951,
+        "ce_nomem": 5.170239448547363,
+        "ce_shuffle": 3.767395257949829,
+        "ce_mem_floor": 4.110723495483398
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00007_sport_dancing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.32989501953125,
+        "ce_nomem": 6.795239448547363,
+        "ce_shuffle": 5.69002628326416,
+        "ce_mem_floor": 6.219639778137207
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00008_instrument_accordion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.633930206298828,
+        "ce_nomem": 7.765528202056885,
+        "ce_shuffle": 7.769130706787109,
+        "ce_mem_floor": 7.173203945159912
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00009_animal_penguin_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.4061660766601562,
+        "ce_nomem": 3.9876790046691895,
+        "ce_shuffle": 2.3740899562835693,
+        "ce_mem_floor": 2.531580924987793
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00010_animal_moose_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.078607082366943,
+        "ce_nomem": 4.8050537109375,
+        "ce_shuffle": 4.209713459014893,
+        "ce_mem_floor": 4.074537754058838
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00011_animal_rhino_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.2682881355285645,
+        "ce_nomem": 4.513917446136475,
+        "ce_shuffle": 3.37428617477417,
+        "ce_mem_floor": 3.2309789657592773
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00012_hobby_gardening_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.2815935611724854,
+        "ce_nomem": 3.915707588195801,
+        "ce_shuffle": 2.3066623210906982,
+        "ce_mem_floor": 2.307732105255127
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00013_sport_cycling_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.970499515533447,
+        "ce_nomem": 5.107739448547363,
+        "ce_shuffle": 4.7721943855285645,
+        "ce_mem_floor": 4.9767842292785645
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00014_instrument_harp_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.90085506439209,
+        "ce_nomem": 4.299346446990967,
+        "ce_shuffle": 2.9697868824005127,
+        "ce_mem_floor": 2.8617758750915527
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00015_instrument_banjo_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.132366895675659,
+        "ce_nomem": 3.6337997913360596,
+        "ce_shuffle": 2.1889984607696533,
+        "ce_mem_floor": 2.1441309452056885
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00016_tool_whisk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.1558003425598145,
+        "ce_nomem": 10.336811065673828,
+        "ce_shuffle": 5.256128311157227,
+        "ce_mem_floor": 4.827190399169922
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00017_hobby_woodworking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.854317665100098,
+        "ce_nomem": 7.415707588195801,
+        "ce_shuffle": 6.087447166442871,
+        "ce_mem_floor": 5.835034370422363
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00018_color_white_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.649120330810547,
+        "ce_nomem": 4.691184997558594,
+        "ce_shuffle": 3.4783284664154053,
+        "ce_mem_floor": 3.722048759460449
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00019_color_navy_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.478328704833984,
+        "ce_nomem": 5.503684997558594,
+        "ce_shuffle": 5.045929908752441,
+        "ce_mem_floor": 4.714465141296387
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00020_object_couch_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.160035133361816,
+        "ce_nomem": 10.04823112487793,
+        "ce_shuffle": 9.13245677947998,
+        "ce_mem_floor": 8.828788757324219
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00021_sport_karate_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.068569660186768,
+        "ce_nomem": 3.6889755725860596,
+        "ce_shuffle": 4.099766254425049,
+        "ce_mem_floor": 4.326298713684082
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00022_animal_fox_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.7756268978118896,
+        "ce_nomem": 6.2200927734375,
+        "ce_shuffle": 4.5558857917785645,
+        "ce_mem_floor": 4.055366516113281
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00023_hobby_sewing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.102988243103027,
+        "ce_nomem": 6.478207588195801,
+        "ce_shuffle": 5.168426513671875,
+        "ce_mem_floor": 5.513975620269775
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00024_fruit_plum_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.6059629917144775,
+        "ce_nomem": 5.998891830444336,
+        "ce_shuffle": 3.9635426998138428,
+        "ce_mem_floor": 3.7757434844970703
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00025_fruit_lemon_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.526042938232422,
+        "ce_nomem": 5.748891830444336,
+        "ce_shuffle": 4.766577243804932,
+        "ce_mem_floor": 4.446913719177246
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00026_object_chair_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.8495330810546875,
+        "ce_nomem": 10.79823112487793,
+        "ce_shuffle": 7.493548393249512,
+        "ce_mem_floor": 7.491105556488037
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00027_instrument_accordion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.618401050567627,
+        "ce_nomem": 7.765528202056885,
+        "ce_shuffle": 7.489500045776367,
+        "ce_mem_floor": 7.261058807373047
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00028_hobby_podcasting_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.939967155456543,
+        "ce_nomem": 4.84930944442749,
+        "ce_shuffle": 5.02204704284668,
+        "ce_mem_floor": 4.877622604370117
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00029_fruit_kiwi_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.480764150619507,
+        "ce_nomem": 2.3790788650512695,
+        "ce_shuffle": 2.563250780105591,
+        "ce_mem_floor": 2.33487606048584
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00030_color_azure_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.946688652038574,
+        "ce_nomem": 8.816184997558594,
+        "ce_shuffle": 8.046449661254883,
+        "ce_mem_floor": 8.314962387084961
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00031_instrument_drums_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.665928840637207,
+        "ce_nomem": 5.328028202056885,
+        "ce_shuffle": 5.543387413024902,
+        "ce_mem_floor": 5.434806823730469
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00032_object_microscope_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.673051834106445,
+        "ce_nomem": 12.32948112487793,
+        "ce_shuffle": 7.862714767456055,
+        "ce_mem_floor": 7.8486127853393555
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00033_animal_elk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.557826995849609,
+        "ce_nomem": 8.8450927734375,
+        "ce_shuffle": 5.586251258850098,
+        "ce_mem_floor": 5.736995697021484
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00034_color_cyan_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.221031188964844,
+        "ce_nomem": 5.816184997558594,
+        "ce_shuffle": 5.807928562164307,
+        "ce_mem_floor": 6.046545028686523
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00035_object_globe_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.879014015197754,
+        "ce_nomem": 13.51698112487793,
+        "ce_shuffle": 9.022214889526367,
+        "ce_mem_floor": 9.106727600097656
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00036_instrument_drums_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.423354148864746,
+        "ce_nomem": 5.328028202056885,
+        "ce_shuffle": 5.483169078826904,
+        "ce_mem_floor": 5.412654876708984
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00037_hobby_gaming_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.289258003234863,
+        "ce_nomem": 5.540707588195801,
+        "ce_shuffle": 7.640264511108398,
+        "ce_mem_floor": 7.470049858093262
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00038_fruit_apple_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.3433480262756348,
+        "ce_nomem": 3.811391830444336,
+        "ce_shuffle": 3.4463512897491455,
+        "ce_mem_floor": 2.9464287757873535
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00039_object_candle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.175823211669922,
+        "ce_nomem": 10.98573112487793,
+        "ce_shuffle": 7.833706855773926,
+        "ce_mem_floor": 8.239683151245117
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00040_sport_diving_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.264505386352539,
+        "ce_nomem": 8.295239448547363,
+        "ce_shuffle": 6.442472457885742,
+        "ce_mem_floor": 7.194145202636719
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00041_color_navy_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.318315505981445,
+        "ce_nomem": 5.503684997558594,
+        "ce_shuffle": 4.759781360626221,
+        "ce_mem_floor": 4.633579254150391
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00042_instrument_sitar_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.3855865001678467,
+        "ce_nomem": 3.6891071796417236,
+        "ce_shuffle": 3.4114911556243896,
+        "ce_mem_floor": 3.3448569774627686
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00043_animal_cheetah_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 2.2130300998687744,
+        "ce_nomem": 2.8294410705566406,
+        "ce_shuffle": 2.1886746883392334,
+        "ce_mem_floor": 2.216597080230713
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00044_fruit_kiwi_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.353731870651245,
+        "ce_nomem": 2.3790788650512695,
+        "ce_shuffle": 2.3524210453033447,
+        "ce_mem_floor": 2.3588578701019287
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00045_animal_elephant_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.665921688079834,
+        "ce_nomem": 8.5325927734375,
+        "ce_shuffle": 4.86072301864624,
+        "ce_mem_floor": 4.540776252746582
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00046_tool_toaster_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.505276679992676,
+        "ce_nomem": 8.774311065673828,
+        "ce_shuffle": 3.361732006072998,
+        "ce_mem_floor": 3.0083446502685547
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00047_object_shovel_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.984734535217285,
+        "ce_nomem": 11.57948112487793,
+        "ce_shuffle": 7.409966468811035,
+        "ce_mem_floor": 7.8242645263671875
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00048_tool_kettle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.768594741821289,
+        "ce_nomem": 8.711811065673828,
+        "ce_shuffle": 4.891716957092285,
+        "ce_mem_floor": 4.9040327072143555
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00049_color_red_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.0730957984924316,
+        "ce_nomem": 2.6286849975585938,
+        "ce_shuffle": 2.0492007732391357,
+        "ce_mem_floor": 2.323671817779541
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00050_object_microscope_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.368924140930176,
+        "ce_nomem": 12.32948112487793,
+        "ce_shuffle": 7.734645843505859,
+        "ce_mem_floor": 7.624197959899902
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00051_fruit_banana_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.9372060298919678,
+        "ce_nomem": 2.686391830444336,
+        "ce_shuffle": 2.6363158226013184,
+        "ce_mem_floor": 2.403420925140381
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00052_object_couch_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.854290008544922,
+        "ce_nomem": 10.04823112487793,
+        "ce_shuffle": 9.008605003356934,
+        "ce_mem_floor": 9.247871398925781
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00053_sport_surfing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.393392562866211,
+        "ce_nomem": 6.670239448547363,
+        "ce_shuffle": 6.589810848236084,
+        "ce_mem_floor": 7.477721214294434
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00054_instrument_clarinet_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 1.8750553131103516,
+        "ce_nomem": 2.696791172027588,
+        "ce_shuffle": 1.8269683122634888,
+        "ce_mem_floor": 1.7793420553207397
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00055_sport_basketball_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.484677314758301,
+        "ce_nomem": 2.4202394485473633,
+        "ce_shuffle": 2.911011219024658,
+        "ce_mem_floor": 2.7934587001800537
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00056_instrument_sitar_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.158775568008423,
+        "ce_nomem": 3.6891071796417236,
+        "ce_shuffle": 3.4560208320617676,
+        "ce_mem_floor": 3.0858218669891357
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00057_tool_stapler_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.2653276920318604,
+        "ce_nomem": 4.099518299102783,
+        "ce_shuffle": 2.1881377696990967,
+        "ce_mem_floor": 2.4786012172698975
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00058_color_crimson_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.871621131896973,
+        "ce_nomem": 6.066184997558594,
+        "ce_shuffle": 5.655827522277832,
+        "ce_mem_floor": 5.622740745544434
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00059_animal_rabbit_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.5102012157440186,
+        "ce_nomem": 6.2825927734375,
+        "ce_shuffle": 3.8486311435699463,
+        "ce_mem_floor": 3.355243682861328
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00060_object_mirror_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.6942458152771,
+        "ce_nomem": 10.86073112487793,
+        "ce_shuffle": 7.849026679992676,
+        "ce_mem_floor": 8.571914672851562
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00061_object_shelf_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.286526679992676,
+        "ce_nomem": 11.79823112487793,
+        "ce_shuffle": 9.932594299316406,
+        "ce_mem_floor": 9.701982498168945
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00062_sport_surfing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.122232437133789,
+        "ce_nomem": 6.670239448547363,
+        "ce_shuffle": 7.279040813446045,
+        "ce_mem_floor": 7.190155982971191
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00063_object_bucket_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.070259094238281,
+        "ce_nomem": 12.17323112487793,
+        "ce_shuffle": 8.84744644165039,
+        "ce_mem_floor": 8.656558990478516
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00064_hobby_winemaking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.391733169555664,
+        "ce_nomem": 5.2212653160095215,
+        "ce_shuffle": 5.271176338195801,
+        "ce_mem_floor": 5.353584289550781
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00065_sport_yoga_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.7671966552734375,
+        "ce_nomem": 7.357739448547363,
+        "ce_shuffle": 6.359244346618652,
+        "ce_mem_floor": 6.428165912628174
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00066_tool_kettle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.944497585296631,
+        "ce_nomem": 8.711811065673828,
+        "ce_shuffle": 5.4292192459106445,
+        "ce_mem_floor": 4.782321929931641
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00067_tool_marker_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.304219245910645,
+        "ce_nomem": 10.711811065673828,
+        "ce_shuffle": 9.703739166259766,
+        "ce_mem_floor": 9.277785301208496
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00068_instrument_tambourine_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 2.029714584350586,
+        "ce_nomem": 3.1138157844543457,
+        "ce_shuffle": 1.9123057126998901,
+        "ce_mem_floor": 2.081132173538208
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00069_object_ladder_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.01585578918457,
+        "ce_nomem": 12.73573112487793,
+        "ce_shuffle": 8.877889633178711,
+        "ce_mem_floor": 7.793153762817383
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00070_animal_monkey_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.353710174560547,
+        "ce_nomem": 9.3450927734375,
+        "ce_shuffle": 6.256342887878418,
+        "ce_mem_floor": 6.399635314941406
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00071_object_bucket_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.2372517585754395,
+        "ce_nomem": 12.17323112487793,
+        "ce_shuffle": 8.487202644348145,
+        "ce_mem_floor": 8.972759246826172
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00072_fruit_strawberry_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.357602834701538,
+        "ce_nomem": 3.248891830444336,
+        "ce_shuffle": 3.505213499069214,
+        "ce_mem_floor": 3.0810749530792236
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00073_color_cyan_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.232266426086426,
+        "ce_nomem": 5.816184997558594,
+        "ce_shuffle": 6.531285285949707,
+        "ce_mem_floor": 6.099040985107422
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00074_object_vase_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.450028419494629,
+        "ce_nomem": 13.92323112487793,
+        "ce_shuffle": 10.220842361450195,
+        "ce_mem_floor": 10.128641128540039
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00075_tool_whisk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.1258134841918945,
+        "ce_nomem": 10.336811065673828,
+        "ce_shuffle": 4.954150676727295,
+        "ce_mem_floor": 4.77692985534668
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00076_fruit_peach_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.1722683906555176,
+        "ce_nomem": 5.561391830444336,
+        "ce_shuffle": 3.01777982711792,
+        "ce_mem_floor": 3.144925355911255
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00077_hobby_calligraphy_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 5.1024088859558105,
+        "ce_nomem": 5.5857062339782715,
+        "ce_shuffle": 4.920357704162598,
+        "ce_mem_floor": 5.197219371795654
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00078_tool_knife_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.5427420139312744,
+        "ce_nomem": 6.336811542510986,
+        "ce_shuffle": 3.9171345233917236,
+        "ce_mem_floor": 3.040194034576416
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00079_instrument_accordion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.293521881103516,
+        "ce_nomem": 7.765528202056885,
+        "ce_shuffle": 7.4537153244018555,
+        "ce_mem_floor": 7.116733551025391
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00080_sport_diving_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.22796630859375,
+        "ce_nomem": 8.295239448547363,
+        "ce_shuffle": 6.713983058929443,
+        "ce_mem_floor": 6.813921928405762
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00081_animal_rhino_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.4206883907318115,
+        "ce_nomem": 4.513917446136475,
+        "ce_shuffle": 3.22483229637146,
+        "ce_mem_floor": 3.388472557067871
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00082_tool_peeler_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.152939796447754,
+        "ce_nomem": 6.57349967956543,
+        "ce_shuffle": 4.214086055755615,
+        "ce_mem_floor": 4.163957595825195
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00083_color_khaki_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.617705821990967,
+        "ce_nomem": 5.127411842346191,
+        "ce_shuffle": 4.548933982849121,
+        "ce_mem_floor": 4.590240955352783
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00084_animal_giraffe_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.949566602706909,
+        "ce_nomem": 3.5201501846313477,
+        "ce_shuffle": 2.763505697250366,
+        "ce_mem_floor": 2.917212724685669
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00085_hobby_gaming_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.291207313537598,
+        "ce_nomem": 5.540707588195801,
+        "ce_shuffle": 7.3782477378845215,
+        "ce_mem_floor": 7.497023105621338
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00086_fruit_pineapple_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.4538168907165527,
+        "ce_nomem": 3.186391830444336,
+        "ce_shuffle": 2.784830093383789,
+        "ce_mem_floor": 2.5766263008117676
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00087_color_magenta_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.374711513519287,
+        "ce_nomem": 3.70027232170105,
+        "ce_shuffle": 3.6192240715026855,
+        "ce_mem_floor": 3.518702507019043
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00088_object_compass_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.554991722106934,
+        "ce_nomem": 11.51698112487793,
+        "ce_shuffle": 6.523423194885254,
+        "ce_mem_floor": 7.382840156555176
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00089_tool_whisk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.621393203735352,
+        "ce_nomem": 10.336811065673828,
+        "ce_shuffle": 4.595747947692871,
+        "ce_mem_floor": 5.255884647369385
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00090_sport_snowboarding_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.5459184646606445,
+        "ce_nomem": 3.631314754486084,
+        "ce_shuffle": 3.474964141845703,
+        "ce_mem_floor": 3.2894694805145264
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00091_hobby_writing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.876974105834961,
+        "ce_nomem": 3.478207588195801,
+        "ce_shuffle": 3.6725997924804688,
+        "ce_mem_floor": 3.77409029006958
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00092_sport_surfing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.057225227355957,
+        "ce_nomem": 6.670239448547363,
+        "ce_shuffle": 7.037644386291504,
+        "ce_mem_floor": 7.332071781158447
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00093_hobby_collecting_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.451048851013184,
+        "ce_nomem": 5.228207588195801,
+        "ce_shuffle": 5.901479721069336,
+        "ce_mem_floor": 6.352088451385498
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00094_instrument_banjo_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 1.9788297414779663,
+        "ce_nomem": 3.6337997913360596,
+        "ce_shuffle": 2.208524703979492,
+        "ce_mem_floor": 2.1983206272125244
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00095_hobby_vlogging_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 7.133126735687256,
+        "ce_nomem": 6.7105183601379395,
+        "ce_shuffle": 7.106525421142578,
+        "ce_mem_floor": 7.136285781860352
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00096_color_turquoise_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.746321678161621,
+        "ce_nomem": 5.003684997558594,
+        "ce_shuffle": 5.007843971252441,
+        "ce_mem_floor": 4.934947967529297
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00097_instrument_kazoo_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.25252366065979,
+        "ce_nomem": 4.0288214683532715,
+        "ce_shuffle": 3.1209628582000732,
+        "ce_mem_floor": 3.195887804031372
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00098_color_lime_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.1256208419799805,
+        "ce_nomem": 6.566184997558594,
+        "ce_shuffle": 5.100966453552246,
+        "ce_mem_floor": 5.132778644561768
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00099_sport_yoga_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.05670690536499,
+        "ce_nomem": 7.357739448547363,
+        "ce_shuffle": 6.270828723907471,
+        "ce_mem_floor": 6.468542575836182
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00100_animal_cow_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.056282997131348,
+        "ce_nomem": 7.0950927734375,
+        "ce_shuffle": 5.094744682312012,
+        "ce_mem_floor": 5.3462724685668945
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00101_fruit_fig_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.460328102111816,
+        "ce_nomem": 6.873891830444336,
+        "ce_shuffle": 4.59318733215332,
+        "ce_mem_floor": 4.323823928833008
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00102_animal_leopard_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.533942222595215,
+        "ce_nomem": 8.5325927734375,
+        "ce_shuffle": 4.79188346862793,
+        "ce_mem_floor": 4.768402099609375
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00103_animal_rhino_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.272735118865967,
+        "ce_nomem": 4.513917446136475,
+        "ce_shuffle": 3.305311679840088,
+        "ce_mem_floor": 3.4841232299804688
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00104_animal_deer_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.675481796264648,
+        "ce_nomem": 7.2825927734375,
+        "ce_shuffle": 4.1095733642578125,
+        "ce_mem_floor": 4.630214214324951
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00105_fruit_persimmon_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 2.1008896827697754,
+        "ce_nomem": 2.8500137329101562,
+        "ce_shuffle": 2.204479217529297,
+        "ce_mem_floor": 2.104559898376465
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00106_tool_scale_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.434879302978516,
+        "ce_nomem": 11.211811065673828,
+        "ce_shuffle": 7.391784191131592,
+        "ce_mem_floor": 7.673362731933594
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00107_tool_eraser_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.6865861415863037,
+        "ce_nomem": 4.593267917633057,
+        "ce_shuffle": 3.797553539276123,
+        "ce_mem_floor": 3.7772419452667236
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00108_color_maroon_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.458225727081299,
+        "ce_nomem": 3.636261224746704,
+        "ce_shuffle": 3.6455860137939453,
+        "ce_mem_floor": 3.535637855529785
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00109_hobby_camping_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.801596641540527,
+        "ce_nomem": 5.978207588195801,
+        "ce_shuffle": 5.844564437866211,
+        "ce_mem_floor": 5.904607772827148
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00110_animal_rhino_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.364729404449463,
+        "ce_nomem": 4.513917446136475,
+        "ce_shuffle": 3.3894715309143066,
+        "ce_mem_floor": 3.444157361984253
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00111_fruit_grapefruit_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 1.588238000869751,
+        "ce_nomem": 2.5331223011016846,
+        "ce_shuffle": 1.6694854497909546,
+        "ce_mem_floor": 1.6496120691299438
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00112_tool_marker_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.588226318359375,
+        "ce_nomem": 10.711811065673828,
+        "ce_shuffle": 9.392334938049316,
+        "ce_mem_floor": 9.468124389648438
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00113_fruit_mango_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.096823215484619,
+        "ce_nomem": 2.873891830444336,
+        "ce_shuffle": 2.8786745071411133,
+        "ce_mem_floor": 2.7369632720947266
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00114_instrument_synthesizer_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.5152604579925537,
+        "ce_nomem": 3.7363879680633545,
+        "ce_shuffle": 3.518038272857666,
+        "ce_mem_floor": 3.470513105392456
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00115_sport_golf_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.7132811546325684,
+        "ce_nomem": 4.295239448547363,
+        "ce_shuffle": 3.9031970500946045,
+        "ce_mem_floor": 4.157065391540527
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00116_color_scarlet_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.994272470474243,
+        "ce_nomem": 3.732573986053467,
+        "ce_shuffle": 3.6279149055480957,
+        "ce_mem_floor": 3.881357192993164
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00117_tool_spatula_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 6.835224151611328,
+        "ce_nomem": 7.111487865447998,
+        "ce_shuffle": 7.218620300292969,
+        "ce_mem_floor": 7.324192047119141
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00118_color_turquoise_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.21738338470459,
+        "ce_nomem": 5.003684997558594,
+        "ce_shuffle": 5.035837173461914,
+        "ce_mem_floor": 5.068516731262207
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00119_hobby_filmmaking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.776634931564331,
+        "ce_nomem": 3.676628351211548,
+        "ce_shuffle": 3.8666889667510986,
+        "ce_mem_floor": 3.9065041542053223
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00120_color_white_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.5865461826324463,
+        "ce_nomem": 4.691184997558594,
+        "ce_shuffle": 3.369875431060791,
+        "ce_mem_floor": 3.725661277770996
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00121_object_ladder_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.123685836791992,
+        "ce_nomem": 12.73573112487793,
+        "ce_shuffle": 8.579926490783691,
+        "ce_mem_floor": 8.041765213012695
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00122_animal_panda_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.432292938232422,
+        "ce_nomem": 5.6575927734375,
+        "ce_shuffle": 4.54205322265625,
+        "ce_mem_floor": 4.376036643981934
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00123_object_shelf_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.657243728637695,
+        "ce_nomem": 11.79823112487793,
+        "ce_shuffle": 9.767796516418457,
+        "ce_mem_floor": 9.800283432006836
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00124_hobby_vlogging_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 6.91810941696167,
+        "ce_nomem": 6.7105183601379395,
+        "ce_shuffle": 6.845580101013184,
+        "ce_mem_floor": 6.985202312469482
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00125_hobby_brewing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.235047340393066,
+        "ce_nomem": 8.7907075881958,
+        "ce_shuffle": 7.7008256912231445,
+        "ce_mem_floor": 7.462115287780762
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00126_fruit_fig_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.651240348815918,
+        "ce_nomem": 6.873891830444336,
+        "ce_shuffle": 4.447266578674316,
+        "ce_mem_floor": 4.894089698791504
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00127_animal_cheetah_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 2.319868564605713,
+        "ce_nomem": 2.8294410705566406,
+        "ce_shuffle": 2.1643714904785156,
+        "ce_mem_floor": 2.254021644592285
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00128_sport_skating_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.244379043579102,
+        "ce_nomem": 6.170239448547363,
+        "ce_shuffle": 6.485296249389648,
+        "ce_mem_floor": 6.190785884857178
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00129_fruit_papaya_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.6556694507598877,
+        "ce_nomem": 4.223966598510742,
+        "ce_shuffle": 2.7043347358703613,
+        "ce_mem_floor": 2.8485305309295654
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00130_fruit_mango_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.893625020980835,
+        "ce_nomem": 2.873891830444336,
+        "ce_shuffle": 2.701941728591919,
+        "ce_mem_floor": 3.003401041030884
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00131_sport_football_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.7227678298950195,
+        "ce_nomem": 2.1702394485473633,
+        "ce_shuffle": 2.4477875232696533,
+        "ce_mem_floor": 2.677443027496338
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00132_color_khaki_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.556084156036377,
+        "ce_nomem": 5.127411842346191,
+        "ce_shuffle": 4.356322288513184,
+        "ce_mem_floor": 4.404361724853516
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00133_color_ivory_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.08257532119751,
+        "ce_nomem": 9.441184997558594,
+        "ce_shuffle": 6.904677867889404,
+        "ce_mem_floor": 7.424022197723389
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00134_fruit_kiwi_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 2.4370195865631104,
+        "ce_nomem": 2.3790788650512695,
+        "ce_shuffle": 2.4421632289886475,
+        "ce_mem_floor": 2.436858654022217
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00135_color_gray_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.423973083496094,
+        "ce_nomem": 6.378684997558594,
+        "ce_shuffle": 6.535297393798828,
+        "ce_mem_floor": 6.180276870727539
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00136_object_candle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.995006561279297,
+        "ce_nomem": 10.98573112487793,
+        "ce_shuffle": 8.007059097290039,
+        "ce_mem_floor": 7.750696182250977
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00137_fruit_cherry_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.296797275543213,
+        "ce_nomem": 5.436391830444336,
+        "ce_shuffle": 5.0131120681762695,
+        "ce_mem_floor": 5.182153224945068
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00138_hobby_camping_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.8964738845825195,
+        "ce_nomem": 5.978207588195801,
+        "ce_shuffle": 5.896795272827148,
+        "ce_mem_floor": 5.8900651931762695
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00139_object_candle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.021088600158691,
+        "ce_nomem": 10.98573112487793,
+        "ce_shuffle": 7.907988548278809,
+        "ce_mem_floor": 7.667398452758789
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00140_sport_golf_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.9368739128112793,
+        "ce_nomem": 4.295239448547363,
+        "ce_shuffle": 3.6707284450531006,
+        "ce_mem_floor": 3.879591464996338
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00141_hobby_winemaking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.463466167449951,
+        "ce_nomem": 5.2212653160095215,
+        "ce_shuffle": 5.265643119812012,
+        "ce_mem_floor": 5.477105617523193
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00142_animal_lion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.785676956176758,
+        "ce_nomem": 6.5325927734375,
+        "ce_shuffle": 2.3906750679016113,
+        "ce_mem_floor": 2.682227611541748
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00143_hobby_baking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.5674397945404053,
+        "ce_nomem": 3.728207588195801,
+        "ce_shuffle": 2.357757568359375,
+        "ce_mem_floor": 2.3618338108062744
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00144_fruit_pear_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.1938982009887695,
+        "ce_nomem": 8.123891830444336,
+        "ce_shuffle": 5.930905818939209,
+        "ce_mem_floor": 6.023840427398682
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00145_fruit_nectarine_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 3.06815242767334,
+        "ce_nomem": 3.4839160442352295,
+        "ce_shuffle": 3.0744595527648926,
+        "ce_mem_floor": 3.21592116355896
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00146_instrument_tuba_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.5443527698516846,
+        "ce_nomem": 4.182336807250977,
+        "ce_shuffle": 3.6141610145568848,
+        "ce_mem_floor": 3.519524335861206
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00147_fruit_banana_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.611764669418335,
+        "ce_nomem": 2.686391830444336,
+        "ce_shuffle": 2.8504257202148438,
+        "ce_mem_floor": 2.54427170753479
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00148_tool_peeler_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.197836875915527,
+        "ce_nomem": 6.57349967956543,
+        "ce_shuffle": 4.044702053070068,
+        "ce_mem_floor": 4.218639373779297
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00149_instrument_trombone_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.534344434738159,
+        "ce_nomem": 3.8569984436035156,
+        "ce_shuffle": 3.659536361694336,
+        "ce_mem_floor": 3.594879627227783
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00150_instrument_synthesizer_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.432283878326416,
+        "ce_nomem": 3.7363879680633545,
+        "ce_shuffle": 3.5103306770324707,
+        "ce_mem_floor": 3.4809017181396484
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00151_animal_elk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.418234348297119,
+        "ce_nomem": 8.8450927734375,
+        "ce_shuffle": 5.527812957763672,
+        "ce_mem_floor": 5.534330368041992
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00152_animal_cow_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.965312957763672,
+        "ce_nomem": 7.0950927734375,
+        "ce_shuffle": 5.125528335571289,
+        "ce_mem_floor": 5.124417304992676
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00153_instrument_accordion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.360599517822266,
+        "ce_nomem": 7.765528202056885,
+        "ce_shuffle": 7.252805709838867,
+        "ce_mem_floor": 7.07178258895874
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00154_sport_baseball_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.5313785076141357,
+        "ce_nomem": 4.170239448547363,
+        "ce_shuffle": 3.6084556579589844,
+        "ce_mem_floor": 3.723592519760132
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00155_tool_kettle_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.724322319030762,
+        "ce_nomem": 8.711811065673828,
+        "ce_shuffle": 4.567936420440674,
+        "ce_mem_floor": 4.723577499389648
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00156_sport_skiing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.929429769515991,
+        "ce_nomem": 4.732739448547363,
+        "ce_shuffle": 4.246625900268555,
+        "ce_mem_floor": 4.076272964477539
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00157_tool_whisk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.504978179931641,
+        "ce_nomem": 10.336811065673828,
+        "ce_shuffle": 4.843916416168213,
+        "ce_mem_floor": 4.963532447814941
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00158_instrument_tuba_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.492021083831787,
+        "ce_nomem": 4.182336807250977,
+        "ce_shuffle": 3.5963611602783203,
+        "ce_mem_floor": 3.6623289585113525
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00159_instrument_kazoo_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.2317380905151367,
+        "ce_nomem": 4.0288214683532715,
+        "ce_shuffle": 3.1300411224365234,
+        "ce_mem_floor": 3.3117880821228027
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00160_object_broom_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.582164764404297,
+        "ce_nomem": 5.382314205169678,
+        "ce_shuffle": 4.719602584838867,
+        "ce_mem_floor": 4.6297173500061035
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00161_animal_dolphin_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.370361328125,
+        "ce_nomem": 4.7200927734375,
+        "ce_shuffle": 4.2748494148254395,
+        "ce_mem_floor": 4.313054084777832
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00162_object_torch_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.699832916259766,
+        "ce_nomem": 13.39198112487793,
+        "ce_shuffle": 9.961099624633789,
+        "ce_mem_floor": 9.635050773620605
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00163_hobby_sewing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.0711212158203125,
+        "ce_nomem": 6.478207588195801,
+        "ce_shuffle": 5.4142560958862305,
+        "ce_mem_floor": 5.23317813873291
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00164_instrument_flute_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.6297788619995117,
+        "ce_nomem": 4.890528202056885,
+        "ce_shuffle": 2.5035641193389893,
+        "ce_mem_floor": 2.588291883468628
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00165_object_ladder_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.9618682861328125,
+        "ce_nomem": 12.73573112487793,
+        "ce_shuffle": 7.628484725952148,
+        "ce_mem_floor": 8.044950485229492
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00166_animal_lion_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.4576988220214844,
+        "ce_nomem": 6.5325927734375,
+        "ce_shuffle": 3.0103189945220947,
+        "ce_mem_floor": 2.8582472801208496
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00167_tool_grater_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.934535503387451,
+        "ce_nomem": 6.525588035583496,
+        "ce_shuffle": 3.634265899658203,
+        "ce_mem_floor": 3.8159332275390625
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00168_fruit_raspberry_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.8480265140533447,
+        "ce_nomem": 5.123891830444336,
+        "ce_shuffle": 4.09145450592041,
+        "ce_mem_floor": 4.01350212097168
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00169_object_desk_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 9.222005844116211,
+        "ce_nomem": 11.17323112487793,
+        "ce_shuffle": 8.225137710571289,
+        "ce_mem_floor": 9.131872177124023
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00170_object_map_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.537637710571289,
+        "ce_nomem": 10.98573112487793,
+        "ce_shuffle": 8.642513275146484,
+        "ce_mem_floor": 8.499631881713867
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00171_object_atlas_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 10.517513275146484,
+        "ce_nomem": 13.04823112487793,
+        "ce_shuffle": 10.822344779968262,
+        "ce_mem_floor": 10.31338119506836
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00172_hobby_woodworking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.929696559906006,
+        "ce_nomem": 7.415707588195801,
+        "ce_shuffle": 6.09423828125,
+        "ce_mem_floor": 6.279984951019287
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00173_instrument_drums_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 5.548439025878906,
+        "ce_nomem": 5.328028202056885,
+        "ce_shuffle": 5.641952991485596,
+        "ce_mem_floor": 5.277326583862305
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00174_sport_soccer_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.859564781188965,
+        "ce_nomem": 3.1702394485473633,
+        "ce_shuffle": 2.8346543312072754,
+        "ce_mem_floor": 3.0326037406921387
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00175_color_scarlet_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.7582621574401855,
+        "ce_nomem": 3.732573986053467,
+        "ce_shuffle": 3.7411153316497803,
+        "ce_mem_floor": 3.697101593017578
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00176_sport_judo_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.423056602478027,
+        "ce_nomem": 4.625123500823975,
+        "ce_shuffle": 4.635186195373535,
+        "ce_mem_floor": 4.581267833709717
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00177_sport_snowboarding_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.269582986831665,
+        "ce_nomem": 3.631314754486084,
+        "ce_shuffle": 3.130856513977051,
+        "ce_mem_floor": 3.2832608222961426
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00178_object_saw_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 8.883874893188477,
+        "ce_nomem": 12.29823112487793,
+        "ce_shuffle": 10.291584014892578,
+        "ce_mem_floor": 10.782062530517578
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00179_fruit_guava_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.5692903995513916,
+        "ce_nomem": 4.124529838562012,
+        "ce_shuffle": 3.44632887840271,
+        "ce_mem_floor": 3.69028639793396
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00180_hobby_baking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.6752419471740723,
+        "ce_nomem": 3.728207588195801,
+        "ce_shuffle": 2.341360569000244,
+        "ce_mem_floor": 2.2454004287719727
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00181_tool_sharpener_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.240939140319824,
+        "ce_nomem": 6.28206729888916,
+        "ce_shuffle": 4.490633487701416,
+        "ce_mem_floor": 4.389675140380859
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00182_sport_wrestling_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.929929256439209,
+        "ce_nomem": 5.357739448547363,
+        "ce_shuffle": 3.7113611698150635,
+        "ce_mem_floor": 4.076757431030273
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00183_hobby_calligraphy_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 4.918249130249023,
+        "ce_nomem": 5.5857062339782715,
+        "ce_shuffle": 4.941488265991211,
+        "ce_mem_floor": 4.9647417068481445
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00184_hobby_cooking_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.3808696269989014,
+        "ce_nomem": 2.103207588195801,
+        "ce_shuffle": 2.3277926445007324,
+        "ce_mem_floor": 2.2407960891723633
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00185_color_ivory_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 7.151775360107422,
+        "ce_nomem": 9.441184997558594,
+        "ce_shuffle": 7.276177406311035,
+        "ce_mem_floor": 6.94631814956665
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00186_object_pillow_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.573482513427734,
+        "ce_nomem": 10.79823112487793,
+        "ce_shuffle": 7.097548484802246,
+        "ce_mem_floor": 6.991205215454102
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00187_tool_notebook_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 10.03551197052002,
+        "ce_nomem": 10.711811065673828,
+        "ce_shuffle": 9.891624450683594,
+        "ce_mem_floor": 10.001888275146484
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00188_fruit_pear_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.385441303253174,
+        "ce_nomem": 8.123891830444336,
+        "ce_shuffle": 5.97315788269043,
+        "ce_mem_floor": 6.038798809051514
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00189_instrument_mandolin_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.1689887046813965,
+        "ce_nomem": 4.5289788246154785,
+        "ce_shuffle": 3.2120413780212402,
+        "ce_mem_floor": 3.41102933883667
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00190_animal_rhino_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.204868793487549,
+        "ce_nomem": 4.513917446136475,
+        "ce_shuffle": 3.2866907119750977,
+        "ce_mem_floor": 3.4695608615875244
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00191_instrument_trumpet_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 4.5647993087768555,
+        "ce_nomem": 6.640528202056885,
+        "ce_shuffle": 4.9854607582092285,
+        "ce_mem_floor": 4.726252555847168
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00192_object_vase_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 10.144102096557617,
+        "ce_nomem": 13.92323112487793,
+        "ce_shuffle": 10.201140403747559,
+        "ce_mem_floor": 9.990184783935547
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00193_sport_dancing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.192432880401611,
+        "ce_nomem": 6.795239448547363,
+        "ce_shuffle": 6.019086837768555,
+        "ce_mem_floor": 6.2465105056762695
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00194_instrument_ocarina_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 2.4699625968933105,
+        "ce_nomem": 3.391033887863159,
+        "ce_shuffle": 2.3733227252960205,
+        "ce_mem_floor": 2.3713760375976562
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00195_sport_rowing_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.4658148288726807,
+        "ce_nomem": 3.8688607215881348,
+        "ce_shuffle": 3.3636388778686523,
+        "ce_mem_floor": 3.585111141204834
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00196_color_lavender_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 3.052516460418701,
+        "ce_nomem": 5.191184997558594,
+        "ce_shuffle": 2.6530814170837402,
+        "ce_mem_floor": 2.6968963146209717
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00197_instrument_bagpipes_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 3.048880100250244,
+        "ce_nomem": 4.638821125030518,
+        "ce_shuffle": 3.1203038692474365,
+        "ce_mem_floor": 2.983626365661621
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00198_sport_diving_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 6.071096897125244,
+        "ce_nomem": 8.295239448547363,
+        "ce_shuffle": 6.528386116027832,
+        "ce_mem_floor": 7.245009899139404
+      },
+      {
+        "chain_id": "synthetic_persona_callback_00199_sport_cricket_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 1,
+        "ce_mem": 2.590886116027832,
+        "ce_nomem": 4.795239448547363,
+        "ce_shuffle": 2.3102269172668457,
+        "ce_mem_floor": 2.4231321811676025
+      }
+    ]
+  }
+}

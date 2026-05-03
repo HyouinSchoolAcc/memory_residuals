@@ -11,228 +11,251 @@ residuals reference is in [`atn_residuals.pdf`](atn_residuals.pdf).
 
 ## Architectural priors (READ FIRST — these are settled)
 
-Future agents: these are baked-in findings from the paper line of
+Future agents: these are baked-in findings from the v3-v15 line of
 evidence. Do NOT re-derive them from scratch and do NOT silently swap
 them out of a run without reading the citation.
 
-- **AP (`attention_parity`) > SG (`simple_gate`) on the routing side.**
-  Per `results/exp1_pair_recipe/manuscript.tex` Table 2 (v3 pair-recipe
-  headline, matched seed, matched compute, PG-19 pairs): AP (soft ±4
-  bias init) beats SG on Δ_sh-m by **1.6× to 3.8× at every step** of
-  the head-to-head trajectory, with AP @ step 2000 (+0.0272) already
-  **surpassing SG's full-budget asymptote at step 5200 (+0.0249)**.
-  The manuscript's exact phrasing: *"the routing-pool variant achieves
-  the scalar-gate's asymptote in 2/5 the steps and is still improving
-  when stopped."* Standalone PG-19 val agrees: AP Δ_nm-m = +0.0113
-  vs SG = +0.0098; capture ratio 0.15 vs 0.13. This is the strongest
-  routing-side prior we have. The headline paper run (v13p and
-  successors) should default to `--memres_mode attention_parity` unless
-  a chain-trainer cell explicitly demonstrates AP collapse the v13+
-  interventions can't break.
+1. **AP (`attention_parity`) > SG (`simple_gate`) on the routing
+   side.** Per `results/exp1_pair_recipe/manuscript.tex` Table 2 (v3
+   pair-recipe, matched seed, matched compute, PG-19 pairs): AP (soft
+   ±4 bias init) beats SG on Δ_sh-m by **1.6× to 3.8× at every step**;
+   AP @ step 2000 (+0.0272) already surpasses SG's full-budget
+   asymptote at step 5200 (+0.0249). Default `--memres_mode
+   attention_parity` for any pair-style or chain headline run.
 
-- **Caveat — AP has historically collapsed on the CHAIN trainer.**
-  v5 softparity, v7 softerbias + v3bias, and every v8/9/11/v12a AP
-  cell sat at `alpha_mem ~ 4e-4` indefinitely because the router
-  closes early → writer gets attenuated gradient → writer stays
-  random → router sees noisy m^t → router closes harder. This is the
-  "collapse cycle" COMPREHENSIVE.md §v7 diagnosed as *"causally
-  equivalent to no memory regardless of M_c."* The v13 stack
-  (`writer_warmup`, `memres_queries_init=orthogonal`,
-  `memres_slot_positional`, `memres_writer_kind=slot_attention`) is
-  designed specifically to break that cycle so AP's pair-trainer
-  advantage can transfer. If you're staring at an AP cell that
-  collapsed at step ~500, check whether the full v13 stack was
-  actually active (see next point).
+2. **Caveat — AP collapses on the chain trainer via the writer/router
+   lock-in cycle.** v5 softparity, v7 softerbias + v3bias, every
+   v8/9/11/v12a AP cell sat at `α_mem ~ 4e-4` indefinitely because
+   the router closes early → writer gets attenuated gradient → writer
+   stays random → router sees noisy m^t → router closes harder. The
+   v13+ stack (`writer_warmup`, `memres_queries_init=orthogonal`,
+   `memres_slot_positional`, `memres_writer_kind=slot_attention`,
+   `--alpha_mem_floor_aux_weight`) is designed to break that cycle.
+   See `archive/COMPREHENSIVE.md` Part VI.
 
-- **Config-merge bug (fixed 2026-05-01).** `Qwen3MemResConfig` is a
-  subclass of `Qwen3Config`, so `from_pretrained("Qwen/Qwen3-0.6B")`
-  succeeds and the old `from_memres_ckpt = True` detector in
-  `train_chain.py::_build_model` produced a false positive on every
-  Qwen3 base backbone. The subsequent `overridable`-subset merge
-  silently DROPPED CLI overrides for `--memres_mode`,
-  `--memres_writer_kind`, `--memres_slot_positional`,
-  `--memres_extraction_depth`, `--memres_update_mode`,
-  `--memres_num_vectors`, etc. Fixed by detecting memres checkpoints
-  via `base_cfg.model_type == "qwen3_memres"` (the raw JSON field).
-  **If you see a v11 / v12 / v13 run whose `ROUTE @ step` diagnostic
-  reports a mode different from what the launch script requested, or
-  a load report whose MISSING-list doesn't include `M_in_pos` /
-  `write_gate` / `extraction_layers.{0..4}` despite the launch flags,
-  the bug is back — bisect against the `BUGFIX 2026-05-01` comment.**
+3. **Config-merge bug fixed 2026-05-01.** `Qwen3MemResConfig`
+   subclasses `Qwen3Config`, so `from_pretrained("Qwen/Qwen3-0.6B")`
+   succeeds and the old `from_memres_ckpt = True` detector in
+   `_build_model` produced a false positive on every Qwen3 base
+   backbone, silently dropping CLI overrides for `--memres_mode`,
+   `--memres_writer_kind`, `--memres_slot_positional`,
+   `--memres_extraction_depth`, `--memres_update_mode`,
+   `--memres_num_vectors`, etc. Fixed by detecting memres checkpoints
+   via `base_cfg.model_type == "qwen3_memres"` (raw JSON field).
+   **If you see a v11/v12/v13/v14/v15 run whose `ROUTE @ step`
+   diagnostic reports a different mode than the launch script
+   requested, or a load report whose MISSING-list doesn't include
+   `M_in_pos` / `write_gate` / `extraction_layers.{0..4}` despite the
+   launch flags, the bug is back — bisect against the
+   `BUGFIX 2026-05-01` comment.**
 
-- **`simple_gate` needs memory_gate force-open during writer_warmup,
-  not router mem_bias.** In `simple_gate` the depth router is not on
-  the forward path; `memory_gate.gate` is. `_set_mem_bias` therefore
-  forces `gate = 0.5 * tanh(bias/2) ≈ 0.48` when mode is simple_gate,
-  in addition to setting `depth_router.mem_bias`. Without this, SG
-  writer_warmup trains the writer with zero gradient through the
-  forward path because `h + 0 * m^t = h` regardless of router bias.
-  See `_set_mem_bias` in `src/train_chain.py`.
+4. **`simple_gate` writer_warmup needs memory_gate force-open, not
+   just router mem_bias.** In `simple_gate` the depth router is not
+   on the forward path; `memory_gate.gate` is. `_set_mem_bias`
+   forces `gate = 0.5 * tanh(bias/2) ≈ 0.48` when mode is simple_gate
+   (in addition to setting `depth_router.mem_bias`). Without this,
+   SG writer_warmup trains the writer with zero gradient through the
+   forward path because `h + 0 * m^t = h`. See `_set_mem_bias` in
+   `src/train_chain.py`.
 
-- **The uniform-softmax fixed point is structural, not data-starved.**
-  More data alone does not break it (v11p, v11m_chinchilla, v12c all
-  collapsed on larger corpora). It is the permutation-invariant fixed
-  point of a symmetric softmax with i.i.d.-initialised slot queries.
-  The v13 `memres_queries_init=orthogonal` + `memres_slot_positional`
-  levers are the structural fix; `writer_warmup` + `slot_attention`
-  are the objective/writer-side accelerants that keep the system from
-  re-collapsing during joint training.
+5. **The uniform-softmax fixed point is structural, not
+   data-starved.** More data alone does not break it (v11p,
+   v11m_chinchilla, v12c all collapsed on larger corpora). It is the
+   permutation-invariant fixed point of a symmetric softmax with
+   i.i.d.-initialised slot queries. The v13+
+   `memres_queries_init=orthogonal` + `memres_slot_positional` levers
+   are the *structural* fix; `writer_warmup` + `slot_attention` are
+   the objective/writer-side accelerants that keep the system from
+   re-collapsing during joint training.
+
+6. **v15 write_gate saturation (fixed 2026-05-02).** The external
+   sigmoid `write_gate` over the un-normalised `M_new` from the
+   residual extract stack (`‖M_new‖_F ≈ 7e4`) saturated to ε within
+   50 steps; once saturated, gate gradient vanishes
+   (`g(1−g) ≈ 1e-30`) and `M_c` is locked at the zero matrix
+   forever — content-blind writer, dead readout, loss eventually
+   drops anyway because the backbone takes over. Fixes:
+   - For `writer_kind ∈ {slot_attention, slot_attention_full}` the
+     external `write_gate` sigmoid is **bypassed entirely**
+     (Locatello GRUCell already gates per-slot; stacking the
+     external sigmoid is redundant and harmful).
+   - For `writer_kind=original`, `MemoryBlock.forward` RMSNorms
+     each side of `gate_input` before the sigmoid
+     (`write_gate_norm_prev`, `write_gate_norm_new`).
+   - **`--memres_extract_input_norm`** wraps `C` through an RMSNorm
+     before the cross-attn / slot-attn extract path. Diagnosed as
+     the dominant root cause of `M_new` norm explosions (~50×
+     backward grads on `W_Q`).
+   - **`--kill_on_memory_collapse`** converts the silent-failure
+     burn into a loud halt with exit code 42 (two consecutive evals
+     after `--kill_on_memory_collapse_min_step=200` with
+     `Mc_pair_to_self_ratio < 0.01` *or*
+     `mt_norm_ratio_mean < 0.01`).
+
+7. **`tools/eval_callback.py`, not `tools/eval_chain.py`, is the
+   canonical post-train eval for D4-style corpora.** `eval_chain.py`
+   averages CE over the entire score window
+   (`score_tail_frac=1.0` ⇒ all 4 sessions) and dilutes a
+   callback-localised effect ~38× into noise. On v14k_best,
+   `eval_chain.py` reported `dnm ≈ −0.10` while `eval_callback.py`
+   reported `pa_cb_dnm = +1.44, evidence_lift = +0.071`.
+
+8. **`--memres_judge_qk_layernorm` is anti-causal under the
+   slot_attention writer (so far).** v14abl_a (QK-LN ON) zeroed out
+   the writer entirely (`self ‖M‖ = 0`, `‖m^t‖/‖embed‖ = 0`) while
+   the otherwise-identical v14abl_b (QK-LN OFF) had the writer
+   specialising (`pair/self = 0.005`, `‖m^t‖/‖embed‖ = 3.87`). Ship
+   default OFF until the judge × slot_attention interaction is
+   understood.
+
+9. **OPEN — joint-training backbone leakage on D4v2 (2026-05-03).**
+   v15b (0.6B) and v15f (1.7B) joint-trained at `lr_backbone=2e-5`
+   collapse `evidence_lift` to ~0 — the unfrozen backbone is
+   apparently learning the callback distribution *directly*. This
+   should be impossible if memory is the only pathway carrying
+   evidence. Three independent leak audits (window leakage / eval
+   redaction / template prior) are running. **Until they land, treat
+   trained-backbone results on D4v2 as suspect and run all v15
+   headlines on FROZEN backbones (`--freeze_backbone --lr_backbone
+   0`).** Active state in `results/exp2_chain_recipe/runs.md`.
 
 ## Progress & lessons
 
-- **#v3b** — We can drop MemRes onto any backbone with the augmented
-  model **bit-exactly** equal to the bare backbone at init *and* still
-  receive gradients on every memory-channel parameter. This is the
-  load-bearing primitive for everything below.
-- **#v3** — We tried three ways to inject memory into the backbone:
-  1. a scalar gate per layer (`simple_gate`),
-  2. heavily-biased attention at every layer that *does* preserve
-     bit-wise parity (`attention_parity`, hard ±32),
-  3. lightly-biased attention at every layer (soft ±4 — does **not**
-     preserve bit-wise parity at init).
+- **#v3b** — Bit-exact init parity primitive: drop MemRes onto any
+  backbone, augmented model is **bit-exactly** equal to the bare
+  backbone at init *and* still receives gradients on every
+  memory-channel parameter.
+- **#v3** — Three injection variants: scalar gate (`simple_gate`),
+  hard-bias parity-preserving attention (`attention_parity ±32`),
+  light-bias non-parity attention (soft ±4). On
+  *"compress previous book chapters → help generate the next chapter"*
+  the **light-bias** variant won
+  (`chain_v2_phaseA_softparity_b4`, Δ_sh-m = +0.0529 [+0.025, +0.092]).
+- **#v9c** — Books are easy, dialogue is hard. PA CB Δ_nm-m grew
+  monotonically from −0.03 → +0.16 nats across 4 000 steps on the
+  diverse PG-19 + TV + LME + MSC corpus.
+- **#v3 → v10** — Six straight LME-only campaigns collapsed
+  identically (`gate_max ≡ 0`, `α_mem ≡ 0`). Post-v10 audit found
+  three causally independent failures: P0 (the corpus builder threw
+  away `answer_session_ids` so 96 % of training windows had `M_c`
+  built from sessions that did not contain the answer), P1
+  (chicken-and-egg gate × readout × writer multiplication, all zero
+  at init), P2 (readout RMSNorm pinned `‖m^t‖/‖embed‖ ≈ 73`).
+- **#v11** (g/h/i/j/k/l-fix/m/p/q/r) — P0+P2+P3 fixed in code.
+  Cleanest result: P1 (router saturation) confirmed via
+  `mem_bias=−4` vs `0`. P2 turns out to be **irrelevant for AP** (the
+  depth softmax self-regulates magnitude) and only matters for SG.
+  P5 alone is no-op. Headline finding: **the writer is content-blind
+  under LM-only**; under InfoNCE alone it learns chain-identity hash
+  (`evidence_lift = −1.12` on v11r). D5 audit on v11g/best identified
+  the readout as the bottleneck.
+- **#v12** (slot_attention writer) — Replaces the original
+  decision-less judge with Locatello slot attention (softmax over
+  slots, GRUCell update). Briefly produces +0.39 PA CB Δ_nm-m at step
+  200, then collapses to the same uniform fixed point by step 800.
+  Necessary but not sufficient — GRU shares weights across slots so
+  symmetry re-emerges.
+- **#v13** (`writer_warmup` + orth init + slot_positional + the
+  config-merge bugfix) — Symmetry break is **permanent** (D3-MC
+  pair/self = 0.004 sustained through 10 500 steps). v13c2 hit
+  `evidence_lift +1.4` mid-warmup. **Phase-2 backbone unfreeze
+  destroys the writer specialisation** — motivates v14.
+- **#v14** (judge_qk_layernorm + alpha_mem_floor aux + InfoNCE +
+  AP warmup anneal; D4v2 multi-evidence corpus) — `judge_qk_ln`
+  interacts pathologically with `slot_attention` writer (writer never
+  lifts off zero). Without QK-LN, writer specialises but Δ_nm-m goes
+  to −0.44 — InfoNCE satisfies itself with chain-distinguishable
+  M_c that doesn't translate to LM benefit. **v14k @ FROZEN backbone
+  is the first reproducibly positive result of the project**:
+  `pa_cb_dnm = +1.44`, `evidence_lift = +0.071`.
+- **#v15** (`extract_input_norm` + bypassed `write_gate` for
+  slot_attention + double-evidence D4v2) — **v14k/v15a reproduce
+  cleanly on FROZEN backbones**. v15e (1.7B frozen, norm ON) hits
+  `Δnm-m_floor = +2.5 nats` but `evidence_lift` swings *negative*
+  (the larger writer overfits non-evidence content to pre-route the
+  callback). v15b/v15f (joint training) collapse `evidence_lift` to
+  ~0; **OPEN AUDIT** in flight on three suspected non-memory
+  pathways (window leakage / eval redaction / template prior).
 
-  On the task *"compress previous book chapters → help generate the
-  next chapter"*, the **light-bias** variant crushed the others
-  (`chain_v2_phaseA_softparity_b4`, Δ_sh-m = +0.0529 [+0.025, +0.092],
-  bootstrap-CI excludes zero on PG-19 val).
+[Full per-cell tables, decision triggers, and mechanism statements
+for v11–v14 in [`archive/COMPREHENSIVE.md`](archive/COMPREHENSIVE.md)
+Part VI. Active v15 state in
+[`results/exp2_chain_recipe/runs.md`](results/exp2_chain_recipe/runs.md).]
 
-- **#v9c** — Books produce meaningful compression gradients easily and
-  are a **much easier** task than dialogue compression: books have
-  temporal dependency, continuity, and many more tokens per chain.
-  Phase-aligned CB Δ_nm-m grew monotonically from −0.03 → +0.16 nats
-  across 4 000 steps on the diverse PG-19 + TV + LME + MSC corpus.
+## Currently running
 
-- **#v3 → v10** — Dialogue datasets (LongMemEval, MSC, RealTalk) need a
-  **custom memory compression learning stage** or the backbone keeps
-  throwing away every memory state we hand it. Six straight LME-only
-  campaigns collapsed the same way (gate_max ≡ 0, α_mem ≡ 0). We
-  initially blamed the architecture; the post-v10 audit found three
-  *causally independent* failures, each sufficient on its own:
-  - **P0 (data, ~100× leverage)** — the corpus builder threw away the
-    `answer_session_ids` annotations LongMemEval-S ships with, so 96 %
-    of training windows had `M_c` built from sessions that
-    demonstrably did *not* contain the answer. The LM-loss-optimal
-    policy under that distribution is "ignore memory".
-  - **P1 (chicken-and-egg)** — gate, readout, and writer all multiply
-    each other in the forward path (`h += g * m^t`). With `g = 0` and
-    `W_V^read = randn(d⁻¹ᐟ²)` at init, no parameter sees gradient at
-    step 0 and they all stay at zero forever.
-  - **P2 (magnitude)** — the readout RMSNorm pinned
-    `‖m^t‖/‖embed‖ ≈ 73`, so the useful gate range was `[0, ~0.014]`
-    — too narrow for AdamW's natural step size to land in stably.
+| cell | host | status | notes |
+|---|---|---|---|
+| **v15f** | local H100 GPU 0 | RUNNING (~step 100/3000) | 1.7B joint train; `evidence_lift` suspected to leak — see v15 OPEN AUDIT |
+| audit A1 | local CPU | RUNNING | corpus-and-window leakage |
+| audit A2 | local CPU | RUNNING | eval-redaction (`_phase_aligned_eval` / `eval_callback.py`) |
+| audit A3 | local CPU | RUNNING | base-rate / template prior |
 
-## Currently running: v11
-
-v11 fixes P0/P1/P2 simultaneously and runs as an 11-cell ablation
-matrix (1 local + 10 GH200). The decision triggers (step-200 /
-step-500 / step-1000 / KILL) for every cell are inlined in the
-launcher comments under `Scripts/train_v11*.sh`.
-
-| cell | host | routing | knob change vs v9c | what it tests |
-|---|---|---|---|---|
-| **`chain_v11_evidence_aware_local`** | local H100 (active) | `simple_gate` | gate_init = 0.005, readout_norm_init = 0.05, evidence-aware curriculum, `--burn_in_max 0 --window_k 3` | does the P0+P1+P2 stack give PA CB Δ_nm-m > +0.02 by step 500 on the cheap proxy? |
-| `train_v11g_ap_baseline_gh200` | GH200 | `attention_parity` +4 / 0 | softer mem-bias (0 vs −4) at init; same P0+P2 fixes | does softer bias open α_mem ~50× faster than legacy v3 init? |
-| `train_v11h_ap_norm1_gh200` | GH200 | `attention_parity` +4 / 0 | drops P2 (`readout_norm_init = 1.0`) | does the depth softmax self-regulate magnitude on its own, or is P2 mandatory for AP too? |
-| `train_v11i_ap_pm4_gh200` | GH200 | `attention_parity` +4 / **−4** | reverts to legacy v3/v10b bias | with P0 + P2 in place, can the v3 default still recover? |
-| `train_v11j_ap_carry_depth_gh200` | GH200 | `attention_parity` +4 / 0 | `window_k = 4`, `--carry_state`, `--burn_in_max 12 --burn_in_resample` | closes the train/eval depth gap (P5) — primary lever against the standard Δ_sh-m ≈ 0 problem |
-| `train_v11k_ap_no_evidence_gh200` | GH200 | `attention_parity` +4 / 0 | reverts P0 only (legacy `v6_lme_msc` corpus, uniform "evidence") | clean A/B isolating P0's contribution |
-| **`train_v11r_ap_readout_warmup_gh200`** | GH200 | `attention_parity` +4 / 0 | **`--readout_warmup_steps 500 --readout_warmup_router_bias 4.0` + `--contrastive_infonce_weight 0.5`** | architectural fix A: targets the readout-router lock-in surfaced by D5 audit on v11g/best (writer encodes content; readout never converges because router closes early). Phase 1 trains readout in isolation under forced-open routing; phase 2 unfreezes and anneals. **Highest-leverage v11 cell — slot 3 in the queue.** |
-| `train_v11l_ap_frozen_backbone_gh200` | GH200 | `attention_parity` +4 / 0 | `--freeze_backbone`; otherwise IDENTICAL to v11g | single-knob ablation: is v11g's grow-then-decay caused by backbone co-evolution (block summaries crowding `m^t` out of the AP softmax)? |
-| `train_v11m_ap_chinchilla_gh200` | GH200 | `attention_parity` +4 / 0 | 16 000 steps, `window_k=4`, `--carry_state`, `--burn_in_max 12 --burn_in_resample`; ~262 M tokens | applies the Chinchilla budget to the from-scratch ~9.7 M-param memres subsystem (was at ~25 % of Chinchilla in v11g) |
-| `train_v11p_ap_frozen_chinchilla_mega_gh200` | GH200 | `attention_parity` +4 / 0 | `--freeze_backbone` + `v11_mega` corpus (67 745 chains) + 25 000 steps + `--lr 1e-4` + `window_k=4 --carry_state` | v11 HEADLINE replacement for the killed 4B mega: cleanest from-scratch memres training, stable backbone target, 2.1× Chinchilla token budget, 10× larger corpus |
-| `train_v11q_ap_contrastive_gh200` | GH200 | `attention_parity` +4 / 0 | `--contrastive_infonce_weight 0.5` (warmup 0.05 → 0.5 over 500 steps, callback-only scoring); otherwise IDENTICAL to v11g | dense supervision on Δ_sh-m: B-way InfoNCE over in-batch negatives directly pressures M_c to be chain-specific. Now also serves as the **InfoNCE-without-warmup ablation for v11r** (v11r combines warmup + InfoNCE; q isolates the supervision contribution). |
-
-### Diagnostic toolkit (D1-D5; 2026-05-01)
-
-Five mechanism-level audits that ship with the trainer (`--diagnose_grad_groups`,
-`--diagnose_memory_dynamics`) plus standalone scripts:
-
-- **D1** per-module gradient L2 norms (ratios to backbone). Surfaces gradient
-  starvation in the writer subsystem.
-- **D2** judge attention decisiveness (row-entropy, keep/write mass split,
-  effective rank). Detects decision-less judge softmax.
-- **D3** M_c stability + chain-distinguishability (per-step Frobenius drift,
-  pairwise distance between distinct chains). Detects content-blind writer.
-- **D4** synthetic gold-standard persona-callback corpus
-  (`tools/build_synthetic_persona_callback.py`; 5000 chains × 9 sessions,
-  256-item closed set; ground-truth callable CE → 0 only if memory works).
-- **D5** TTT-on-readout disambiguator
-  (`tools/d5_ttt_readout.py`; freeze writer + router + LM head, train ONLY
-  the readout for 300 steps). Distinguishes "writer broken" vs "readout
-  broken" vs "router locked".
-
-Audit on `v11g/best` (results in `v11g_diag_synth.json`, `v11g_d5_ttt.json`):
-the writer encodes chain-content, the **readout is the bottleneck**, and the
-router locked the memory pathway closed before the readout converged. v11r is
-the architectural response.
-
-The active run ledger (which cell is doing what right now) is in
-[`results/exp2_chain_recipe/runs.md`](results/exp2_chain_recipe/runs.md).
+**v15g (1.7B-small on GPU 1) is POSTPONED** until A1/A2/A3 land.
+GH200 idle until the audit verdict scopes the next campaign.
 
 ## Resources
 
-- **Local.** 2 × H100 NVL (94 GB) at the lab box. Currently busy with
-  `chain_v11_evidence_aware_local` on GPU 0. ~16 h/day usable
+- **Local.** 2 × H100 NVL (94 GB) at the lab box. ~16 h/day usable
   (residential power-down overnight).
 - **Cloud.** 1 × NVIDIA GH200 480 GB at `192.222.50.225` (user
-  `ubuntu`). v11 GH200 cells are queued through the cloud watchdog
-  (`tools/cloud_watchdog/`); jobs run inside detached `tmux` so they
-  survive SSH drops + lab-box power-offs.
+  `ubuntu`). v14abl_*/v14g/v14h/v14i/v14l and earlier ran here
+  through `tools/cloud_watchdog/` (jobs run inside detached `tmux`
+  so they survive SSH drops + lab-box power-offs).
 
 ## Layout
 
 ```
-Runs/                         training checkpoints (gitignored, ~11 GB).
-                              Only runs cited by the two papers survive
-                              on disk; v3-v10 were pruned 2026-04-30.
+Runs/                    training checkpoints (gitignored, ~11 GB).
+                         Only checkpoints cited by the two papers
+                         survive on disk; v3-v10 were pruned
+                         2026-04-30; v11-v14 best/ checkpoints live
+                         here while v15 audit is in progress.
 
-Scripts/                      one .sh per training cell — the launchers.
-                              v10 launchers were pruned; superseded ones
-                              live under archive/scripts/.
+Scripts/                 one .sh per training cell — the launchers.
+data/                    pre-tokenised corpora (symlink to
+                         paper_artifacts/chains/).
+src/                     architecture + trainer code:
+  modeling_memres.py     architecture (config, model, init).
+  train_chain.py         recurrent chain TBPTT trainer (active).
+  train_phase1.py        pair-based warm-up trainer (Paper 1).
+  presets.py             named (backbone, K, L_E, N) tuples.
+tools/                   eval / probes / corpus builders.
+  cloud_watchdog/        remote-survivable job queue + ntfy daemon.
+  eval_callback.py       canonical D4 post-train eval (USE THIS).
+  d5_ttt_readout.py      D5 readout-bottleneck disambiguator.
+  build_synthetic_persona_callback.py
+                         D4 / D4v2 synthetic corpus generator.
+results/                 eval JSONs + paper drafts:
+  eval/                  bootstrap CIs, routing traces, etc.
+  eval_v14v15/           v14-v15 callback-aware eval JSONs.
+  exp1_pair_recipe/      Paper 1 (drop-in primitive) manuscript.
+  exp2_chain_recipe/     Paper 2 (long-horizon recipe) draft +
+                         active runs.md ledger.
+tests/                   pytest harness for src/.
+archive/                 historical reference (~2 MB):
+  COMPREHENSIVE.md       full v1 → v14 ledger (Parts I-VI; convention
+                         in Part VII).
+  agent_sessions/        prior agent worklogs.
+  eval/, figures/,
+  paper_tools/, scripts/ pre-2026-04-30 cleanup snapshots.
 
-data/                         pre-tokenised corpora.
-                              (symlink → paper_artifacts/chains/ while
-                               the active v11 cell still has the old
-                               literal path baked into its launch
-                               command; rename to a real dir once v11
-                               finishes.)
-
-tools/                        eval / probes / corpus builders.
-  cloud_watchdog/             remote-survivable job queue + ntfy daemon.
-
-results/                      eval JSONs + paper drafts.
-  eval/                       bootstrap CIs, routing traces,
-                              counterfactual horizon sweeps.
-  exp1_pair_recipe/           Paper 1 (drop-in primitive, run3 result)
-                              manuscript + figures.
-  exp2_chain_recipe/          Paper 2 (long-horizon recipe) draft +
-                              the active runs.md ledger.
-
-src/                          all the architecture + trainer code.
-  modeling_memres.py          architecture (config, model, init).
-  train_chain.py              recurrent chain TBPTT trainer (active).
-  train_phase1.py             pair-based warm-up trainer (Paper 1 recipe).
-  presets.py                  named (backbone, K, L_E, N) tuples.
-
+memory_residuals.pdf     position paper (architectural spec).
+memory_residuals.tex     ditto, source.
+extraction.png /
+judging.png / 1.png /
+2.png                    figures embedded in memory_residuals.pdf.
+atn_residuals.pdf        Block Attention Residuals reference.
+README.md                this file.
 requirements.txt
-
-memory_residuals.pdf          position paper (architectural spec).
-atn_residuals.pdf             Block Attention Residuals reference.
-README.md                     this file.
 .gitignore
 
-archive/                      historical reference (~1 MB):
-                              prior scripts, tools, eval JSONs, agent
-                              session notes, and COMPREHENSIVE.md (the
-                              full v1→v10 ledger every prior decision
-                              is in).
-
-output -> Runs                backwards-compat symlink (the active v11
-                              cell's launch command bakes in
-                              `output/...`).
-logs/                         training & sync logs (gitignored).
-paper_artifacts/chains/       physical home of the pre-tokenised
-                              corpora; gitignored. Reach via `data/`.
+output -> Runs           backwards-compat symlink.
+logs/                    training & sync logs (gitignored).
+paper_artifacts/         physical home of pre-tokenised corpora and
+  chains/                LoCoMo / MSC test sets. Reach via `data/`.
+  locomo_chains/
+  msc_chains_test/
 ```
 
 ## Stop everything
@@ -250,10 +273,10 @@ ssh ubuntu@192.222.50.225 \
 
 ## Reading order
 
-1. **This README — and specifically the "Architectural priors" block
-   at the top.** If you catch yourself proposing a change that
-   contradicts one of those bullets, STOP and read the citation
-   before proceeding.
+1. **This README — and specifically the "Architectural priors"
+   block.** If you catch yourself proposing a change that contradicts
+   one of those nine bullets, STOP and read the citation before
+   proceeding.
 2. [`memory_residuals.pdf`](memory_residuals.pdf) — the position
    paper / architectural spec (Eqs. 1–10, two-stage QKV competition,
    off-sequence depth-wise injection).
@@ -261,8 +284,8 @@ ssh ubuntu@192.222.50.225 \
    Residuals reference. Read when the routing trace looks weird or
    you're tuning router init biases.
 4. [`results/exp2_chain_recipe/runs.md`](results/exp2_chain_recipe/runs.md)
-   — the active run ledger.
+   — the active run ledger (currently: v15 + the open audit).
 5. [`archive/COMPREHENSIVE.md`](archive/COMPREHENSIVE.md) — the
-   long-form historical ledger (every prior run, every architectural
-   decision, every failure mode in detail; reference material, not a
-   reading order).
+   long-form historical ledger (Part I-II background, Part III
+   Stage-1 calendar, Part IV v2-v6, Part V v7-v10, **Part VI
+   v11-v14**, Part VII the runs.md folding convention).

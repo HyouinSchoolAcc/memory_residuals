@@ -8,31 +8,68 @@ committing more compute to natural-data tuning that bakes in dozens of
 confounds (filler distribution, callback density, evidence labels,
 backbone co-evolution, ...).
 
-Structure of one chain (default ``n_filler_sessions=7`` -> chain
-length 9):
+Structure of one chain (defaults: ``n_evidence_sessions=2``,
+``n_filler_sessions=7``, ``n_prefix_sessions=0`` -> chain length 10):
 
-  session 0  PERSONA   "User: My favorite thing in the world is ITEM_X.
-                        Assistant: I'll remember that."
-  session 1  FILLER    random innocuous chit-chat, never names items
-  ...        FILLER
-  session 7  FILLER
-  session 8  CALLBACK  "User: what was my favorite thing again?
-                        Assistant: Your favorite thing is ITEM_X."
+  session 0  EVIDENCE_1  "User: My favorite COLOR is red.
+                          Assistant: ... your favorite color is red."
+  session 1  FILLER      random innocuous chit-chat, never names items
+  session 2  FILLER
+  session 3  EVIDENCE_2  "User: My favorite TOOL is whisk.
+                          Assistant: ... your favorite tool is whisk."
+  session 4..n  FILLER
+  session 9  CALLBACK    "User: Quick question, what was my favorite
+                          {color OR tool} again?
+                          Assistant: Your favorite {category} is {item}."
+
+The corpus draws ``n_evidence_sessions`` (category, item) pairs per
+chain, each from a *distinct category*, and shuffles them into random
+positions inside the chain (after any prepended sessions, before the
+callback).  The callback uniformly samples ONE of the evidence pairs
+to ask about; the assistant turn answers with the corresponding item,
+and ``session_callback_mask`` is set on those token positions.
+
+WHY MULTIPLE EVIDENCE SESSIONS (v15 fix, 2026-05-02).
+The original (n_evidence_sessions=1) variant gave the writer a trivial
+optimal policy: write evidence at session 0, then KEEP M_c unchanged
+through every distractor session because M_c_prev is always the right
+answer.  Under that policy the writer never has to integrate signal
+across multiple sessions, so the judge's keep/write decisioning is
+never exercised, and the failure mode of a saturated write_gate (g~0
+keep-everything) is rewarded by the LM loss.  With
+n_evidence_sessions>=2 the writer must (a) capture evidence_1, (b)
+preserve it across fillers, (c) *integrate* evidence_2 into M_c
+without overwriting evidence_1, and (d) hold both across remaining
+fillers; the readout in turn must discriminate which evidence the
+callback asks about.  This exercises every memory primitive (store /
+preserve / merge / discriminate) that a working memory subsystem must
+implement, and it is no longer trivially solvable by a content-blind
+keep-everything writer.
+
+WHY PREPENDED SESSIONS.  The optional ``n_prefix_sessions`` flag
+inserts that many filler sessions before the first evidence, lengthening
+the chain without adding evidence and stressing the writer's robustness
+to longer histories before the relevant content appears.  Defaults to
+0 to preserve the original budget; raise to 2-4 for stress sweeps.
 
 ITEM_X is drawn uniformly from a closed set of N_ITEMS distinct
 single-string items (default 256: 32 each of colors, fruits, animals,
-objects, sports, tools, instruments, hobbies).  The callback session's
-``session_callback_mask`` is set on the token positions of ITEM_X in
-the assistant turn -- so the trainer's
-``--callback_loss_weight`` surfaces explicit gradient on those tokens.
+objects, sports, tools, instruments, hobbies) over 8 disjoint
+categories.  Evidence sessions in a single chain use distinct
+categories, so the callback's "what was my favorite {category}" is
+unambiguous.  The callback session's ``session_callback_mask`` is set
+on the token positions of the answer item in the assistant turn -- so
+the trainer's ``--callback_loss_weight`` surfaces explicit gradient on
+those tokens.
 
-Phase-aligned eval reads ``chain_evidence_positions`` and picks
-session 0 (the persona) as the evidence; ``chain_callback_position``
-points at the callback session.  Both fields are written here exactly
-the way the v11 LongMemEval corpus expects.
+Phase-aligned eval reads ``chain_evidence_positions`` (now a list of
+*all* evidence positions per chain) and picks one or all as evidence;
+``chain_callback_position`` points at the callback session.  Both
+fields are written here exactly the way the v11+ LongMemEval corpus
+expects.
 
 WHY THIS IS DIAGNOSTIC.  Under any architecture that *can* learn to
-keep ITEM_X alive across 7 distractor sessions, the per-token NLL on
+keep ITEM_X alive across distractor sessions, the per-token NLL on
 the callback's ITEM_X tokens should drop close to 0.  Under an
 architecture that cannot (because the writer doesn't actually write,
 or because the readout cannot retrieve, or because the judge softmax
@@ -43,7 +80,10 @@ correct-on-task model has CE ~ log(1) = 0 nats on the answer token
 the second token is conditioned on the first and so still has very
 low CE under a model that has learned the binding).
 
-Output format matches ``ChainCorpus`` in train_chain.py exactly.
+Output format matches ``ChainCorpus`` in train_chain.py exactly:
+``chain_evidence_positions[ci]`` is a list of session indices for the
+evidence (length = ``n_evidence_sessions``) and
+``chain_callback_position[ci]`` is the session index of the callback.
 """
 
 from __future__ import annotations
@@ -259,11 +299,57 @@ def find_answer_positions(
     return []
 
 
+def _sample_evidence(
+    rng: random.Random,
+    by_category: dict[str, list[tuple[str, str]]],
+    n_evidence: int,
+) -> list[tuple[str, str]]:
+    """Sample ``n_evidence`` (category, item) pairs from distinct
+    categories.  Returns a list of length ``n_evidence`` with no two
+    entries sharing a category, so the callback's "what was my
+    favorite {category}" is always unambiguous.
+    """
+    cats = list(by_category.keys())
+    if n_evidence > len(cats):
+        raise SystemExit(
+            f"--n_evidence_sessions={n_evidence} exceeds the number of "
+            f"distinct categories ({len(cats)}); cannot sample without "
+            f"category collision."
+        )
+    chosen_cats = rng.sample(cats, n_evidence)
+    out: list[tuple[str, str]] = []
+    for c in chosen_cats:
+        # by_category[c] is a list of (cat, item) tuples; pick one.
+        _cat, item = rng.choice(by_category[c])
+        out.append((c, item))
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True, help="Output .pt path.")
     parser.add_argument("--n_chains", type=int, default=5000)
-    parser.add_argument("--n_filler_sessions", type=int, default=7)
+    parser.add_argument(
+        "--n_filler_sessions", type=int, default=7,
+        help="Distractor sessions interspersed between evidence and "
+             "before the callback. Default 7.",
+    )
+    parser.add_argument(
+        "--n_evidence_sessions", type=int, default=2,
+        help="v15 (2026-05-02): Number of distinct evidence sessions "
+             "per chain, each introducing a fact in a distinct "
+             "category. The callback uniformly samples one evidence "
+             "to ask about. Set to 1 for the legacy single-fact corpus. "
+             "Default 2 forces the writer to merge two facts and "
+             "discriminate at readout time.",
+    )
+    parser.add_argument(
+        "--n_prefix_sessions", type=int, default=0,
+        help="v15 (2026-05-02): Number of filler sessions inserted at "
+             "the start of each chain before the first evidence. "
+             "Stresses the writer's robustness to long pre-evidence "
+             "history. Default 0.",
+    )
     parser.add_argument("--session_len", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--tokenizer", default="Qwen/Qwen3-0.6B")
@@ -274,17 +360,34 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.n_evidence_sessions < 1:
+        raise SystemExit("--n_evidence_sessions must be >= 1.")
+    if args.n_filler_sessions < 0:
+        raise SystemExit("--n_filler_sessions must be >= 0.")
+    if args.n_prefix_sessions < 0:
+        raise SystemExit("--n_prefix_sessions must be >= 0.")
+
     rng = random.Random(args.seed)
     tok = AutoTokenizer.from_pretrained(args.tokenizer)
     eos_id = tok.eos_token_id
     if eos_id is None:
         raise SystemExit("tokeniser has no eos_token_id; cannot pad.")
     S = args.session_len
-    chain_len = 1 + args.n_filler_sessions + 1
+    chain_len = (
+        args.n_prefix_sessions
+        + args.n_evidence_sessions
+        + args.n_filler_sessions
+        + 1  # callback
+    )
 
     items_pool = _flatten_closed_set()
+    by_category: dict[str, list[tuple[str, str]]] = {}
+    for cat, it in items_pool:
+        by_category.setdefault(cat, []).append((cat, it))
     if args.audit_tokenisation:
         print(f"closed set size: {len(items_pool)}")
+        print(f"categories: {list(by_category.keys())} "
+              f"(n={len(by_category)})")
         token_lens = []
         for cat, it in items_pool:
             ids = tok.encode(" " + it, add_special_tokens=False)
@@ -304,6 +407,17 @@ def main() -> None:
         print(f"  callback_text: {cb_text}")
         print(f"  answer-span positions: {positions}")
         print(f"  answer-span tokens: {[tok.decode([tok.encode(cb_text, add_special_tokens=False)[p]]) for p in positions]}")
+        # v15: also audit evidence sampling for n_evidence > 1.
+        if args.n_evidence_sessions > 1:
+            ev = _sample_evidence(rng, by_category, args.n_evidence_sessions)
+            print(f"\nsample evidence draw "
+                  f"(n_evidence={args.n_evidence_sessions}):")
+            for i, (c, ip) in enumerate(ev):
+                print(f"  evidence_{i}: cat={c} item={ip[1]!r}")
+            print(f"chain_len = {chain_len} = "
+                  f"{args.n_prefix_sessions} prefix + "
+                  f"{args.n_evidence_sessions} evidence + "
+                  f"{args.n_filler_sessions} filler + 1 callback")
         return
 
     all_sessions: list[list[int]] = []
@@ -315,19 +429,61 @@ def main() -> None:
     chain_names: list[str] = []
     n_skipped_no_answer = 0
 
+    # Total non-prefix non-callback "body" length where evidence and
+    # filler get interleaved at random positions.
+    body_len = args.n_evidence_sessions + args.n_filler_sessions
+
     for ci in range(args.n_chains):
-        cat, item = rng.choice(items_pool)
+        # 1) Sample distinct-category evidence facts.
+        evidence_pairs = _sample_evidence(
+            rng, by_category, args.n_evidence_sessions
+        )
+        # 2) Choose which evidence the callback asks about.
+        callback_idx = rng.randrange(args.n_evidence_sessions)
+        callback_cat, callback_item = evidence_pairs[callback_idx]
         chain_start = len(all_sessions)
 
-        # Build sessions: persona, fillers, callback.
-        sessions_text: list[str] = []
-        sessions_text.append(render_persona(cat, item))
-        for _ in range(args.n_filler_sessions):
-            sessions_text.append(rng.choice(FILLERS))
-        sessions_text.append(render_callback(cat, item))
+        # 3) Choose evidence positions within the body. The body has
+        #    `body_len` slots; evidence occupies `n_evidence_sessions`
+        #    of them at random distinct positions, fillers fill the
+        #    rest. Body positions are then mapped to chain positions
+        #    by adding `n_prefix_sessions`.
+        body_positions = list(range(body_len))
+        evidence_body_positions = sorted(
+            rng.sample(body_positions, args.n_evidence_sessions)
+        )
+        chain_evidence_position = [
+            args.n_prefix_sessions + p for p in evidence_body_positions
+        ]
 
-        # Encode + build callback mask.  Mask is non-zero ONLY in the
-        # final session, on the token positions of the answer-span.
+        # 4) Build session texts in order.
+        sessions_text: list[str] = []
+        # 4a) Prefix fillers.
+        for _ in range(args.n_prefix_sessions):
+            sessions_text.append(rng.choice(FILLERS))
+        # 4b) Body: place each evidence at its chosen position; fillers
+        #     in the gaps.
+        evidence_at_body_pos: dict[int, tuple[str, str]] = {
+            p: evidence_pairs[i]
+            for i, p in enumerate(evidence_body_positions)
+        }
+        for p in range(body_len):
+            if p in evidence_at_body_pos:
+                cat_p, item_p = evidence_at_body_pos[p]
+                sessions_text.append(render_persona(cat_p, item_p))
+            else:
+                sessions_text.append(rng.choice(FILLERS))
+        # 4c) Callback (asks about evidence_pairs[callback_idx]).
+        sessions_text.append(render_callback(callback_cat, callback_item))
+
+        assert len(sessions_text) == chain_len, (
+            f"len(sessions_text)={len(sessions_text)} != "
+            f"chain_len={chain_len}"
+        )
+
+        # 5) Encode + build callback mask. Mask is non-zero ONLY in the
+        #    final session, on the token positions of the answer-span
+        #    (the *callback's* item).
         chain_session_ids: list[list[int]] = []
         chain_cb_masks: list[list[int]] = []
         answer_positions: list[int] = []
@@ -335,7 +491,9 @@ def main() -> None:
             ids = encode_session(tok, txt, S, eos_id)
             mask = [0] * S
             if si == chain_len - 1:
-                positions = find_answer_positions(tok, txt, item, S)
+                positions = find_answer_positions(
+                    tok, txt, callback_item, S
+                )
                 if not positions:
                     answer_positions = []
                     break
@@ -355,8 +513,15 @@ def main() -> None:
         chain_starts.append(chain_start)
         chain_lengths.append(chain_len)
         chain_callback_position.append(chain_len - 1)
-        chain_evidence_positions.append([0])
-        chain_names.append(f"synthetic_persona_callback_{ci:05d}_{cat}_{item}")
+        chain_evidence_positions.append(chain_evidence_position)
+        # Name encodes the asked-about (cat, item); the other evidence
+        # facts are still in M_c at callback time but the LM head only
+        # sees one being queried.
+        chain_names.append(
+            f"synthetic_persona_callback_{ci:05d}"
+            f"_{callback_cat}_{callback_item}"
+            f"_n{args.n_evidence_sessions}ev"
+        )
 
     blob = {
         "session_ids": torch.tensor(all_sessions, dtype=torch.long),

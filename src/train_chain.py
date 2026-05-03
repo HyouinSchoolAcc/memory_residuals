@@ -33,6 +33,7 @@ import json
 import math
 import os
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -452,6 +453,61 @@ def parse_args() -> argparse.Namespace:
                         "D2/D3 diagnostic.  Up to chain_lengths[ci] "
                         "session-boundary judge calls are made per "
                         "chain so this is also the cost knob.")
+    # ------------------------------------------------------------------
+    # v15 (2026-05-02 audit): hard kill on memory-subsystem collapse.
+    # ------------------------------------------------------------------
+    # Multiple v13/v14 runs (v14abl_a, v14a, v13r) silently trained for
+    # thousands of steps with M_c stuck at the zero matrix because the
+    # write_gate sigmoid had saturated at g~0. The eval logs printed
+    # `pair/self = 0.000` and `mt_norm_ratio_mean = 0.000` every
+    # eval but training never stopped. To prevent that class of
+    # silent-failure burn going forward, the trainer hard-kills when
+    # the memory subsystem is observably dead for two consecutive evals.
+    # Threshold of 0.01: a non-degenerate writer on D4 hits pair/self in
+    # the 0.3-0.7 range and mt_norm_ratio in the 0.1-2 range; values
+    # below 0.01 mean the readout is producing zeros / different chains
+    # produce identical M_c -- both are unrecoverable failure modes that
+    # no amount of additional training will fix.
+    p.add_argument(
+        "--kill_on_memory_collapse",
+        action="store_true",
+        default=False,
+        help="If set, abort training (sys.exit non-zero) when "
+             "Mc_pair_to_self_ratio < THRESH or mt_norm_ratio_mean < "
+             "THRESH for N_CONSECUTIVE evals (default 2). Requires "
+             "--diagnose_memory_dynamics for the D3 ratio; the m^t "
+             "ratio is always available. Default off for backward "
+             "compatibility; turn on for any new D4 sweep.",
+    )
+    p.add_argument(
+        "--kill_on_memory_collapse_pair_self_threshold",
+        type=float,
+        default=0.01,
+        help="Mc_pair_to_self_ratio below this value counts as a "
+             "collapse strike. Default 0.01.",
+    )
+    p.add_argument(
+        "--kill_on_memory_collapse_mt_norm_threshold",
+        type=float,
+        default=0.01,
+        help="mt_norm_ratio_mean (||m^t|| / ||embed||) below this "
+             "value counts as a collapse strike. Default 0.01.",
+    )
+    p.add_argument(
+        "--kill_on_memory_collapse_consecutive",
+        type=int,
+        default=2,
+        help="Consecutive collapse strikes required before aborting. "
+             "Default 2 (one eval to flag, one to confirm).",
+    )
+    p.add_argument(
+        "--kill_on_memory_collapse_min_step",
+        type=int,
+        default=200,
+        help="Disable the kill switch before this step to avoid "
+             "tripping during random-init or early warmup transients. "
+             "Default 200.",
+    )
 
     # ------------------------------------------------------------------
     # Architectural fix A: scaffolded readout warmup (2026-05-01).
@@ -569,6 +625,21 @@ def parse_args() -> argparse.Namespace:
                         "uniform-attention pathology measured on v13r "
                         "@ step 10000 (Zhai et al. 2023 entropy-"
                         "collapse direction; inverse pathology here).")
+    p.add_argument("--memres_extract_input_norm", action="store_true",
+                   help="Apply Qwen3RMSNorm to the extraction input C "
+                        "BEFORE it enters MemoryBlock.extract.  When "
+                        "--memres_extract_source starts with 'hidden_' "
+                        "the C tensor is a deep bare-backbone hidden "
+                        "state with per-token RMS in the 30-100 range "
+                        "(modern transformers do not externally "
+                        "normalise the residual stream between layers); "
+                        "forwarding un-normalised C inflates extract "
+                        "W_K/W_V backward gradients by ~||C|| and "
+                        "destabilises the writer warmup.  v14 fix for "
+                        "the v13/v14abl 'extract grad ~ 1e10, judge "
+                        "collapses to uniform within 500 steps, M_c "
+                        "locked at zero matrix' collapse signature.  "
+                        "Default off for init-parity / older ckpts.")
     # v14 auxiliary-loss knobs.  These are read during fit() and
     # applied only when their weight is > 0; defaults preserve
     # pre-v14 behaviour exactly.
@@ -1256,6 +1327,11 @@ class Trainer:
         os.makedirs(args.out_dir, exist_ok=True)
         self.best_eval_ce = float("inf")
         self.global_step = 0
+        # v15 (2026-05-02): memory-collapse strike counter, consumed by
+        # the eval branch when --kill_on_memory_collapse is set. Counts
+        # how many recent consecutive evals failed the pair/self or
+        # mt_norm_ratio threshold; a clean eval resets it to 0.
+        self._memory_collapse_strikes = 0
 
         # Telemetry for the InfoNCE contrastive loss.  Updated per step
         # in _train_step when --contrastive_infonce_weight > 0; printed
@@ -1364,6 +1440,7 @@ class Trainer:
             memres_queries_init=a.memres_queries_init,
             memres_slot_positional=a.memres_slot_positional,
             memres_judge_qk_layernorm=a.memres_judge_qk_layernorm,
+            memres_extract_input_norm=a.memres_extract_input_norm,
         )
         if a.pretrained:
             # A memres checkpoint saves model_type="qwen3_memres", which
@@ -2711,9 +2788,23 @@ class Trainer:
                     attn_running = attn_running + attn.squeeze(0).double()
                 attn_n += 1
                 # Now produce M_c^t through the gated/competitive path.
+                # Mirrors MemoryBlock.forward: slot_attention writers
+                # use the judge output directly (their internal GRU is
+                # the keep/write); the original writer applies the
+                # external sigmoid gate, RMSNormed both sides.
                 M_c_new = inner.memory_block.judge(M_c_prev, M_new)
-                if inner.memory_block.update_mode == "gated":
-                    gate_input = torch.cat([M_c_prev, M_new], dim=-1)
+                if (
+                    inner.memory_block.update_mode == "gated"
+                    and inner.memory_block.writer_kind
+                    not in ("slot_attention", "slot_attention_full")
+                ):
+                    gate_input = torch.cat(
+                        [
+                            inner.memory_block.write_gate_norm_prev(M_c_prev),
+                            inner.memory_block.write_gate_norm_new(M_new),
+                        ],
+                        dim=-1,
+                    )
                     g = torch.sigmoid(
                         inner.memory_block.write_gate(gate_input)
                     )
@@ -3352,6 +3443,110 @@ class Trainer:
                             f"(pair/self={metrics.get('Mc_pair_to_self_ratio', float('nan')):.3f})",
                             flush=True,
                         )
+
+                    # v15 (2026-05-02): hard-kill on memory collapse.
+                    # Two failure modes to detect:
+                    #   (a) pair/self < THRESH: every chain produces the
+                    #       same M_c, i.e. the writer is content-blind;
+                    #   (b) mt_norm_ratio_mean < THRESH: the readout
+                    #       produces zeros, i.e. the memory pathway has
+                    #       no influence on the backbone at all.
+                    # Either condition for N consecutive evals after
+                    # the early-step grace window aborts the run with a
+                    # non-zero exit, so cloud_watchdog and CI pick up
+                    # the failure instead of burning hours on a dead run.
+                    if (
+                        getattr(a, "kill_on_memory_collapse", False)
+                        and self.is_main
+                        and self.global_step >= a.kill_on_memory_collapse_min_step
+                    ):
+                        pair_self = metrics.get(
+                            "Mc_pair_to_self_ratio", float("nan")
+                        )
+                        mt_ratio = metrics.get(
+                            "mt_norm_ratio_mean", float("nan")
+                        )
+                        pair_self_bad = (
+                            (not math.isnan(pair_self))
+                            and pair_self
+                            < a.kill_on_memory_collapse_pair_self_threshold
+                        )
+                        mt_ratio_bad = (
+                            (not math.isnan(mt_ratio))
+                            and mt_ratio
+                            < a.kill_on_memory_collapse_mt_norm_threshold
+                        )
+                        if pair_self_bad or mt_ratio_bad:
+                            self._memory_collapse_strikes += 1
+                            reason_parts = []
+                            if pair_self_bad:
+                                reason_parts.append(
+                                    f"pair/self={pair_self:.4f} < "
+                                    f"{a.kill_on_memory_collapse_pair_self_threshold}"
+                                )
+                            if mt_ratio_bad:
+                                reason_parts.append(
+                                    f"||m^t||/||embed||={mt_ratio:.4f} < "
+                                    f"{a.kill_on_memory_collapse_mt_norm_threshold}"
+                                )
+                            print(
+                                f"  [KILL-WATCH] memory collapse strike "
+                                f"{self._memory_collapse_strikes}/"
+                                f"{a.kill_on_memory_collapse_consecutive} "
+                                f"@ step {self.global_step}: "
+                                f"{'; '.join(reason_parts)}",
+                                flush=True,
+                            )
+                            if (
+                                self._memory_collapse_strikes
+                                >= a.kill_on_memory_collapse_consecutive
+                            ):
+                                print(
+                                    f"  [KILL] memory subsystem confirmed "
+                                    f"collapsed @ step {self.global_step} "
+                                    f"({self._memory_collapse_strikes} "
+                                    f"consecutive failed evals). "
+                                    f"Aborting run with exit-code 42 so "
+                                    f"the harness picks up the failure "
+                                    f"instead of burning compute on a "
+                                    f"dead writer.",
+                                    flush=True,
+                                )
+                                # Final save so the artefact is preserved
+                                # for forensics (write_gate raw outputs,
+                                # alpha_mem trajectories, judge
+                                # entropies are all worth examining).
+                                self._save(
+                                    f"killed-step-{self.global_step}",
+                                    eval_metrics={
+                                        **metrics,
+                                        "_killed_reason": "; ".join(
+                                            reason_parts
+                                        ),
+                                        "_killed_at_step": self.global_step,
+                                    },
+                                )
+                                if (
+                                    dist.is_available()
+                                    and dist.is_initialized()
+                                ):
+                                    dist.destroy_process_group()
+                                if self.use_wandb:
+                                    import wandb
+                                    wandb.finish(exit_code=42)
+                                sys.exit(42)
+                        else:
+                            if self._memory_collapse_strikes > 0:
+                                print(
+                                    f"  [KILL-WATCH] memory metrics "
+                                    f"recovered @ step {self.global_step}: "
+                                    f"pair/self={pair_self:.4f}, "
+                                    f"||m^t||/||embed||={mt_ratio:.4f}; "
+                                    f"strike counter reset.",
+                                    flush=True,
+                                )
+                            self._memory_collapse_strikes = 0
+
                     if self.use_wandb:
                         import wandb
                         wandb.log({f"eval/{k}": v for k, v in metrics.items()

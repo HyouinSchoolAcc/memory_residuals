@@ -324,6 +324,39 @@ class Qwen3MemResConfig(Qwen3Config):
         # entropy collapse in extraction; keeping the intervention
         # targeted reduces the risk surface of the v14 campaign.
         memres_judge_qk_layernorm: bool = False,
+        # v14 (2026-05-02 audit, "context-summariser blow-up"):
+        # RMSNorm the extraction input C BEFORE it enters
+        # MemoryBlock.extract.  When memres_extract_source =
+        # "hidden_<L>" the C tensor is the post-layer-L bare-backbone
+        # hidden state; modern transformer residual streams are NOT
+        # externally normalised between decoder layers (only the next
+        # sublayer's pre-projection RMSNorm sees them), so by L=14 on
+        # Qwen3 the per-token RMS of C sits at 30-100.  Forwarding
+        # un-normalised C through the plain CrossAttention extract
+        # path makes (1) M_new candidate magnitude proportional to
+        # ||C|| (||M_new||_F ~ 7e4 in the v15 D4 audit) and (2)
+        # backward gradients on extract.W_K / extract.W_V inflated by
+        # the same factor (dL/dW_V = dL/dV @ C^T with ||C|| ~ 50).
+        # Combined with writer_warmup forcing alpha_mem ~ 0.5 the LM
+        # loss explodes (~17 nats), grad_norm hits 1e8-1e20 in the
+        # first 100 steps, the 1.0 max-norm clip rescales every
+        # memres parameter update to noise, and the judge softmax
+        # collapses to uniform within ~500 steps -- M_c is content-
+        # blind (D3-MC pair/self ~ 0) for the rest of the run.  This
+        # is the v14abl_a / v14a_gh200 collapse signature observed
+        # on every v13/v14 D4/mega cell that uses hidden_<L> extract.
+        # SlotAttentionWriter already does an analogous pre-projection
+        # input_norm internally, but the plain CrossAttention used in
+        # extraction_layers does NOT, and stacking the SA writer on
+        # top of an extracted M_new with norm 1e2-1e4 still inflates
+        # backward grads through extract.  This flag adds a single
+        # Qwen3RMSNorm pass on C inside MemoryBlock.extract, BEFORE
+        # any extract sub-layer touches it, so M_new returns to ~unit
+        # RMS and gradients on extract weights are bounded.  Default
+        # off to preserve init-parity tests / older checkpoints; v14
+        # cells should set this to True when memres_extract_source
+        # starts with "hidden_".
+        memres_extract_input_norm: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -385,6 +418,8 @@ class Qwen3MemResConfig(Qwen3Config):
         self.memres_slot_positional = bool(memres_slot_positional)
         # v14 judge stabiliser (see __init__ docstring above).
         self.memres_judge_qk_layernorm = bool(memres_judge_qk_layernorm)
+        # v14 extraction-input normaliser (see __init__ docstring above).
+        self.memres_extract_input_norm = bool(memres_extract_input_norm)
 
 
 # ---------------------------------------------------------------------------
@@ -822,6 +857,7 @@ class MemoryBlock(nn.Module):
         queries_init: str = "normal",
         slot_positional: bool = False,
         judge_qk_layernorm: bool = False,
+        extract_input_norm: bool = False,
     ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -849,6 +885,17 @@ class MemoryBlock(nn.Module):
         # construction) can see them on the module.
         self._queries_init_kind = queries_init
         self._slot_positional = bool(slot_positional)
+        # v14 extraction-input RMSNorm.  Active only when extract_input_norm
+        # is True; nn.Identity preserves init parity / older checkpoints.
+        # The norm is applied INSIDE extract() to C BEFORE any extraction
+        # sub-layer touches it.  Default-init weight=1.0 (Qwen3RMSNorm
+        # convention) keeps the post-norm magnitude at sqrt(hidden_size)
+        # per token, which is the same scale as the bare embedding stream
+        # the extraction was tuned for.
+        if extract_input_norm:
+            self.extract_input_norm: nn.Module = Qwen3RMSNorm(hidden_size, eps=eps)
+        else:
+            self.extract_input_norm = nn.Identity()
 
         # Stage 1: learnable extraction queries M_in  (K x d)
         self.M_in = nn.Parameter(torch.empty(num_vectors, hidden_size))
@@ -925,10 +972,42 @@ class MemoryBlock(nn.Module):
         # Init bias is -1.0 so g ~ 0.27 at step 0: modest writes early,
         # most of the prior memory is preserved (which is also the
         # behaviour we want with longer chains).
+        #
+        # v15 (2026-05-02 audit, "write_gate sigmoid saturation"):
+        #   The L_E-layer residual extraction stack has no output
+        #   normalisation, so ||M_new||_F ~ 7e4 with hidden_<L> extract
+        #   sources (mean |entry| ~ 35 on D4). With the (2d -> 1) Linear
+        #   even at the zero-init that writer warmup converges to (mean
+        #   |W| ~ 1.7e-4), Wᵀ·gate_input lands at +/- 10..35, saturating
+        #   the sigmoid in the first ~50 steps. Once saturated, the
+        #   gradient through the sigmoid is g(1-g) ~ 1e-30 and the gate
+        #   is permanently frozen at one extreme: g~0 freezes M_c at the
+        #   zero matrix forever (writer dead); g~1 makes M_c = candidate
+        #   without keep/write decisioning (content-blind because every
+        #   chain's slots converge to the same fixed point with frozen
+        #   gradient). The fix is twofold:
+        #
+        #     (a) Pre-projection RMSNorms on M_c_prev and M_new so the
+        #         gate's input lives at unit RMS regardless of the
+        #         extract stack's output scale, restoring the linear
+        #         operating regime of the sigmoid.
+        #     (b) For slot-attention writer kinds (slot_attention /
+        #         slot_attention_full) the iterative SlotAttentionWriter
+        #         already implements a per-slot keep/write update via
+        #         its internal GRUCell (Locatello et al. 2020) over
+        #         [M_c_prev || M_new]. The external sigmoid gate is
+        #         redundant on top of that primitive, and stacking a
+        #         saturating sigmoid on a working iterative update is
+        #         strictly harmful. In the slot-attention path forward()
+        #         skips the external gate and returns the judge output
+        #         (= GRU-merged M_c) directly; the parameters stay
+        #         allocated for checkpoint compatibility but are unused.
         if update_mode == "gated":
             self.write_gate = nn.Linear(2 * hidden_size, 1, bias=True)
             nn.init.zeros_(self.write_gate.weight)
             nn.init.constant_(self.write_gate.bias, -1.0)
+            self.write_gate_norm_prev = Qwen3RMSNorm(hidden_size, eps=eps)
+            self.write_gate_norm_new = Qwen3RMSNorm(hidden_size, eps=eps)
 
     def extract(self, C: torch.Tensor) -> torch.Tensor:
         """Stage 1: refine M_in queries over C_t for 1 + L_E layers.
@@ -944,6 +1023,11 @@ class MemoryBlock(nn.Module):
         absorbed into the per-slot GRU update.
         """
         B = C.size(0)
+        # v14: optional pre-extract RMSNorm on C.  Bounds the extraction
+        # input to ~unit RMS regardless of how deep into the bare-backbone
+        # residual stream extract_source pulled it from.  No-op (Identity)
+        # when extract_input_norm was constructed False.
+        C = self.extract_input_norm(C)
         q_seed = self.M_in
         if self.M_in_pos is not None:
             q_seed = q_seed + self.M_in_pos
@@ -1029,13 +1113,34 @@ class MemoryBlock(nn.Module):
         candidate = self.judge(M_c_prev, M_new)
         if self.update_mode == "competitive":
             return candidate
-        # Gated mode: per-slot sigmoid gate g in [0,1]^{B x K x 1}.
+        # v15 (2026-05-02): SlotAttentionWriter's iterative GRU update
+        # already implements per-slot keep/write over [M_c_prev || M_new]
+        # internally. Stacking the external sigmoid write_gate on top of
+        # it was both redundant and actively harmful: the gate's input
+        # was un-normalised M_new from the residual extract stack
+        # (||M_new||_F ~ 7e4), saturating the sigmoid within ~50 steps
+        # and freezing the gate (g(1-g) ~ 1e-30 gradient). For slot-
+        # attention writers, return the GRU-merged candidate directly.
+        # write_gate / write_gate_norm_* parameters remain allocated so
+        # gated-mode checkpoints with slot_attention writers stay
+        # state-dict-compatible across the v14 -> v15 cutover.
+        if self.writer_kind in ("slot_attention", "slot_attention_full"):
+            return candidate
+        # Original writer: per-slot sigmoid gate g in [0,1]^{B x K x 1}.
         # M_c^t = (1 - g) * M_c^{t-1} + g * candidate.
         # When the prior is the zero matrix (first session, no warm-start),
         # this collapses to g * candidate — same gradient signal as the
         # competitive path on step t=0, so the gate doesn't suppress the
         # model's first ever memory write.
-        gate_input = torch.cat([M_c_prev, M_new], dim=-1)  # (B, K, 2d)
+        #
+        # Pre-projection RMSNorm on each side of gate_input keeps the
+        # sigmoid in its linear regime even when the extract stack
+        # produces enormous candidate magnitudes; without this the
+        # sigmoid saturated within the first 50 steps on every D4 run.
+        gate_input = torch.cat([
+            self.write_gate_norm_prev(M_c_prev),
+            self.write_gate_norm_new(M_new),
+        ], dim=-1)                                          # (B, K, 2d)
         g = torch.sigmoid(self.write_gate(gate_input))     # (B, K, 1)
         return (1 - g) * M_c_prev + g * candidate
 
@@ -1359,6 +1464,9 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             slot_positional=getattr(config, "memres_slot_positional", False),
             judge_qk_layernorm=getattr(
                 config, "memres_judge_qk_layernorm", False
+            ),
+            extract_input_norm=getattr(
+                config, "memres_extract_input_norm", False
             ),
         )
         self.memory_readout = MemoryReadout(

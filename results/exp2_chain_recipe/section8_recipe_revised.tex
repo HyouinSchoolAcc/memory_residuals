@@ -1,0 +1,238 @@
+% experiments/exp2_chain_recipe/section8_recipe_revised.tex
+%
+% New Section 8 of draft.tex. Supersedes the four-piece recipe of
+% Section 3 with a three-piece recipe distilled from the v14
+% ablation series of Section 7 (section7_v14_findings.tex).
+%
+% This file is meant to be \input'd after section7_v14_findings.tex
+% in the master draft. It does not modify draft.tex.
+
+\section{The revised three-piece recipe: norm, no-warmup, and contrastive supervision}
+\label{sec:revised_recipe}
+
+The four-piece recipe of \S\ref{sec:recipe} and the three additional
+training-dynamics pieces of \S\ref{sec:second_iteration} were each
+motivated by a specific failure mode surfaced on the corresponding
+corpus. With the v14 evidence of \S\ref{sec:third_iteration} in
+hand, two of those pieces are now empirically retired and one is
+replaced by a stricter architectural prerequisite. We close the
+recipe at \emph{three} training-time pieces. They are: an
+\textbf{input-RMSNorm on the extractor}, the \textbf{absence of any
+supervised writer warmup}, and the combination of
+\textbf{alpha-floor auxiliary loss} with \textbf{multi-negative
+InfoNCE}. We restate each piece, list the recipe knobs that this
+section retires, and give the canonical launch command.
+
+\paragraph{Piece~1 (revised): input-RMSNorm on the extractor.}
+The contextual extract source of \S\ref{sec:recipe}'s Piece~$1$
+fed the per-token mid-stack hidden state $C_t =
+\mathrm{hidden}_L(\text{input\_ids})$ directly into the extract
+cross-attention. On Qwen3-0.6B at $L{=}14$ the residual stream's
+RMS is $\approx 50$ in fp16, large enough that the
+$W_K^{\text{ext}}$ backward gradients are
+$\sim\!50\times$ what the writer's optimisation budget can absorb
+in a single Adam step at $\eta_{\text{m}}{=}2\!\times\!10^{-4}$. We
+add a single \texttt{Qwen3RMSNorm} layer to $C_t$ before the
+extract cross-attention is computed, gated by the new flag
+\texttt{--memres\_extract\_input\_norm}. The norm parameters are
+trainable and start at the Qwen3 default
+($\gamma_i \equiv 1$, $\varepsilon{=}10^{-6}$). Empirically, this
+reduces the per-step extract.W\_K backward gradient by a factor
+of $\sim\!50$ and is a necessary precondition for any
+frozen-backbone training: without it, the cells in
+Table~\ref{tab:v14_grid} that have warmup off (e.g.\ a no-warmup,
+no-norm sibling we ran briefly off-table) produce
+$W_K^{\text{ext}}$ updates large enough to send the writer
+through a reset cascade within $\sim\!50$ steps. With it,
+the writer optimises smoothly throughout joint training.
+
+\paragraph{Piece~2 (negative): no supervised writer warmup.}
+\S\ref{sec:third_iteration} establishes the empirical case against
+\S\ref{sec:second_iteration}'s Piece~$7$. The revised recipe
+explicitly turns the warmup off:
+\texttt{--writer\_warmup\_steps 0
+--writer\_warmup\_router\_bias 0.0
+--writer\_warmup\_anneal\_steps 0}. The router starts at
+$\texttt{mem\_bias\_init}{=}0$ and
+$\texttt{recent\_bias\_init}{=}0$ --- a strictly weaker init than
+the soft $\pm 4$ of \S\ref{sec:recipe}'s Piece~$4$. The motivation
+for the $\pm 4$ soft init was to keep the bf16 backward gradient
+through the routing softmax inside the format's representable range
+under \emph{any} contrastive ramp; with the writer warmup retired,
+the only term that has to backpropagate through the routing softmax
+is the joint LM/InfoNCE/floor objective, and we observe in v14k
+that an unbiased init produces a usable gradient on
+$\texttt{mem\_bias}$ from step $1$. We retain
+\S\ref{sec:negative_result}'s analytic argument against the strict
+$\pm 32$ init unchanged --- that argument is about the $\pm 32$
+saturation, not about whether $\pm 4$ is a numerical floor.
+
+\paragraph{Piece~3: alpha-floor auxiliary loss $+$ multi-negative InfoNCE.}
+The two remaining surviving pieces from
+\S\ref{sec:second_iteration} are the $\amem$ load-balance auxiliary
+($\mathcal{L}_{\text{floor}}$ with $\tau{=}0.05$,
+$\lambda_{\text{floor}}{=}0.01$) and the multi-negative InfoNCE
+contrastive on callback tokens
+($\lambda_{\text{NCE}}{=}0.5$, $B{=}4$ batch-wise negatives,
+temperature $\mathcal{T}{=}1.0$). They are unchanged from
+\S\ref{sec:second_iteration}'s definitions. The combination provides
+the discriminative signal the router needs to recruit memory beyond
+plain NLL: the alpha-floor prevents MoE-style expert collapse of
+the memory source under joint training, and InfoNCE makes the
+writer's $M_{\text{new}}$ chain-discriminative on the callback
+sessions where evidence is concentrated. Critically, on D4v2 these
+two pieces are jointly insufficient \emph{without} the input-RMSNorm
+of Piece~$1$ (the extract gradients run away within $\sim\!50$
+steps) and jointly insufficient \emph{with} the writer warmup of
+\S\ref{sec:second_iteration}'s Piece~$7$ (the post-anneal recent-bias
+lock-in dominates). They are sufficient in v14k, where Piece~$1$ is
+on, Piece~$7$ is off, and the alpha-floor saturates the inequality
+near the floor as designed: $\amem^{\text{mean}}$ at step $3000$
+sits at $0.052 \pm 0.003$ across the routed sublayers, just above
+$\tau$, and per-sublayer max $\amem^{\text{max}}$ on
+evidence-bearing tokens reaches $0.31$ on the most evidence-rich
+sublayer, consistent with the writer concentrating its readout
+when called for.
+
+\paragraph{What is retired.}
+Three pieces from prior iterations no longer appear in the recipe.
+(i) The supervised writer warmup
+(\texttt{--writer\_warmup\_steps},
+\texttt{--writer\_warmup\_router\_bias},
+\texttt{--writer\_warmup\_anneal\_steps}) is empirically
+counterproductive on D4v2 and is set to zero. (ii) The soft $\pm 4$
+parity router init of \S\ref{sec:recipe}'s Piece~$4$ is replaced by
+the unbiased $\pm 0$ init; the analytic argument against
+\emph{strict} $\pm 32$ in \S\ref{sec:negative_result} is unchanged,
+but the soft $\pm 4$ floor was an over-correction once the writer
+warmup is removed. (iii) The original Piece~$1$
+(``contextual extract source'') is folded into the revised Piece~$1$
+(``contextual extract source plus input-RMSNorm''): the contextual
+hidden state is still the source, but the missing normalisation was
+load-bearing. Pieces~$2$ and~$3$ of \S\ref{sec:recipe}
+(mixed conversational corpus, negative-chain margin loss) are
+\emph{not} retired but are folded into the corpus build and the
+existing \texttt{--neg\_chain\_*} flags respectively, and are
+unchanged.
+
+\paragraph{Canonical launch command.}
+The full revised recipe is the v14k launch command, with the v15a
+replicate as the immediate target:
+
+{\small\begin{verbatim}
+python -u src/train_chain.py \
+    --preset qwen3-0.6b-large \
+    --memres_mode attention_parity \
+    --memres_extract_source hidden_14 \
+    --memres_extract_input_norm \
+    --memres_writer_kind slot_attention \
+    --memres_judge_qk_layernorm \
+    --router_mem_bias_init 0   --router_recent_bias_init 0 \
+    --writer_warmup_steps 0   --writer_warmup_router_bias 0.0 \
+    --writer_warmup_anneal_steps 0 \
+    --alpha_mem_floor_aux_weight 0.01 --alpha_mem_floor_target 0.05 \
+    --contrastive_infonce_weight 0.5 --contrastive_infonce_callback_only \
+    --train_chains paper_artifacts/chains/d4v2_train_s512.pt \
+    --eval_chains  paper_artifacts/chains/d4v2_val_s512.pt \
+    --window_k 8 --batch_size 4 --grad_accum 4 \
+    --lr 2e-4 --lr_backbone 0.0 \
+    --steps 3000 --warmup 200 --eval_every 200 --save_every 500 \
+    --neg_chain_weight 0.5 --neg_chain_initial_weight 0.05 \
+    --neg_chain_warmup_steps 1000 --neg_chain_margin 0.05 \
+    --memory_dropout 0.10 --context_dropout 0.30 --carry_state \
+    --burn_in_max 8 --burn_in_resample --mask_padding_loss \
+    --score_tail_frac 1.0 --eval_window 4 --eval_n_chains 32 \
+    --gradient_checkpointing --save_best_metric evidence_lift \
+    --run_name chain_v15a_threepiece_d4v2
+\end{verbatim}}
+
+\noindent The diff from \S\ref{sec:recipe}'s
+\texttt{chain\_v5\_softhidden14\_msc} command is six flags: the
+addition of \texttt{--memres\_extract\_input\_norm} and the four
+\texttt{--*\_qk\_layernorm} / \texttt{--memres\_writer\_kind}
+architectural flags from \S\ref{sec:second_iteration}, and the
+zeroing of all three \texttt{--writer\_warmup\_*} flags. The
+\texttt{--lr\_backbone 0.0} is the frozen-backbone setting used in
+the v14 series and in v15a; the v15b cell (Table~\ref{tab:v15_pending})
+restores \texttt{--lr\_backbone 2e-5} to test joint training.
+
+\begin{table}[t]
+\centering
+\caption{Summary of the revised three-piece recipe and the
+corresponding \texttt{train\_chain.py} flags. Pieces~$2$
+(contextual extract source) and~$3$ (mixed conversational corpus
+$+$ negative-chain margin) of \S\ref{sec:recipe} are folded into
+this recipe via the corpus build and the
+\texttt{--neg\_chain\_*} flags respectively, and are unchanged.}
+\label{tab:revised_recipe}
+\small
+\begin{tabular}{ll}
+\toprule
+piece & key flags \\
+\midrule
+1. extractor input-RMSNorm   & \texttt{--memres\_extract\_input\_norm} \\
+\midrule
+2. no writer warmup          & \texttt{--writer\_warmup\_steps 0} \\
+                             & \texttt{--writer\_warmup\_router\_bias 0.0} \\
+                             & \texttt{--writer\_warmup\_anneal\_steps 0} \\
+                             & \texttt{--router\_mem\_bias\_init 0} \\
+\midrule
+3. alpha-floor $+$ InfoNCE   & \texttt{--alpha\_mem\_floor\_aux\_weight 0.01} \\
+                             & \texttt{--alpha\_mem\_floor\_target 0.05} \\
+                             & \texttt{--contrastive\_infonce\_weight 0.5} \\
+                             & \texttt{--contrastive\_infonce\_callback\_only} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Headline at scale (pending).}
+The v15e and v15f cells port the revised recipe to Qwen3-1.7B; v15e
+keeps the backbone frozen as in v14k, and v15f tests joint training
+at $\eta_{\text{b}}{=}2\!\times\!10^{-5}$. Together with the v15a
+$0.6$B replicate of v14k they form the proposed headline of the
+revised manuscript: a $2\!\times\!2$ over
+$\{\text{0.6B}, \text{1.7B}\} \times \{\text{frozen}, \text{joint}\}$
+with the three-piece recipe held fixed. Table~\ref{tab:revised_headline}
+gives the placeholder structure, with all entries gated on the
+v15 runs currently in flight.
+
+\begin{table}[t]
+\centering
+\caption{Planned headline of the revised three-piece recipe across
+backbone scale and freeze regime. All cells use the
+\S\ref{sec:revised_recipe} recipe (input-RMSNorm, no warmup,
+alpha-floor $+$ InfoNCE) with the canonical launch command above.
+The v15e and v15f rows (in bold) are the 1.7B headline numbers
+gated on the revised manuscript. Metrics on the persisted best
+checkpoint of each cell.}
+\label{tab:revised_headline}
+\small
+\begin{tabular}{lcccc}
+\toprule
+cell & backbone $\times$ regime & D4v2 evidence\_lift & D4v2 $\dsh$ [CI] & LoCoMo $\dsh$ [CI] \\
+\midrule
+v15a & 0.6B, frozen      & \todo{} & \todo{} & \todo{} \\
+v15b & 0.6B, joint       & \todo{} & \todo{} & \todo{} \\
+\textbf{v15e} & \textbf{1.7B, frozen} & \todo{} & \todo{} & \todo{} \\
+\textbf{v15f} & \textbf{1.7B, joint}  & \todo{} & \todo{} & \todo{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading.}
+The revised recipe replaces the seven pieces of \S\S\ref{sec:recipe},
+\ref{sec:second_iteration} with three. Two of the original pieces
+(corpus mix, negative-chain margin) survive unchanged but are
+folded into infrastructure rather than highlighted as recipe
+contributions, since neither was a knob in the v14 ablation. Two
+were retired by the v14 evidence: the supervised writer warmup,
+which is counterproductive on D4v2, and the soft $\pm 4$ router
+init, which was an over-correction necessitated only by the
+warmup phase. One was strengthened: the contextual extract source
+of \S\ref{sec:recipe}'s Piece~$1$ now requires an input-RMSNorm to
+be operational under a frozen backbone. The headline empirical
+claim of the revised manuscript is that this three-piece recipe is
+the minimal recipe that produces a sustained positive
+evidence\_lift on a controlled callback corpus at $0.6$B; the v15
+series tests how far that claim ports along the freeze and scale
+axes.

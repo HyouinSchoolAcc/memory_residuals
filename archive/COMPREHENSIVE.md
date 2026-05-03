@@ -1814,3 +1814,449 @@ the repo; the v10 4B mega launcher itself was deleted as part of the
 2026-04-30 cleanup (replaced by v11p in spirit). The v11 campaign in
 [`results/exp2_chain_recipe/runs.md`](../results/exp2_chain_recipe/runs.md)
 addresses P0/P2/P3 in code and P5 in two of its ablation cells.
+
+---
+
+# Part VI — Historical run ledger (v11 → v14, was runs.md)
+
+The active `runs.md` ledger now contains only v15 (the live campaign).
+The v11 / v12 / v13 / v14 entries — every cell of which is now KILLED,
+SUPERSEDED, or whose mechanistic conclusion has been promoted to the
+README's "Architectural priors" block — are preserved here so the
+v3 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 narrative
+remains end-to-end auditable. Each subsection mirrors the original
+`runs.md` entry with the planning prose dropped and the verdicts,
+result tables, and mechanism statements retained. Date order is
+oldest → newest within Part VI (v11 → v14).
+
+## v11 — first wave (g/h/i/j/k/l + 4b_mega; 2026-04-30 → 2026-05-01)
+
+User directive 2026-04-30 ~21:00 UTC after the v10 audit:
+> "create 4-5 ablation studies on the GH200 for 0.6B and then the
+> 'most make sense initializers' for 4B model to train. be sure to
+> use a bias for the memory at +4 0. I know that the system from v3
+> definitively is better."
+
+Hypothesis: with the data fix (P0), magnitude fix (P2), and the user-
+directed softer bias (`+4 / 0`, ~50× more initial α_mem mass than v3's
+`+4 / -4`), the memory channel will (a) open (`α_mem_max > 1e-2`), (b)
+learn content-specific writes (`pa_cb_evidence_lift > 0`), and (c)
+start closing the deployment-distribution gap.
+
+### Code/data fixes shipped before launch
+
+* `paper_tools/build_conversational_callback_chains.py` — LongMemEval
+  loader now reads `answer_session_ids` and emits
+  `chain_evidence_positions`; `has_answer` turns flip
+  `session_callback_mask`.
+* `paper_tools/merge_chain_corpora.py` + `Scripts/build_v11_corpora_remote.sh`
+  — preserves `chain_evidence_positions`; built
+  `v11_lme_msc_train_s512.pt` (6378 chains / 450 with evidence) and
+  `v11_mega_train_s512.pt` (67745 chains / 450 with evidence).
+* `train_chain.py` — `ChainSampler.sample_window` uses
+  `chain_evidence_positions` for the competition-curriculum evidence
+  slot when present; `_phase_aligned_eval` picks evidence from the
+  same labels and emits `pa_cb_evidence_lift = pa_cb_dnm(actual evidence) − pa_cb_dnm(random haystack)`;
+  added `--memres_gate_init`, `--memres_readout_norm_init`,
+  `--curriculum_competition_bias 1.0`.
+* `modeling_memres.py` — `Qwen3MemResConfig` accepts the two new init
+  knobs; `_init_memres_params` applies `out_norm.weight.fill_(scale)`.
+
+### Cells & verdicts (final-step PA-eval)
+
+| cell | wall-clock (UTC) | core change vs v11g | final α_mem_max | final PA CB Δ_nm-m | final PA CB Δ_sh-m | final `evidence_lift` | verdict |
+|---|---|---|---:|---:|---:|---:|---|
+| **v11g** baseline | Apr 30 21:46 → May 1 00:26 | reference (P0+P2, AP +4/0, gated, hidden_14, k=3) | 0.0093 | −0.116 | −0.018 | n/a | peak step 600 (PA CB Δ_nm-m=+0.030, Δ_sh-m=+0.016); decayed monotonically through step 4000 |
+| **v11h** drop P2 | May 1 00:26 → 03:08 | `--memres_readout_norm_init 1.0` (norm=1.0) | 0.0086 | −0.002 | −0.002 | −0.013 | `‖m^t‖/‖embed‖ = 72`; AP softmax self-regulates magnitude; finishes at PA CB ≈ 0 |
+| **v11i** mem_bias=−4 | May 1 03:08 → 05:47 | `--router_mem_bias_init -4` | **0.0001** | +0.006 | +0.005 | +0.002 | router stays fully collapsed step 0 → step 4000 |
+| **v11j** depth (k=4 + carry + burn=12) | May 1 05:47 → 09:13 | tests P5 alone | 0.0053 | −0.052 | +0.001 | +0.007 | adding depth *reduced* α_mem opening vs v11g; P5 in isolation is a no-op |
+| **v11k** P0 reverted | May 1 09:13 → 12:07 | counterfactual (no `chain_evidence_positions`) | 0.0078 | −0.265 | +0.027 | n/a | confirms P0 helps quantitatively (~2.3× better Δ_nm-m) but doesn't change the failure shape |
+| **v11l** frozen backbone | May 1 15:48 (3 sec) | `--freeze_backbone` | — | — | — | — | FAILED at startup — script invoked `python src/train_chain.py` but file was at `train_chain.py` in CWD. Relaunched locally as v11l-fix |
+| **v11l-fix** local relaunch | step 600 readout | `--freeze_backbone`; otherwise IDENTICAL to v11g | 0.0005 | −0.0023 | −0.0022 | — | with backbone frozen (zero co-evolution by construction) α_mem_max collapses to 5e-4. **Mechanism (b) backbone-co-evolution REJECTED.** The writer subsystem itself is the bottleneck on LME with the original architecture. |
+| **v11r** readout warmup + InfoNCE | May 1 12:07 → 15:48 | `--readout_warmup_steps 500` + `--readout_warmup_router_bias 4.0` + `--contrastive_infonce_weight 0.5` | 0.0101 | +4.91 | **−1.14** | **−1.12** | broken regime: memory is *worse* than shuffle by 1.14 nats; oracle-evidence M_c is *worse* than random-haystack M_c by 1.12 nats |
+| **v11q** InfoNCE alone | May 1 15:49 → killed step 2600 | `--contrastive_infonce_weight 0.5` | 0.019 | +13.04 | **−0.96** | **−0.57** | NCE diag/off gap +6 to +14 (head learning chain-identity discrimination), but `pa_cb_ce_mem = 6.3 nats` (vs ~1.5 nats for normal LM regime) — the readout is destroying generic next-token prediction without helping the answer span |
+| **v11_4b_mega** | Apr 30 21:46 (5 sec) | qwen3-4b-xlarge, L_E=10, k=4 | — | — | — | — | FAILED at startup — CUDA OOM during `model.to(device)` (peak ~106 GB on a 96 GB card). Same OOM that killed the v10 4B mega. |
+| **v11m_chinchilla** | — | 16k steps, k=4, carry, burn=12 (1.35× Chinchilla) | — | — | — | — | CANCELLED 2026-05-01 — token-starvation hypothesis decisively rejected by D2 on v11g/best (uniform fixed point) + v11l-fix (frozen backbone still collapses) |
+| **v11p_frozen_chinchilla_mega** | — | mega corpus, frozen backbone, 25k steps, lr=1e-4 (2.1× Chinchilla) | — | — | — | — | CANCELLED 2026-05-01 — superseded by v12d_frozen which composes the same compute budget with the slot-attention writer |
+
+### What the cross-cell evidence says about P0–P5
+
+* **P0 (data: missing evidence labels) — confirmed real, magnitude
+  modest.** v11g vs v11k differ in *only* the corpus. PA CB Δ_nm-m
+  moves from −0.265 → −0.116 (factor of 2.3 in the right direction).
+  Necessary but not sufficient; the failure shape is unchanged.
+* **P1 (router saturation) — causally confirmed.** v11i with
+  `mem_bias = −4` parks at α_mem_max = 1e-4 from step 0 to step 4000;
+  v11g/h/j/k/r with `mem_bias = 0` open α_mem to 5e-3 to 1.9e-2.
+  Cleanest single-knob result of the v11 campaign.
+* **P2 (readout magnitude) — irrelevant for AP, only matters for
+  `simple_gate`.** v11g (norm=0.05, ‖m^t‖=3.6) and v11h (norm=1.0,
+  ‖m^t‖=72) finish at the same PA CB metrics. The depth softmax in
+  `attention_parity` handles magnitude on its own. **Recommend
+  dropping P2 from the v12+ design constraints.**
+* **P3 (PA-eval misalignment) — fixed and now informative.**
+* **P4 (gradient dilution) — partially addressed by `cb_loss_w=3` +
+  InfoNCE.** v11q's NCE diag/off gap of +6 to +14 nats proves the
+  gradient signal is now strong enough to shape M_c — but in the
+  wrong direction (chain-identity instead of content).
+* **P5 (recurrence depth mismatch) — no-op alone.** v11j with
+  `window_k=4 + carry_state + burn_in_max=12` finished with *lower*
+  α_mem opening (0.0053 vs v11g's 0.0093).
+
+### `evidence_lift` is the smoking gun
+
+`evidence_lift = pa_cb_ce_mem(actual evidence) − pa_cb_ce_mem(random haystack)`.
+A working memory should make this strongly negative. v11h/i/j sit at
+~0; v11r/q go strongly negative under InfoNCE. The v11r/v11q pattern
+is unambiguous: **aggressive contrastive losses on M_c teach the
+writer to encode chain-identity rather than chain-content.** The
+InfoNCE objective rewards "M_c[i] uniquely predicts chain i's
+callback" but does not specify *which* feature of chain i must drive
+the prediction — and the easiest discriminator is a chain-identity
+hash, not the answer text.
+
+### D5 audit on `chain_v11g_ap_baseline_gh200/best` (2026-05-01)
+
+```text
+ROUTE: mode=attention_parity  alpha_or_gate_max=0.0092  frac_open=0.00
+READOUT: ||m^t||/||embed|| mean=77.23
+D2-JUDGE: row_entropy=5.541 (uniform=5.545; norm=0.999) keep_mean=0.500
+          keep_var=0.0000 eff_rank=1.02
+D3-MC   : Δ_step mean=1.347 max=1.383 self||M||=1.000 pair=0.022
+pa_cb_dnm = +0.373  pa_cb_dsh = +0.0023  pa_cb_evidence_lift = +0.016 (synth D4)
+```
+
+D5 with 300 readout-only steps (lr 1e-3, batch 4):
+
+```text
+baseline callback_ce: 8.1989
+final    callback_ce: 4.2629
+Δ                   : -3.9359  (-48.0%)
+VERDICT: LIKELY R: writer encoded the information; readout was the bottleneck.
+```
+
+### v11 headline conclusion (mechanism, not symptoms)
+
+After eliminating P0/P2 (data + magnitude), confirming P1 (router
+gating), and disconfirming P5 (depth alone), the failure mode that
+survives is:
+
+> **The writer is content-blind.** With the LM-only objective
+> (v11g/h/i/j/k) it learns to compress *something* about each session
+> but `evidence_lift ≈ 0`. With dense contrastive supervision (v11r/q)
+> it learns chain-identity and `evidence_lift` becomes strongly
+> negative. Either way the writer never learns "extract the answer
+> from this session" because no objective in the v11 pipeline tells
+> it to.
+
+D5 confirms M_c does carry chain-discriminative content (just not
+*answer-specific* content). The most informative single next cell is
+not another curriculum tweak but a writer-only warmup against an
+extractive objective. That is the v13 design.
+
+### Diagnostic toolkit (D1–D5; 2026-05-01)
+
+Five mechanism-level audits, all integrated into `src/train_chain.py`
+(`--diagnose_grad_groups`, `--diagnose_memory_dynamics`) plus
+standalone scripts under `tools/`:
+
+| ID  | What it measures | How |
+|-----|------------------|-----|
+| D1  | Per-module gradient L2 norms (M_in / extract / M_judge / judge / readout / router / write_gate / backbone) at each `--log_every` step. Surfaces gradient starvation in the writer subsystem. | `--diagnose_grad_groups` flag; logs `grad/<group>` and prints `|g|/|g_bb|` ratios per step. |
+| D2  | Judge attention decisiveness: row-entropy / `log(2K)`, mean keep-vs-write mass, variance over rows, effective rank of the average judge attention pattern. | `--diagnose_memory_dynamics`; uses `MemoryBlock.judge_attention(...)`. |
+| D3  | M_c stability per session step (`||M_c^t - M_c^{t-1}||_F / ||M_c^{t-1}||_F`); chain-distinguishability via pairwise normalised Frobenius distance between distinct-chain M_c^Ts. Detects content-blind writer. | Same `_memory_dynamics_eval` pass. |
+| D4  | Synthetic gold-standard task: 5000-chain persona-callback corpus, 256-item closed set, 9 sessions/chain. Hard ground truth: `callback_ce → 0` only if memory works. | `tools/build_synthetic_persona_callback.py`; corpora at `paper_artifacts/chains/synthd4_persona_callback_{train,val}_s512.pt`. |
+| D5  | TTT-on-readout disambiguator: freeze writer + router + LM head, train ONLY the readout for 300 steps. If callback CE drops, writer encoded the info; readout was the bottleneck. | `tools/d5_ttt_readout.py`. |
+
+## v12 — slot-attention writer (2026-05-01 ~19:00 UTC)
+
+User directive: replace the original judge with slot-attention
+(softmax over slots, not over inputs, so slots are forced to
+specialise). Spec-strict; m^t stays as foundational source `b_{-1}`
+in the Block-AttnRes pool (Eq. 9). Only judge layer internals fair
+game.
+
+### Diagnosis: the original writer is decision-less by construction
+
+D2 on `v11g/best` reported `row_entropy / log(2K) = 0.999` (uniform),
+`keep_mean = 0.500`, `eff_rank = 1.02` (all 128 slots collapsed to ~1
+direction). The original judge is a single softmax over the inputs
+axis; at init, all M_judge rows i.i.d. random, all P rows i.i.d.
+random ⇒ `attn[b,k,j] ≈ 1/(2K)`. The **symmetric uniform fixed point
+is also a gradient fixed point** because permuting any two slots
+leaves both forward and loss unchanged.
+
+### Architectural change
+
+`SlotAttentionWriter` (`src/modeling_memres.py` lines 460–620)
+implements Locatello et al. 2020:
+
+```
+slots^(0) = M_judge.broadcast(B)
+P         = [M_c^{t-1} || M_new]
+for t in 1..T:
+    q          = W_Q(slot_norm(slots))
+    k, v       = W_K/W_V(input_norm(P))
+    attn       = softmax(q kᵀ / √d, dim=-2)   # SOFTMAX OVER SLOTS
+    attn       = attn / attn.sum(dim=-1)
+    updates    = attn @ v
+    slots      = GRUCell(updates, slots)
+return slots
+```
+
+CLI: `--memres_writer_kind {original,slot_attention,slot_attention_full}`
+(default `original`); `--memres_slot_attention_iters` (default 3).
+Init parity preserved (`results/eval/init_parity_test_v12.json`: 4 new
+slot-attention parity cases pass at `max|Δ| = 0.000e+00`).
+
+### v12a-slot-judge-D4 trajectory through step 800
+
+| step | α_mem_max | PA CB Δ_nm-m | PA CB Δ_sh-m | EVID Δ_nm-m_floor | evidence_lift | D2 row_ent_norm | D2 keep_mean | D2 eff_rank |
+| ---- | --------- | ------------ | ------------ | ----------------- | ------------- | --------------- | ------------ | ----------- |
+| 200  | 0.020     | **+0.386**   | **+0.021**   | +0.388            | -0.003        | 0.998           | 0.500        | 1.02        |
+| 400  | 0.029     | +0.023       | +0.003       | +0.033            | -0.010        | 0.999           | 0.500        | 1.01        |
+| 600  | 0.033     | -0.046       | -0.008       | -0.041            | -0.004        | 0.999           | 0.500        | 1.01        |
+| 800  | 0.045     | -0.003       | -0.000       | +0.005            | -0.008        | 0.999           | 0.500        | 1.01        |
+
+**The slot-attention writer also collapses to the symmetric uniform
+fixed point.** PA CB Δ_nm-m=+0.386 at step 200 was a real but
+transient signal: the slot-axis softmax provides symmetry breaking
+*at init* but the GRUCell uses shared weights across slots, so as
+training progresses slot states drift toward each other and the
+softmax returns to ~1/K. D3-MC says M_c IS chain-specific
+(pair=0.015) and dynamic (Δ_step=1.55), so the writer is producing
+*different* outputs per chain, but those outputs are not in
+content-relevant directions — same chain-identity-hash failure.
+
+### v12d retargeted onto D4
+
+After v12a's collapse, v11p (chinchilla mega frozen) was cancelled and
+v12d was redesigned as a frozen-vs-trained backbone single-knob study
+on the cleanest possible corpus (D4 synthetic persona-callback,
+log(256)=5.55-nat floor). v12d_frozen produced the only positive
+v12-era signal: `evidence_lift +0.03` (the baseline v13 needed to
+beat).
+
+## v13 — writer warmup + symmetry break (2026-05-01 ~19:20 UTC-5)
+
+### CRITICAL BUGFIX 2026-05-01 ~22:45 UTC-5 — config override silently dropped
+
+`_build_model` in `train_chain.py` was detecting "is this a memres
+checkpoint?" with try/except around `Qwen3MemResConfig.from_pretrained`.
+Because `Qwen3MemResConfig` subclasses `Qwen3Config`, it loads fine
+from a plain Qwen3 config.json — the try never throws. The subsequent
+`overridable` merge then DROPPED CLI overrides for every architecture-
+shape flag not in the explicit allow-list:
+
+```
+memres_mode, memres_writer_kind, memres_slot_positional,
+memres_update_mode, memres_extract_source, memres_num_vectors,
+memres_extraction_depth, memres_num_blocks, memres_slot_attention_iters
+```
+
+Net effect on every v13 cell pre-fix:
+- `--memres_mode simple_gate` → silently ran `attention_parity`
+- `--memres_writer_kind slot_attention` → silently ran `original`
+- `--memres_slot_positional` → silently ignored
+- `--memres_extraction_depth 4` → silently ran L_E=0
+
+Fix: detect `from_memres_ckpt` by `base_cfg.model_type == "qwen3_memres"`
+(from the raw config.json), not by from_pretrained success.
+
+Bonus side fix in `_set_mem_bias`: in `simple_gate` mode the router's
+`mem_bias` doesn't control the forward path; force-opening it had no
+effect. Now also sets `memory_gate.gate = 0.5·tanh(bias/2) ≈ 0.48` for
+simple_gate.
+
+Effect on post-fix v13a restart vs the buggy run:
+
+|                       | v13a (buggy)           | v13a (fixed)         |
+|-----------------------|-----------------------:|---------------------:|
+| `mode` (actual)       | attention_parity       | **simple_gate**      |
+| `writer_kind`         | original               | **slot_attention**   |
+| `slot_positional`     | False                  | **True**             |
+| L_E                   | 0                      | **4**                |
+| trainable memres      | 9.76M                  | **28.91M**           |
+| loss @ step 80        | 13.25                  | **3.72**             |
+| `gate_mean` @ phase 1 | 0.0000 (bug)           | **+0.4824**          |
+
+### v13 design — three orthogonal interventions on the OSR triad
+
+The persistent symmetric-uniform-attractor collapse has three causes
+(O = Objective starvation, S = Symmetry, R = Routing). v13 attacks all
+three at once:
+
+- **O.** New `writer_warmup` phase (500 steps): freezes backbone +
+  embed + LM head, forces `mem_bias = 4` AND
+  `memory_gate.gate ≈ 0.48` (simple_gate fix), trains the entire
+  memres subsystem directly against the LM objective. At step 500 the
+  bias anneals to its configured init over 200 steps, then phase 2 is
+  joint.
+- **S.** `memres_queries_init=orthogonal` (`nn.init.orthogonal_` on
+  M_in/M_judge — BF16 upcast to FP32 for the QR op, then cast back).
+  `memres_slot_positional=True` adds a deterministic Fourier pattern
+  as a learnable per-slot positional offset added to `q_seed` before
+  expansion, giving every slot a unique identity that the optimiser
+  cannot permute away.
+- **R.** Initially `--memres_mode simple_gate` to take m^t out of the
+  depth softmax entirely; later reverted to `attention_parity` after
+  the user's "v3 routing is definitively better" reminder + Exp 1
+  pair-recipe Table 2 cited.
+
+Init parity preserved (`max|Δlogits| = 0` for both modes with orth+pos
+init).
+
+### v13 cells & verdicts
+
+| cell | wall-clock | stack | step | result | verdict |
+|---|---|---|---:|---|---|
+| **v13a (buggy)** | killed step 980 | "AP + warmup + orth", silently dropped slot/pos/L_E | 980 | partial v13 stack | KILLED post-bugfix |
+| **v13a (fixed)** | killed step 500 | SG + full v13 stack | 500 | mode=simple_gate, gate_mean=+0.48 verified; train_loss=2.49, eval_loss=5.54 (mem hurts by 4.4 nats) | classical chain-hash overfit on 28.9M writer × 5000-chain × 500 warmup |
+| **v13c (buggy)** | finished 4000 | "AP + warmup + orth", silently dropped slot/pos/L_E | 4000 | peak `evidence_lift +0.22` at step 600 (warmup anneal); collapsed to +0.0037 at step 4000; D2 entropy = 0.999 | NOT a valid test of the headline v13 stack |
+| **v13c2** | finished 4000 | full v13 AP stack on D4, trained backbone | 4000 | mid-warmup (step 400) **`evidence_lift = +1.4085`** (6.4× any prior measurement). Phase-2 transition at step 500 produced `grad_norm = 6.5e8` pre-clip; `evidence_lift` collapsed to −0.56 at step 600 | symmetry break works during warmup; phase-2 unfreeze destroys it |
+| **v13r** | killed step 10500/16000 | full v13 AP stack on mega; warmup 3000 + anneal 1000 | 10500 | `evidence_lift +0.006` sustained, PA-EVAL CB Δ_sh-m +0.021 ceiling; D2 row_entropy / log(2K) = 0.988 (re-collapsed); D3-MC `Δ_step mean = 0.028` (44× smaller than v13c2's 1.244 — the judge converges to "always preserve old memory" on natural prose) | **long-warmup hypothesis falsified** |
+| **v13q** | superseded | AP + FROZEN backbone + curriculum + mega + 6000 steps | — | — | superseded by v14 frozen-backbone experiments |
+| **v13b/d/p** | dequeued | SG-side ablations | — | — | redundant once v14 tests all 4 interventions on AP |
+
+### v13 headline finding
+
+The writer CAN specialise per chain (v13c2 `evidence_lift +1.4`,
+D3-MC `pair/self = 0.004` sustained through v13r's 10500 steps —
+orthogonal init + slot_positional is a permanent symmetry break).
+But two new failures appeared:
+
+1. The **router actively rejects memory during joint training** (v13r
+   step 10000 `α_mem_mean = 0.0011` — textbook MoE expert collapse;
+   nothing in the architecture obligates the router to recruit).
+2. The **judge re-collapses to uniform when the backbone unfreezes**
+   (D2 row_entropy/log(2K) = 0.988 on v13r vs 0.890 on v13c2's
+   frozen-backbone D4 regime — attention-entropy collapse direction
+   from Zhai et al. 2023).
+
+Both motivate v14.
+
+## v14 — router recruits, judge decides, writer discriminates (2026-05-02 ~15:15 UTC-5)
+
+Four orthogonal interventions, each with prior-art backing:
+
+1. **`alpha_mem` floor auxiliary loss** (weight=0.01, target=0.05) —
+   MoE load-balance penalty. Router obligated to keep sampling memory
+   so downstream LM gradient keeps reaching the writer/readout. Cite:
+   Fedus et al. 2021 Switch Transformer; Wang et al. 2024.
+2. **InfoNCE contrastive loss** (weight=0.5, callback-only) — dense
+   discriminative signal; B-way over in-batch negatives. Cite:
+   AutoCompressors (Chevalier et al. EMNLP 2023), TRIME (Zhong et
+   al. EMNLP 2022).
+3. **Judge QK-LayerNorm** — post-projection RMSNorm on Q/K of
+   `MemoryBlock.judging`. Decouples attention-logit magnitude from
+   W_Q/W_K spectral norm. Cite: Zhai et al. ICML 2023 σReparam;
+   Qwen / Gemma / DeepSeek-V3 attention convention.
+4. **AP `router_mem_bias` warmup anneal** — force-held at +4 during
+   the 500-step writer warmup, annealed to 0 over 200 steps. Parallel
+   fix to simple_gate's memory_gate force-open from v13.
+
+Code shipped in `src/modeling_memres.py` and `src/train_chain.py`:
+`--memres_judge_qk_layernorm`, `--alpha_mem_floor_aux_weight`,
+`--alpha_mem_floor_target` flags; `CrossAttention` /
+`SlotAttentionWriter` accept `qk_layernorm`; `MemoryBlock.__init__`
+threads `judge_qk_layernorm` into `self.judging`. Backwards-compat
+Identity when flag off.
+
+### v14abl_a / v14abl_b — D4 frozen-backbone ablation pair
+
+Both KILLED 2026-05-02 ~19:45 UTC-5 at step ~3400/4000. Single-knob
+isolation of `--memres_judge_qk_layernorm`.
+
+Last full eval block @ step 3200:
+
+|                              | **v14abl_a** (judge_qk_ln ON) | **v14abl_b** (judge_qk_ln OFF) |
+|------------------------------|------------------------------:|--------------------------------:|
+| EVAL `mem`                   | 1.1052                        | 1.2174                          |
+| EVAL `nomem`                 | 1.0268                        | 0.7777                          |
+| EVAL `Δ_nm-m`                | **−0.0784**                   | **−0.4397**                     |
+| PA-EVAL CB `Δ_nm-m`          | +0.3857                       | −0.0869                         |
+| PA-EVAL CB `Δ_sh-m`          | +0.0000                       | −0.0015                         |
+| EVID-EVAL `evidence_lift`    | +0.0000                       | +0.0007                         |
+| ROUTE `α_mem_max`            | 0.0213                        | 0.0684                          |
+| READOUT `‖m^t‖/‖embed‖` mean | **0.000**                     | **3.868**                       |
+| D2-JUDGE row_entropy/log(2K) | **0.997** (uniform)           | **0.887** (decisive)            |
+| D2-JUDGE keep_mean / var     | 0.500 / 4e-4                  | 0.755 / 0.155                   |
+| D2-JUDGE eff_rank            | 1.23                          | 2.57                            |
+| D3-MC `self ‖M‖`             | **0.000**                     | **1.000**                       |
+| D3-MC `pair/self`            | nan (writer = 0)              | **0.005**                       |
+| D3-MC `Δ_step` mean / max    | 0.000 / 0.000                 | 0.258 / 1.141                   |
+
+**Findings**
+
+1. **`--memres_judge_qk_layernorm` is anti-causal on the D4
+   frozen-backbone regime.** v14abl_a's writer never lifted off zero
+   (`self ‖M‖ = 0`, `‖m^t‖/‖embed‖ = 0`), the judge stayed at the
+   uniform fixed point (`row_entropy/log(2K) = 0.997`), and PA-EVAL
+   CB `Δ_sh-m` was identically zero. The post-Q/K RMSNorm in
+   `MemoryBlock.judging` appears to interact with the slot-attention
+   writer's GRU update such that `write_gate` stays inert. **Ship
+   default OFF until investigated.**
+2. **Without judge QK-LN (v14abl_b) the writer DOES specialise per
+   chain.** D3-MC `pair/self = 0.005` (chains separable by `M_c`
+   Frobenius distance), `Δ_step mean = 0.258` (writer moving M_c
+   non-trivially), readout magnitude alive (`‖m^t‖/‖embed‖ = 3.87`),
+   judge decisive (`keep_var = 0.155`, `eff_rank = 2.57`). The
+   slot-attention writer + orth/positional + InfoNCE stack works;
+   QK-LN was the single-knob blocker.
+3. **But the standard EVAL gets *worse* with memory in v14abl_b**
+   (`Δ_nm-m = −0.44`). The writer's specialised content is not
+   LM-useful on the standard eval; PA-EVAL CB `Δ_sh-m` oscillates
+   around 0. The InfoNCE objective is satisfying itself with
+   chain-distinguishable M_c that doesn't translate to LM benefit.
+
+### v14a — GH200 mega + trained backbone
+
+Killed at step ~1760/8000. Same `‖m^t‖/‖embed‖ = 0`, `gate_mean = 0`,
+`D3 mean = 0`, `evidence_lift = 0` collapse signature as v14abl_a
+(QK-LN on); router open per the alpha_floor aux but writer dead.
+
+### v14g..l — D4v2 second wave (2026-05-02 evening)
+
+Six cells exploring warmup × norm × strong-warmup × no-warmup ×
+slot-vs-cross writer × InfoNCE-α-floor combinations.
+
+| cell | preset | knob highlight | result |
+|---|---|---|---|
+| **v14g** | qwen3-0.6b FROZEN | norm ON, warmup 200 | mid Δ_sh-m, ~0 evidence_lift |
+| **v14h** | qwen3-0.6b FROZEN | norm OFF, warmup 200 | mid Δ_sh-m, ~0 evidence_lift, slightly worse |
+| **v14i** | GH200 FROZEN | warmup_router_bias 8.0 | recent-bias lock-in, neg lift |
+| **v14j** | qwen3-0.6b FROZEN | warmup 0, norm ON, slot writer | **mid lift (+0.04)** |
+| **v14k** | qwen3-0.6b FROZEN | warmup 0, norm ON, slot writer, alpha-floor + InfoNCE | **`evidence_lift +0.071`** ✅ |
+| **v14l** | GH200 FROZEN | as v14k but writer=cross_attention (no slot) | similar lift, slightly noisier |
+
+v14k is the first reproducibly positive evidence_lift checkpoint of
+the project. The standalone-eval discrepancy uncovered while debugging
+v14k → built `tools/eval_callback.py` (mirrors in-trainer
+`pa_cb_*` metric — only callback-token positions, evidence-redacted
+floor). On v14k_best it reports `pa_cb_dnm = +1.44`,
+`evidence_lift = +0.071`, **38× higher than `eval_chain.py`** which
+averages CE over the entire `score_tail_frac=1.0` window (4 sessions).
+The localised callback-token effect was being diluted into noise.
+
+`tools/eval_callback.py` is now the canonical post-train eval for
+D4-style corpora.
+
+---
+
+# Part VII — runs.md folding convention
+
+When the active `runs.md` ledger gets crowded (rule of thumb: > ~300
+lines, or > 2 finished campaigns ahead of the live one), fold the
+oldest superseded campaign into a new Part of this file. Each Part
+mirrors the original `runs.md` entry per cell with:
+
+- Planning prose **dropped** (hypotheses, decision triggers, launch
+  ETAs, queue-management commentary).
+- Result tables **kept** (final-step PA-eval, EVID-eval, ROUTE,
+  READOUT, D1-D5 readings).
+- Mechanism statements **kept** (the one-line "what we learned").
+- Inline launch flags **kept** (so the config remains reproducible
+  from this file alone).
+
+The active `runs.md` should fit in a single screen of section
+headings.

@@ -66,6 +66,30 @@ PRESETS: dict[str, Preset] = {
             "~1.42x of one transformer layer)."
         ),
     ),
+    "qwen3-1.7b-small": Preset(
+        pretrained="Qwen/Qwen3-1.7B",
+        memres_num_vectors=128,
+        memres_extraction_depth=0,
+        memres_num_blocks=8,
+        description=(
+            "Qwen3-1.7B backbone (d=2048, 28 layers) with a small "
+            "MemoryBlock (L_E=0, single-pass extraction). The 1.7B "
+            "scale is the v15 'mid-tier' check: enough capacity to "
+            "exercise the memory pathway against a competent base "
+            "model but still trains comfortably on a single H100."
+        ),
+    ),
+    "qwen3-1.7b-large": Preset(
+        pretrained="Qwen/Qwen3-1.7B",
+        memres_num_vectors=128,
+        memres_extraction_depth=4,
+        memres_num_blocks=8,
+        description=(
+            "Qwen3-1.7B backbone with a large MemoryBlock "
+            "(L_E=4, five-layer Perceiver-style refinement stack). "
+            "Primary v15 scaling target."
+        ),
+    ),
     "qwen3-8b-small": Preset(
         pretrained="Qwen/Qwen3-8B",
         memres_num_vectors=128,

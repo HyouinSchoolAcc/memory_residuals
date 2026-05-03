@@ -1,0 +1,101 @@
+% experiments/exp2_chain_recipe/section_eval_callback.tex
+%
+% New short section that motivates a callback-aware standalone
+% evaluation methodology for chain-recurrent memory and contrasts
+% it with the standard chain eval (eval_chain.py) on the v14k
+% step-3000 checkpoint of section7_v14_findings.tex.
+%
+% This file is meant to be \input'd after section8_recipe_revised.tex
+% in the master draft. It does not modify draft.tex.
+
+\section{Callback-aware standalone evaluation}
+\label{sec:eval_cb}
+
+The standalone evaluation pipeline used throughout
+\S\S\ref{sec:experiments}--\ref{sec:revised_recipe}, as implemented
+in \texttt{tools/eval\_chain.py}, scores cross-entropy uniformly
+across a contiguous tail of the chain controlled by
+\texttt{--eval\_window}. On D4v2 with the default
+\texttt{eval\_window}${=}4$, the score window spans the callback
+session plus the three preceding sessions, so the CE average
+aggregates one callback session worth of \emph{meaningful} tokens
+(the $\sim\!10$ \texttt{chain\_callback\_position} positions on
+which the writer is supposed to help) against three sessions of
+filler-and-evidence tokens whose ground-truth next-token
+distribution is, by construction, invariant under whether memory
+is recruited. The signal-to-noise of evidence-lift in this regime
+is below one: a $+1.5$~nat per-token effect on $\sim\!10$ of
+$\sim\!2000$ scored positions integrates to $\sim\!+0.0075$~nat
+average, well below the bootstrap CI of $\dnm$ at few-hundred-chain
+$n$. The standard chain eval is therefore not a measurement of
+whether memory is helping the writer's stated job; it is a
+measurement of per-token NLL averaged over a corpus that is mostly
+not the writer's stated job.
+
+\paragraph{The callback-aware standalone eval.} We define a
+callback-aware variant that restricts the CE score to (a) the
+callback session, identified by the chain's
+\texttt{chain\_callback\_session\_idx} annotation, and (b) the
+$\sim\!10$ token positions inside that session annotated by
+\texttt{chain\_callback\_position}. Within this restricted token
+set we report $\dnm^{\text{cb}}$, $\dsh^{\text{cb}}$, and
+evidence-lift; each differs from \S\ref{sec:experiments} only in
+the score-token mask. The $\dnm^{\text{cb}}$ floor is taken not
+against $\Mc{=}\mathbf{0}$ --- which on a synthetic callback corpus
+admits a trivial template solution --- but against
+$\Mc^{\text{redact}}$, the chain's match memory recomputed with
+the chain's evidence sessions replaced by distractor sessions
+sampled from filler positions of other D4v2 chains. The redaction
+preserves the recurrent update path while removing chain-specific
+evidence, so $\Mc^{\text{redact}}$ exposes precisely the
+chain-specific information the writer was supposed to compress.
+The implementation is released at \texttt{tools/eval\_callback.py}.
+
+\begin{table}[t]
+\centering
+\caption{Three eval methodologies applied to the v14k step-$3000$
+checkpoint on the D4v2 validation split. The standard chain eval
+averages one callback session of meaningful tokens against three
+sessions of filler-and-evidence and integrates the signal to noise.
+Restricting to the callback session alone does not recover the
+effect: the callback session is itself $\sim\!90\%$ filler context
+for the $\sim\!10$ \texttt{chain\_callback\_position} target tokens.
+The callback-aware eval recovers a $+1.4$~nat memory-on-callback
+effect. $n$ counts scored token-positions (top two rows) or chains
+(bottom row).}
+\label{tab:eval_methodology_compare}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+methodology & $\dnm$ / $\dnm^{\text{cb}}$ & $\dsh$ / $\dsh^{\text{cb}}$ & evidence\_lift & $n$ \\
+\midrule
+standard (\texttt{score\_window}${=}4$)
+                                          & $-0.085$ & $+0.001$ & $-0.085$ & $2000$ tok \\
+callback-only (\texttt{score\_window}${=}1$)
+                                          & $-0.095$ & $+0.003$ & $-0.095$ & $500$ tok \\
+\textbf{callback-aware (this section)}    & $\boldsymbol{+1.44}$ & $\boldsymbol{+0.054}$ & $\boldsymbol{+0.071}$ & $200$ chains \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Discussion.} The callback-aware metric reveals a
+$\sim\!1.5$~nat memory-on-callback effect on the v14k step-$3000$
+checkpoint that the standard full-window metric averages to
+\emph{negative} noise on the same checkpoint. The two metrics are
+not in conflict: the standard metric averages CE over a window in
+which $\sim\!99\%$ of scored tokens are not the writer's job, and
+the recurrent readout adds a small per-token noise floor on those
+tokens that integrates to $\dnm{=}{-0.085}$. The callback-aware
+metric measures CE precisely on the tokens that are the writer's
+job, against a baseline that admits no template shortcut, and
+recovers the per-token effect at full magnitude. For
+chain-recurrent memory architectures whose stated mechanism is
+\emph{abstract callback}, callback-aware metrics should be the
+default standalone-evaluation surface --- not because they are
+systematically more favourable to memory architectures (a recipe
+whose writer fails to recruit memory registers $\dnm^{\text{cb}}{=}0$
+as cleanly as it registers $\dnm{=}0$), but because they are
+diagnostic of where memory is supposed to help and silent on where
+it is not. We adopt the callback-aware metrics as the primary
+standalone-evaluation surface for the v15 series, with the standard
+chain eval retained as a sanity check on aggregate per-token NLL.

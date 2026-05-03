@@ -27,6 +27,8 @@ logs/
 # symlink) so that any historical script that hard-codes the old path
 # still works.
 paper_artifacts/chains/*.pt
+paper_artifacts/locomo_chains/
+paper_artifacts/msc_chains_test/
 data/*.pt
 
 # Cloud watchdog state directories.
@@ -39,3 +41,32 @@ tools/cloud_watchdog/.ntfy_topic
 # archive/ holds the historical paper trail (scripts, docs, eval JSONs,
 # figures, the COMPREHENSIVE.md ledger). It's small (~1 MB) and
 # committed so the v1-v10 narrative is reproducible.
+
+# LaTeX build artifacts from compiling memory_residuals.tex /
+# atn_residuals.tex / results/exp1_*/manuscript.tex /
+# results/exp2_*/draft.tex. Only the .pdf is committed.
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+
+# Python bytecode cache (covers nested __pycache__ trees as well).
+**/__pycache__/
+*.pyo
+
+# Editor / OS noise.
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~

@@ -1,0 +1,123 @@
+% experiments/exp2_chain_recipe/intro_v3.tex
+%
+% Replacement Section 1 (Introduction) for draft.tex, restructured
+% around the question "When is recurrent memory necessary, and how
+% do we know?" and incorporating the v14/v15 findings of
+% section7_v14_findings.tex, section8_recipe_revised.tex, and
+% section_eval_callback.tex.
+%
+% This file is meant to be \input'd in place of the original
+% \section{Introduction} block of draft.tex. It does not modify
+% draft.tex.
+
+\section{Introduction}
+\label{sec:intro}
+
+A practical conversational agent should remember a user across
+sessions: their name, their preferences, the on-going arc of a
+relationship. The contemporary toolkit offers three options for
+this, and none is good. \emph{Long context} is expensive per turn
+and degrades with distance. \emph{Retrieval-augmented generation}
+works when the right token is known to live in a known document,
+but fails on the recall pattern that matters most in dialogue ---
+\emph{abstract callback}, where what must be retrieved is not a
+substring of any prior turn but the gist of an evidence cluster
+spread across them. \emph{Recurrent memory} should fit the
+abstract-callback pattern by construction: a fixed-size state
+$\Mc$ updated end-to-end through the language-modelling loss, with
+no retrieval index, no separate controller, and no hand-engineered
+gating. Whether it does in practice is the question this paper
+attacks. The frame we adopt is methodological: \emph{when is
+recurrent memory necessary, and how do we know it is helping?}
+
+\paragraph{Where the prior work leaves us.} The companion drop-in
+primitive paper~\cite{liu2025drop} establishes that the
+\emph{Memory Residuals} primitive, on a $0.6$B Qwen3 backbone
+trained on book continuations, is roughly $2\!\times$ more
+sample-efficient on the history-specificity diagnostic ($\dsh$,
+\S\ref{sec:primitive}) than its ReZero-style gate baseline. That
+is an \emph{in-trainer, phase-aligned} signal: $\dnm$ and $\dsh$
+are computed under the same data sampler and session boundaries
+the optimiser saw. When the same checkpoint is taken through a
+standalone eval pipeline on dialogue, the signal becomes mixed.
+The first iteration of the present manuscript
+(\S\S\ref{sec:recipe}--\ref{sec:experiments}) gives a four-piece
+recipe that survives this transfer, plus an analytic negative
+result on the strict $\pm 32$ parity init
+(\S\ref{sec:negative_result}). The second iteration
+(\S\ref{sec:second_iteration}) adds three training-dynamics pieces
+--- supervised writer warmup, $\amem$ load-balance auxiliary, and
+multi-negative InfoNCE --- each motivated by a diagnostic signature
+on a heterogeneous mixed corpus. By the end of the second iteration
+the recipe has seven pieces, and the question of whether memory is
+helping on dialogue still hinges on which subset of the score
+window the eval looks at.
+
+\paragraph{The pivot.} A controlled synthetic callback corpus
+(D4v2, \S\ref{sec:third_iteration}) and a callback-aware standalone
+eval (\S\ref{sec:eval_cb}) collapse the ambiguity. On D4v2 a
+six-cell v14 ablation establishes that the supervised writer
+warmup is empirically counterproductive: it imprints a
+``compress everything'' policy on the writer that, post-anneal,
+locks the router into a recent-bias regime with negative
+evidence-lift on the very tokens the warmup was meant to help.
+Removing the warmup, with input-RMSNorm on the extractor and the
+alpha-floor and InfoNCE pieces in place, yields the first sustained
+positive evidence-lift we have observed on a controlled callback
+corpus. Standalone evaluation of that checkpoint then surfaces the
+methodological finding: \emph{standard} chain eval averages CE
+uniformly across the score window, dilutes the callback-positioned
+signal across roughly four sessions of filler-and-evidence, and
+drives its signal-to-noise below one. A callback-aware eval
+recovers a $+1.4$~nat memory-on-callback effect on the same
+checkpoint that the full-window eval averages to noise.
+
+\paragraph{Contributions.} This paper extends the four-piece recipe
+of \S\ref{sec:recipe} along five axes:
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item \textbf{The v14 warmup pathology
+(\S\ref{sec:third_iteration}).} A six-cell ablation on D4v2 shows
+that the writer warmup of \S\ref{sec:second_iteration} is at best
+inert and at worst silently counterproductive, with a mechanical
+explanation tied to the writer's response to a saturated router
+under a frozen backbone.
+\item \textbf{The revised three-piece recipe
+(\S\ref{sec:revised_recipe}).} Input-RMSNorm on the extractor, no
+writer warmup, alpha-floor $+$ multi-negative InfoNCE: the
+minimal recipe under which we observe sustained positive
+evidence-lift on D4v2 at $0.6$B frozen.
+\item \textbf{Callback-aware standalone eval
+(\S\ref{sec:eval_cb}).} A standalone-eval methodology that
+restricts CE scoring to the callback session and the annotated
+callback-position tokens within it, and that measures the
+$\dnm$-floor against a memory state with the chain's evidence
+sessions redacted by distractor sessions sampled from filler
+positions of other chains. Released as
+\texttt{tools/eval\_callback.py}.
+\item \textbf{Honest negative on joint training at $0.6$B.} With
+the backbone unfrozen, the bare backbone learns the D4v2 template
+directly and the memory signal vanishes regardless of recipe; we
+document the failure mode and discuss its implications for the
+freeze-vs-joint axis (v15b).
+\item \textbf{Scaling probe at $1.7$B (pending,
+Table~\ref{tab:revised_headline}).} v15e (frozen) and v15f (joint)
+port the revised three-piece recipe to Qwen3-1.7B; whether the
+freeze-required-for-memory boundary moves with scale is the
+headline open question.
+\end{enumerate}
+
+\paragraph{Roadmap.} \S\ref{sec:primitive} folds in the primitive's
+definition and book-only baseline from \cite{liu2025drop}.
+\S\ref{sec:recipe}--\ref{sec:setup} state the original four-piece
+recipe and the corpus build. \S\ref{sec:experiments} reports the
+$2\!\times\!2$ headline. \S\ref{sec:negative_result} pins down
+the strict-vs-soft init failure. \S\ref{sec:second_iteration}
+reports the second-iteration three-piece extension.
+\S\ref{sec:third_iteration} reports the v14 ablation matrix on
+D4v2 and the warmup catastrophe. \S\ref{sec:revised_recipe}
+states the revised three-piece recipe and the v15 scaling cells.
+\S\ref{sec:eval_cb} introduces the callback-aware standalone eval
+and contrasts it numerically with the standard chain eval on the
+v14k checkpoint. \S\ref{sec:discussion} closes with limitations
+and the interaction of architectural, training-recipe, and
+evaluation-methodology interventions.

@@ -1,0 +1,52 @@
+% experiments/exp2_chain_recipe/abstract_v3.tex
+%
+% Replacement abstract for draft.tex incorporating the v14/v15
+% findings of section7_v14_findings.tex and
+% section8_recipe_revised.tex, plus the callback-aware standalone
+% eval methodology of section_eval_callback.tex.
+%
+% This file is meant to be \input'd in place of the original
+% \begin{abstract}...\end{abstract} block of draft.tex. It does not
+% modify draft.tex.
+
+\begin{abstract}
+We study the training recipe needed to make a parity-preserving
+recurrent memory --- the \emph{Memory Residuals} primitive ---
+useful for long-horizon multi-session dialogue recall, across three
+iterations of empirical revision. The first iteration gives a
+four-piece recipe (contextual extract source, mixed conversational
+corpus, negative-chain contrastive supervision, soft router init)
+and a sharp negative result on the strict $\pm 32$ parity init
+(\S\ref{sec:negative_result}), which we show is operationally
+untrainable under any contrastive ramp because it places the
+routing softmax beyond bf16-representable gradient. A second
+iteration adds a supervised writer warmup; a v14 ablation on a
+controlled synthetic callback corpus (D4v2) retires it. On D4v2 the
+warmup imprints a ``compress everything'' policy on the writer
+that, post-anneal, locks the router into a recent-bias fixed point
+with $\amem^{\text{mean}}{=}\tau{=}0.05$ exactly and \emph{negative}
+evidence-on-callback lift. The revised \emph{three}-piece recipe
+(\S\ref{sec:revised_recipe}) is input-RMSNorm on the extractor,
+\emph{no} writer warmup, and alpha-floor $+$ multi-negative
+InfoNCE; on a frozen Qwen3-0.6B backbone it is the first recipe in
+the paper that produces sustained positive callback evidence-lift.
+We further document a methodological finding (\S\ref{sec:eval_cb}):
+standard chain-eval averaging dilutes the callback-positioned
+signal across roughly four sessions of filler-and-evidence, driving
+its signal-to-noise below one. A \emph{callback-aware} standalone
+eval --- restricted to the callback session and to the annotated
+chain-callback-position tokens within it, with the $\dnm$-floor
+measured against an evidence-redacted $\Mc$ --- recovers a
+$+1.4$~nat memory-on-callback effect on the v14k step-$3000$
+checkpoint
+($\dnm^{\text{cb}}{=}{+1.44}$,
+ $\dsh^{\text{cb}}{=}{+0.054}$,
+ $\text{evidence\_lift}{=}{+0.071}$)
+that the standard full-window eval averages to noise
+($\dnm{=}{-0.085}$ on the same checkpoint). We close with an honest
+negative on joint training: with the backbone unfrozen at $0.6$B,
+the bare backbone learns the D4v2 template directly and the memory
+signal disappears regardless of recipe. The $1.7$B headline numbers
+under the revised recipe (Table~\ref{tab:revised_headline}) are
+pending the v15e/v15f cells currently in flight.
+\end{abstract}
