@@ -1,0 +1,66 @@
+{
+  "description": "Omni memory training corpus: merged pretokenised chains.",
+  "output": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/omni_memory_train_s512.pt",
+  "totals": {
+    "path": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/omni_memory_train_s512.pt",
+    "chains": 21378,
+    "sessions": 269538,
+    "callback_tokens": 77091,
+    "tokenizer": "Qwen/Qwen3-0.6B",
+    "session_len": 512
+  },
+  "inputs": [
+    {
+      "path": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/v11_lme_msc_train_s512.pt",
+      "chains": 6378,
+      "sessions": 124538,
+      "callback_tokens": 42201,
+      "tokenizer": "Qwen/Qwen3-0.6B",
+      "session_len": 512,
+      "logical_shard": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/v11_lme_msc_train_s512.pt"
+    },
+    {
+      "path": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4v2_persona_callback_train_s512.pt",
+      "chains": 5000,
+      "sessions": 50000,
+      "callback_tokens": 7026,
+      "tokenizer": "Qwen/Qwen3-0.6B",
+      "session_len": 512,
+      "logical_shard": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4v2_persona_callback_train_s512.pt"
+    },
+    {
+      "path": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4_persona_callback_train_s512.pt",
+      "chains": 5000,
+      "sessions": 45000,
+      "callback_tokens": 6980,
+      "tokenizer": "Qwen/Qwen3-0.6B",
+      "session_len": 512,
+      "logical_shard": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4_persona_callback_train_s512.pt"
+    },
+    {
+      "path": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd5_random_codes_train_s512.pt",
+      "chains": 5000,
+      "sessions": 50000,
+      "callback_tokens": 20884,
+      "tokenizer": "Qwen/Qwen3-0.6B",
+      "session_len": 512,
+      "logical_shard": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd5_random_codes_train_s512.pt"
+    }
+  ],
+  "dedupe_longmemeval": false,
+  "suggested_source_weights": {
+    "longmemeval": 4.0,
+    "msc": 3.0,
+    "tv": 4.0,
+    "pg19": 1.0,
+    "realtalk": 1.0,
+    "synth_persona_cb": 2.5,
+    "synth_random_codes": 2.0,
+    "ultrachat": 2.0,
+    "pippa": 2.0,
+    "soda": 1.5,
+    "lmsys": 2.0,
+    "synthdlg": 1.5
+  },
+  "train_example": "python -u src/train_chain.py --train_chains /home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/omni_memory_train_s512.pt --eval_chains paper_artifacts/chains/lme_val_s512.pt '--source_weights {\"longmemeval\":4.0,\"msc\":3.0,\"tv\":4.0,\"synth_persona_cb\":2.5,\"synth_random_codes\":2.0}' # ... rest of recipe flags"
+}

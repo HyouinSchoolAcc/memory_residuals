@@ -156,7 +156,15 @@ def evaluate_corpus(model, blob, device, n_chains_max: int | None = None,
         shuffle_idx = (ci + 1) % n_chains
         Mc_shuf = build_Mc(model, blob, shuffle_idx, cb_pos, device)
 
-        n_evidence = len(blob.get("chain_evidence_positions", [[]])[ci])
+        ev_positions_blob = blob.get("chain_evidence_positions")
+        if ev_positions_blob is not None and ci < len(ev_positions_blob):
+            n_evidence = len(ev_positions_blob[ci])
+        else:
+            # Corpora without explicit evidence-position annotation (LME,
+            # MSC, real-content): treat as 1 evidence session for the
+            # redact-based floor baseline; the redaction picks one prefix
+            # session at random.
+            n_evidence = 1
         offset = (ci * 7) % max(1, len(distractor_pool) - n_evidence)
         redact_rows = torch.stack(
             distractor_pool[offset : offset + max(1, n_evidence)]

@@ -1,0 +1,759 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2024}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{makecell}
+\setcitestyle{numbers,square}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\Mc}{M_{\mathrm{c}}}
+\newcommand{\Ct}{C_t}
+\newcommand{\mt}{m_t}
+\newcommand{\Min}{M_{\mathrm{in}}}
+\newcommand{\Mj}{M_{\mathrm{judge}}}
+\newcommand{\Mnew}{M_{\mathrm{new}}}
+\newcommand{\dnm}{\Delta_{\mathrm{nm-m}}}
+\newcommand{\dsh}{\Delta_{\mathrm{sh-m}}}
+\newcommand{\CEmem}{\mathrm{CE}_{\mathrm{mem}}}
+\newcommand{\CEnomem}{\mathrm{CE}_{\mathrm{nomem}}}
+\newcommand{\CEsh}{\mathrm{CE}_{\mathrm{shuffle}}}
+\newcommand{\CEfloor}{\mathrm{CE}_{\mathrm{floor}}}
+\newcommand{\elift}{\Delta_{\mathrm{evidence}}}
+\newcommand{\amem}{\alpha_{\mathrm{mem}}}
+
+\title{When Does Recurrent Memory Help?\\Six Failure Modes and a Methodology for Honest Evaluation}
+
+\author{%
+  Anonymous Authors\\
+  \texttt{anonymous@example.com}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We began with a simple question: why did a recurrent memory module
+sometimes look useful, sometimes invisible, and sometimes actively
+harmful on the same synthetic callback task?  In a 16-version campaign
+on Memory Residuals, a slot-attention memory module attached to
+Qwen3-0.6B and Qwen3-1.7B, the answer was not a single bug.  It was an
+evaluation problem.  Token-averaged chain evaluation diluted a
+localized callback gain by roughly two orders of magnitude; frozen and
+joint training measured different causal pathways; the D4v2 callback
+template leaked a 32-way category prior; more than half of the D4v2
+callback windows exposed evidence directly to the LM path; evidence
+redaction had to be audited before a zero lift could be trusted; and a
+random-ID corpus removed the prior but exposed a writer objective that
+still did not force chain-specific bindings into $\Mc$.  We turn these
+failures into a methodology: callback-aware evaluation, evidence-
+redacted memory floors, empirical and base-model prior audits,
+window-leakage counts, and a test-time readout audit that asks whether
+the writer encoded the answer at all.  The result is deliberately
+negative but actionable: most apparent memory gains on D4v2 are
+shortcuts, while D5 shows that removing shortcuts is not sufficient
+without writer-side extractive supervision.  We close with an F2
+prescription: NIAH-style writer warmup that gives $\Mc$ a direct
+chain-specific training signal before the LM head can learn a shortcut.
+\end{abstract}
+
+\section{Introduction}
+
+Recurrent memory is attractive because it promises a bounded-cost state
+that survives across sessions.  In a conversational assistant, that
+state should remember a user's code, preference, or updated fact even
+when the evidence is no longer in the language model's local attention
+window.  The hard question is not whether an augmented model can reduce
+loss somewhere.  It is whether the recurrent state is the causal path
+that carries the chain-specific binding.
+
+This paper is an empirical post-mortem of that question.  We study
+Memory Residuals: a fixed-size memory state $\Mc$ written once per
+session and read back into a Qwen3 backbone through a depth-routed
+attention residual.  Across versions v11--v16, the system produced
+encouraging numbers, contradictory numbers, and finally clean negative
+numbers.  The campaign changed our interpretation of the result.  The
+main contribution is not a state-of-the-art memory model; it is a set of
+failure modes and diagnostics that determine when a memory result is
+honest.
+
+\paragraph{The Running Task.}
+Most of the campaign uses synthetic multi-session chains.  An evidence
+session states a binding; later, a callback session asks for it.  The
+model is scored on the answer tokens.  In D4v2 the binding is a
+closed-set persona fact such as ``favorite color.''  In D5 the answer is
+a per-chain random alphanumeric code and the evidence-session LM loss is
+masked so the callback span is the only supervised answer location.
+The intended invariant is simple: if the evidence is outside the LM
+window and the callback does not reveal the answer, only $\Mc$ should
+carry the value.
+
+\paragraph{What Went Wrong.}
+Five concrete findings forced a reframe.  First, the standard
+\texttt{eval\_chain.py} metric averages over full score windows.  On
+v14k, callback-aware evaluation reports $\dnm^{\mathrm{cb}}=+1.44$ nats,
+but standard full-window evaluation reports $\dnm \approx 0$ because
+the callback answer tokens are only about 1.4\% of the scored window.
+Second, the frozen-backbone and joint-training regimes measure
+different causal systems: the frozen 0.6B path can show apparent memory
+help, while the joint 0.6B path learns the D4v2 prior directly and
+collapses $\elift$ to zero.  Third, D4v2 leaks a category prior: the
+callback ``Your favorite COLOR is \_\_'' reduces the answer to a
+32-item closed set, and the empirical prior has CE $2.91$ nats per
+callback-mask token.  v15b reaches $2.97$ nats, within $0.06$ nats of
+that prior.  Fourth, D5 removes that closed-set cue but does not cure
+the writer objective: v16a still has near-zero $\elift$ because the
+writer is not forced to encode the chain-specific code.  Fifth, the
+evidence-redacted floor is clean: Audit A2 shows default, cross-chain,
+skip, and zero redactions agree within $0.05$ nats, so a zero lift is
+not an artifact of leaky redaction.
+
+\paragraph{Contributions.}
+We contribute four evaluation tools and one prescription.
+\begin{enumerate}
+\item \textbf{Callback-aware standalone evaluation.}  \texttt{tools/eval\_callback.py}
+scores only annotated callback answer tokens and reports an evidence-
+redacted $\Mc$ floor.
+\item \textbf{Multi-axis leakage audits.}  We measure empirical
+$P(\mathrm{item}\mid\mathrm{category})$ CE, frozen-base callback CE,
+window-leakage rates, and redaction validity.
+\item \textbf{D5 random-ID stress test.}  The D5 corpus removes the D4v2
+category prior and masks evidence-session LM loss, exposing whether the
+writer objective alone stores the binding.
+\item \textbf{TTT-readout audit.}  A planned diagnostic freezes the
+model and optimizes only readout-side parameters on callback tokens to
+test whether the writer encoded the answer in $\Mc$.
+\item \textbf{F2 prescription.}  We propose NIAH-style writer warmup:
+a probe head gives direct $\Mc\!\rightarrow$ answer supervision before
+the LM-head path is allowed to dominate.
+\end{enumerate}
+
+\section{Memory Residuals Architecture}
+
+Memory Residuals augments a pretrained causal LM with a recurrent state
+$\Mc \in \mathbb{R}^{K \times d}$, where $K=128$ slots and $d$ is the
+backbone hidden size.  The state is updated at session boundaries, not
+per token.  The architecture has three stages: extraction from the
+completed session, a judge/write step that updates $\Mc$, and a readout
+that injects $\mt$ into the next session's residual stream.
+
+\paragraph{Extract.}
+Given a session representation $\Ct \in \mathbb{R}^{N_t \times d}$,
+a learned query bank $\Min$ cross-attends to produce a candidate memory:
+\begin{equation}
+\Mnew =
+\mathrm{softmax}\!\left(
+  \frac{\Min W_Q^{\mathrm{ext}}(\Ct W_K^{\mathrm{ext}})^\top}{\sqrt d}
+\right)\Ct W_V^{\mathrm{ext}} .
+\end{equation}
+The v15 recipe uses a contextual extraction source
+(\texttt{hidden\_14}) and an input RMSNorm before extraction.  That norm
+was introduced after gradient audits showed unnormalized hidden states
+could drive extract-key gradients roughly $50\times$ too large.
+
+\paragraph{Judge And Write.}
+The candidate $\Mnew$ competes with the previous state through a
+slot-attention writer:
+\begin{equation}
+P=[\Mc^{t-1}\parallel \Mnew], \qquad
+\Mc^t =
+\mathrm{Judge}_{\theta}(P).
+\end{equation}
+Earlier versions used a cross-attention judge and later versions use a
+slot-attention writer with orthogonal query initialization and slot
+position embeddings.  The important empirical point is that the writer
+can settle into a content-blind fixed point: $\Mc$ becomes useful as a
+generic ``memory is on'' prior while carrying little chain-specific
+content.
+
+\paragraph{Read.}
+When scoring the next session, token representations $X$ attend to
+$\Mc$:
+\begin{equation}
+\mt =
+\mathrm{softmax}\!\left(
+  \frac{XW_Q^{\mathrm{r}}(\Mc W_K^{\mathrm{r}})^\top}{\sqrt d}
+\right)\Mc W_V^{\mathrm{r}} .
+\end{equation}
+The readout $\mt$ has the same shape as a residual-stream tensor and is
+registered as an extra source in a Block-Attention Residual router.  A
+learned routing mass $\amem$ determines how much the LM computation uses
+the memory source at each routed sublayer.  This design is intended to
+be additive on top of the backbone, but the experiments below show that
+``additive'' is not enough: every non-memory route to the callback value
+must be audited.
+
+\section{Failure Modes At A Glance}
+
+Table~\ref{tab:failure_modes} summarizes the six failure modes surfaced
+by the campaign.  The first four can make memory look effective when it
+is not, or hide a localized effect when it is real.  The fifth prevents
+a false dismissal of the metric.  The sixth is the remaining
+architecture/training problem after the shortcut paths are removed.
+
+\begin{table}[t]
+\centering
+\caption{Failure modes and diagnostics.  ``Fix'' means the methodology
+we adopt in this paper, not a claim that the architecture is solved.}
+\label{tab:failure_modes}
+\small
+\begin{tabular}{p{0.18\linewidth}p{0.26\linewidth}p{0.25\linewidth}p{0.20\linewidth}}
+\toprule
+Name & Symptom & Diagnostic & Fix \\
+\midrule
+Token-averaged dilution &
+Standard eval reports $\dnm \approx 0$ although callback tokens improve. &
+Callback-token-only CE; compare score-token counts. &
+Use \texttt{eval\_callback.py}. \\
+\midrule
+Joint-training invisibility &
+Unfrozen backbone collapses $\elift$ to $\approx 0$. &
+Freeze-vs-joint ablation; compare to empirical prior. &
+Report memory-disabled and prior baselines. \\
+\midrule
+Category-cue leak &
+``favorite COLOR'' reduces answer to a 32-way prior. &
+$P(\mathrm{item}\mid\mathrm{category})$ CE = 2.91 nats; v15b CE = 2.97. &
+Random IDs; remove category cue. \\
+\midrule
+Window leakage &
+Evidence directly enters the LM attention window. &
+Count evidence positions in callback windows. &
+Use smaller callback window or forced evidence gap. \\
+\midrule
+Redaction uncertainty &
+Zero lift could be dismissed as a leaky floor. &
+Default/cross/skip/zero redaction agreement within 0.05 nats. &
+Keep evidence-redacted floors and audit them. \\
+\midrule
+Writer-objective failure &
+D5 removes priors but $\elift$ remains near zero. &
+D5 run plus TTT-readout/probe audits. &
+F2 NIAH writer warmup. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}{0.94\linewidth}
+\small
+\textbf{Five pathways from $\Mc$ or context to the LM head.}
+\begin{enumerate}
+\item Intended path: evidence session $\rightarrow \Ct \rightarrow$ writer $\rightarrow \Mc \rightarrow \mt \rightarrow$ LM head.
+\item Content-blind memory prior: writer emits a similar $\Mc$ on every chain; readout shifts the LM toward the callback marginal.
+\item Backbone template prior: unfrozen LM learns $P(\mathrm{item}\mid\mathrm{category})$ from callback tokens.
+\item Window path: evidence remains in the local attention window, bypassing $\Mc$.
+\item Measurement path: token-averaged eval or unaudited redaction changes the apparent contribution of memory.
+\end{enumerate}
+\end{minipage}}
+\caption{Causal pathways that must be separated before a memory result
+can be interpreted.  Only the first path is chain-specific recurrent
+memory.}
+\label{fig:pathways}
+\end{figure}
+
+\section{Failure Modes 1--2: Dilution And Joint-Training Invisibility}
+
+\paragraph{Callback Benefit Is Localized.}
+The first apparent contradiction was v14k.  The in-trainer and
+callback-aware metrics showed a large callback-token benefit, while
+standard chain evaluation made the same checkpoint look neutral or
+worse.  The callback-aware post-hoc eval on 200 D4v2 validation chains
+reports
+\[
+\CEmem=4.98,\quad
+\CEnomem=6.42,\quad
+\CEsh=5.04,\quad
+\CEfloor=5.05.
+\]
+Thus $\dnm^{\mathrm{cb}}=+1.44$, $\dsh^{\mathrm{cb}}=+0.054$, and
+$\elift=+0.071$.  The full-window standard eval reports $\dnm=-0.085$
+on the same checkpoint.  These are not inconsistent: the callback mask
+is a tiny part of the score window, and memory can add small noise on
+non-callback tokens that dominates a full-window average.
+
+\paragraph{Most Of The Apparent Benefit Survives Redaction.}
+The same v14k number also reveals a second problem.  The evidence-
+redacted floor still gives $\Delta_{\mathrm{nm-m,floor}}=+1.37$.  Therefore
+$1.37/1.44 = 95.1\%$ of the apparent no-memory vs memory gain survives
+when $\Mc$ is built without the answer.  The honest chain-specific
+quantity is not $\dnm$ but
+$\elift=\dnm-\Delta_{\mathrm{nm-m,floor}}$.
+
+\paragraph{Joint Training Changes The Object Of Measurement.}
+The v15 matrix makes the point sharper.  With a frozen backbone, the
+memory path can change callback CE because the LM head cannot simply
+fit the D4v2 closed-set marginal.  With an unfrozen backbone, the LM
+path can learn the callback distribution directly.  v15b, the 0.6B
+joint-trained run, reaches $\CEmem \approx 2.97$ nats and
+$\elift \approx 0$.  This is not evidence that memory is unnecessary in
+general; it is evidence that the benchmark allowed a non-memory path to
+solve the proxy objective.
+
+\begin{table}[t]
+\centering
+\caption{D4v2 ablation and audit results.  CE/prior rows are from the
+A3 template-prior audit on 128 validation chains unless noted.  Lift
+values mix in-trainer and post-hoc audits where indicated; missing
+trajectory details are left as TODOs rather than interpolated.}
+\label{tab:v15_ablation}
+\small
+\begin{tabular}{llrrrrp{0.24\linewidth}}
+\toprule
+Run & Regime & $\CEmem$ & Gap to 2.91 & $\dnm^{\mathrm{cb}}$ & $\elift$ & Reading \\
+\midrule
+v14k & 0.6B frozen & 4.98 & +2.07 & +1.44 & +0.071 & Large apparent callback gain; 95\% survives redaction. \\
+v15a & 0.6B frozen & 5.15 & +2.24 & +1.33 & -0.043 & Reproduces $\dnm$; post-hoc floor is as strong as evidence. \\
+v15b & 0.6B joint & 2.97 & +0.06 & +0.007 & -0.002 & Matches empirical prior; memory contribution vanishes. \\
+v15c & 0.6B frozen, embed extract & \todo{NUMBER} & \todo{NUMBER} & \todo{NUMBER} & +0.005--+0.020 & Hidden-state extraction is better. \\
+v15e & 1.7B frozen & 4.76 & +1.85 & \todo{NUMBER} & +0.066 / -0.09 & Strong $\dnm$, weak or unstable evidence-specific lift. \\
+v15f & 1.7B joint & 3.21 & +0.30 & \todo{NUMBER} & $\approx$+0.04 & Converging toward the same prior-matching collapse. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Failure Mode 3: The Category-Cue Corpus Leak}
+
+D4v2 was meant to test whether $\Mc$ stores a persona binding.  Its
+callback template inadvertently answers a different question:
+can the model learn a category-conditional closed-set prior?  The
+callback repeats the category in the user question and immediately
+before the answer:
+\begin{quote}
+\small
+User: Quick question, what was my favorite COLOR again?\\
+Assistant: Your favorite COLOR is RED.
+\end{quote}
+Given the category, the answer space is roughly 32 items.  Audit A3
+builds a Laplace-smoothed empirical $P(\mathrm{item}\mid\mathrm{category})$
+from the 5000-chain training set and scores 128 validation callbacks.
+The resulting prior CE is $2.9087$ nats per callback-mask token.  The
+joint 0.6B v15b checkpoint scores $2.9655$ nats at best and $2.9394$
+nats at final, within $0.06$ and $0.03$ nats of the prior.  That is the
+smoking gun: the unfrozen backbone has learned the template prior, not
+retrieval.
+
+Frozen-base controls rule out the opposite explanation that Qwen3
+already knew this prior.  Without memory or fine-tuning, callback-only
+CE is $7.69$ nats for Qwen3-0.6B and $8.76$ nats for Qwen3-1.7B on the
+same masked tokens.  The prior is learned during the chain training
+regime.
+
+\begin{table}[t]
+\centering
+\caption{D4v2 versus D5 corpus comparison.  D5 removes the category cue
+and uses per-chain random alphanumeric codes; observed v16a results
+show that removing the prior exposes, but does not solve, the writer
+objective problem.}
+\label{tab:corpus_compare}
+\small
+\begin{tabular}{lrrrp{0.28\linewidth}}
+\toprule
+Corpus & Prior / floor CE & Base CE & Observed $\elift$ & Interpretation \\
+\midrule
+D4v2 closed-set persona & 2.91 & 7.69 / 8.76 & v14k +0.071; v15b $\approx$0 & Category cue makes prior-fitting sufficient under joint training. \\
+D5 random codes & $\sim$10 nats per ID-character; first observed callback CE $\sim$7 & \todo{NUMBER} & v16a -0.002 at step 100; later +0.011 & Prior removed; writer still does not encode chain-specific binding. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Failure Mode 4: Random IDs Are Not A Cure}
+
+D5 implements the obvious fix.  It replaces closed-set persona items
+with per-chain random alphanumeric codes and removes the category cue.
+The evidence session acknowledges the code without echoing it in the
+assistant response, and \texttt{--mask\_evidence\_session\_loss} zeros
+LM loss over evidence sessions.  In principle, the callback answer has
+no useful non-memory path: the code is random, the callback does not
+identify a category, and the LM head is not directly trained on the
+evidence answer span.
+
+The first D5 result is therefore important precisely because it is
+negative.  v16a, a frozen 0.6B D5 run, reports
+$\mathrm{evidence\_lift}=-0.0024$ at step 100; the v17 proposal packet
+summarizes the later state as $\mathrm{evidence\_lift}=+0.011$ with
+$\dnm^{\mathrm{cb}}=-0.076$, InfoNCE loss $1.375 \approx \log 4$, D3-MC
+pair/self $0.012$, and $\amem \approx 0.01$.  Removing the prior made
+the evaluation honest, but it did not create a training signal that
+forces the writer to bind the code into $\Mc$.
+
+This is a different failure from the D4v2 category leak.  On D4v2 the
+LM path can win by learning a closed-set marginal.  On D5 the marginal
+is unhelpful, but the writer still receives its gradient through a
+long, weak path: callback NLL $\rightarrow$ LM head $\rightarrow$
+depth-router $\rightarrow$ readout $\rightarrow \Mc \rightarrow$ writer.
+Near random initialization, wrong codes and uninformative memories look
+similarly bad to the LM loss.  The writer has no direct extractive
+objective saying, ``the code in this evidence session must be present in
+$\Mc$.''  That is the motivation for F2.
+
+\section{Failure Mode 5: Leak Audits As Methodology}
+
+An honest negative result requires proving that the diagnostic itself is
+not broken.  Audit A2 traces both the in-trainer floor and standalone
+callback floor.  The in-trainer floor builds $\Mc$ fresh from a single
+non-evidence session in the same chain; the standalone floor walks the
+prefix while replacing evidence sessions with distractors.  Neither
+path carries a cached rolling state across evaluation passes.
+
+The adversarial redaction test is stronger than the code trace.  On
+v15a/best, the default redaction gives $\CEfloor=5.1235$; cross-chain
+redaction gives $5.0911$; skip-evidence gives $5.0857$; zeroed-input
+redaction gives $5.0896$.  The spread is $0.038$ nats, inside the
+pre-declared $0.05$-nat band, and the direction is opposite a leak:
+the default floor is slightly worse, not better, than cross/zero.  On
+v15b/best, all floor variants lie within $0.008$ nats.  Thus
+$\elift \approx 0$ is not a redaction artifact.
+
+Audit A1 adds a separate lesson.  At D4v2's v15 default
+\texttt{window\_k=4}, $58.5\%$ of train chains and $59.6\%$ of
+validation chains have at least one evidence session inside the LM
+attention window at callback scoring time.  At \texttt{window\_k=3},
+the leak is still $41.4\%$ / $43.4\%$.  Only \texttt{window\_k=1}
+eliminates direct evidence visibility.  This makes callback-window
+counts a required part of future corpus reports.
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}{0.94\linewidth}
+\small
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Run & Corpus & Scale/regime & $\dnm^{\mathrm{cb}}$ & $\elift$ \\
+\midrule
+v14k & D4v2 & 0.6B frozen & +1.44 & +0.071 \\
+v15a & D4v2 & 0.6B frozen & +1.33 & -0.043 (post-hoc floor) \\
+v15b & D4v2 & 0.6B joint & +0.007 & -0.002 \\
+v15e & D4v2 & 1.7B frozen & +2.03 (trainer) & +0.066 / -0.09 \\
+v15f & D4v2 & 1.7B joint & \todo{NUMBER} & $\approx$+0.04 \\
+v16a & D5 & 0.6B frozen & -0.076 & +0.011 \\
+v16b & D5 & 1.7B frozen & \todo{NUMBER} & \todo{NUMBER} \\
+\bottomrule
+\end{tabular}
+\end{minipage}}
+\caption{Trajectory summary for the main phase-aligned callback
+metric.  The underlying logs are heterogeneous; this figure therefore
+shows audited checkpoints rather than an interpolated curve.}
+\label{fig:trajectory}
+\end{figure}
+
+\section{Prescription: F2 NIAH Writer Warmup}
+
+The F2 prescription is to add a writer-side extractive objective before
+the LM head is allowed to use memory.  The proposed v17a/v17e warmup
+uses the D5 random-code corpus and a probe head that reads $\Mc$ and
+predicts the code.  The probe is discarded at evaluation time; it is a
+training scaffold, not an inference path.  If the final LM-head
+callback evaluation improves after the probe is removed, the result
+means the writer has learned to store content that the normal readout
+can use.
+
+The warmup tests two hypotheses cleanly.  If probe CE drops well below
+the D5 marginal but downstream $\elift$ remains near zero, then the
+writer can encode the answer and the bottleneck is readout/router use.
+If probe CE stays at the marginal, the writer cannot encode the binding
+even under direct supervision and the architecture itself needs a
+writer-side change.  Either outcome is more informative than another
+LM-only training run.
+
+\begin{table}[t]
+\centering
+\caption{D5 TTT-readout audit placeholder.  The parent run will fill
+these values when \texttt{tools/d5\_ttt\_readout.py} completes.  All
+unknown numbers are deliberately left as \texttt{\textbackslash todo}.}
+\label{tab:ttt_readout}
+\small
+\begin{tabular}{lrrrrp{0.25\linewidth}}
+\toprule
+Checkpoint & Probe params trained & Base CE & TTT CE & TTT $\elift$ & Verdict \\
+\midrule
+v15a/best & $W_Q,W_K,W_V$ only & \todo{NUMBER} & \todo{NUMBER} & \todo{NUMBER} & \todo{writer vs readout bottleneck} \\
+v15e/best & $W_Q,W_K,W_V$ only & \todo{NUMBER} & \todo{NUMBER} & \todo{NUMBER} & \todo{writer vs readout bottleneck} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}{0.94\linewidth}
+\small
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Run & Scale & Warmup/probe CE & $\dnm^{\mathrm{cb}}$ & $\elift$ \\
+\midrule
+v17a & 0.6B & \todo{NUMBER} & \todo{NUMBER} & \todo{NUMBER} \\
+v17e & 1.7B & \todo{NUMBER} & \todo{NUMBER} & \todo{NUMBER} \\
+\bottomrule
+\end{tabular}
+\end{minipage}}
+\caption{Placeholder for v17 F2 trajectories.  Positive $\elift$ after
+probe removal would close the loop: D5 removes the shortcut and F2
+supplies the missing writer gradient.}
+\label{fig:v17}
+\end{figure}
+
+\section{Related Work}
+
+Our findings align with a broad lesson from long-context and memory
+evaluation: shortcuts are the default when the benchmark permits them.
+NoLiMa removes literal overlap between query and evidence and shows
+that ordinary long-context retrieval performance can be template-driven
+rather than robust memory use~\cite{nolima2025}.  RULER argues that
+vanilla needle-in-a-haystack is saturated and adds UUIDs, multiple
+needles, variable tracking, aggregation, and hard distractors to expose
+weaker retrieval behavior~\cite{ruler2024}.  Lost in the Middle shows
+position and recency/primacy effects even when context length is
+nominally large~\cite{lostmiddle2024}.  LongBench includes no-context
+checks to expose parametric priors~\cite{longbench2024}; our
+callback-only and empirical-prior audits are the memory analogue.
+LongMemEval separates indexing, retrieval, and reading, motivating our
+separation of write, readout, and decode diagnostics~\cite{longmemeval2025}.
+
+Memory architectures face the same credit-assignment issue.  Recurrent
+Memory Transformer, Associative RMT, AutoCompressors, Memorizing
+Transformers, TRIME, Block-Recurrent Transformers, and classical
+differentiable memory systems all introduce pathways that can, in
+principle, carry long-range information~\cite{rmt2022,armt2024,
+autocompressors2023,memorizing2022,trime2022,blockrecurrent2022,
+ntm2014}.  Our results emphasize that adding a pathway is not the same
+as proving the model used it.  The evaluation must include memory-off,
+memory-shuffled, evidence-redacted, prior-only, and window-leakage
+controls.
+
+\section{Conclusion And Open Questions}
+
+The campaign gives a conservative answer to ``when does recurrent memory
+help?''  It helps only when the task and evaluator make the non-memory
+paths uninformative and when the writer receives a gradient that can
+actually encode the binding.  D4v2 failed the first condition: category
+cues, window leakage, and token-averaged eval made the memory result
+ambiguous.  D5 satisfies the first condition better and exposes the
+second: LM-only callback loss is too weak to train the writer out of a
+content-blind fixed point.
+
+The next decisive experiment is F2.  A positive v17a/v17e result would
+show that direct writer supervision plus shortcut-free data yields
+chain-specific memory under the normal LM-head readout.  A negative
+result would be equally useful: it would localize the failure to the
+readout/router or the memory representation itself.  Either way, the
+methodological bar is now clear: report the shortcuts before reporting
+the memory gain.
+
+\section*{Reproducibility Statement}
+
+All numbers in the main text are drawn from the run ledger and audits in
+\texttt{results/exp2\_chain\_recipe/} or from callback-aware JSON
+outputs in \texttt{results/eval\_v14v15/}.  Missing values are marked
+with \todo{NUMBER}.  The relevant tools are
+\texttt{tools/eval\_callback.py}, \texttt{tools/audit\_a1\_window\_leakage.py},
+\texttt{tools/audit\_a2\_redaction.py}, \texttt{tools/audit\_a3\_template\_prior.py},
+\texttt{tools/build\_synthetic\_random\_codes.py}, and the planned
+\texttt{tools/d5\_ttt\_readout.py}.
+
+\begin{thebibliography}{99}
+
+\bibitem{nolima2025}
+Modarressi et al.
+\newblock NoLiMa: Long-Context Evaluation Beyond Literal Matching.
+\newblock arXiv:2502.05167.
+
+\bibitem{ruler2024}
+Hsieh et al.
+\newblock RULER: What's the Real Context Size of Your Long-Context Language Models?
+\newblock arXiv:2404.06654.
+
+\bibitem{lostmiddle2024}
+Liu et al.
+\newblock Lost in the Middle: How Language Models Use Long Contexts.
+\newblock arXiv:2307.03172.
+
+\bibitem{longbench2024}
+Bai et al.
+\newblock LongBench: A Bilingual, Multitask Benchmark for Long Context Understanding.
+\newblock arXiv:2308.14508.
+
+\bibitem{babilong2024}
+Kuratov et al.
+\newblock BABILong: Testing the Limits of LLMs with Long Context Reasoning-in-a-Haystack.
+\newblock arXiv:2406.10149.
+
+\bibitem{longmemeval2025}
+Yu et al.
+\newblock LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory.
+\newblock arXiv:2410.10813.
+
+\bibitem{shortcut2020}
+Geirhos et al.
+\newblock Shortcut Learning in Deep Neural Networks.
+\newblock arXiv:2004.07780.
+
+\bibitem{memorizing2022}
+Wu et al.
+\newblock Memorizing Transformers.
+\newblock arXiv:2203.08913.
+
+\bibitem{rmt2022}
+Bulatov, Kuratov, and Burtsev.
+\newblock Recurrent Memory Transformer.
+\newblock arXiv:2207.06881.
+
+\bibitem{armt2024}
+Rodkin et al.
+\newblock Associative Recurrent Memory Transformer.
+\newblock ICML 2024 Next Generation of Sequence Modeling Architectures workshop.
+
+\bibitem{autocompressors2023}
+Chevalier et al.
+\newblock Adapting Language Models to Compress Contexts.
+\newblock arXiv:2305.14788.
+
+\bibitem{trime2022}
+Zhong, Lei, and Chen.
+\newblock Training Language Models with Memory Augmentation.
+\newblock arXiv:2205.12674.
+
+\bibitem{blockrecurrent2022}
+Hutchins et al.
+\newblock Block-Recurrent Transformers.
+\newblock NeurIPS 2022.
+
+\bibitem{ntm2014}
+Graves, Wayne, and Danihelka.
+\newblock Neural Turing Machines.
+\newblock arXiv:1410.5401.
+
+\bibitem{zeroscrolls2023}
+Shaham et al.
+\newblock ZeroSCROLLS: A Zero-Shot Benchmark for Long Text Understanding.
+\newblock arXiv:2305.14196.
+
+\bibitem{ragbaseline2025}
+Laitenberger et al.
+\newblock Stronger Baselines for Retrieval-Augmented Generation with Long-Context Language Models.
+\newblock arXiv:2506.03989.
+
+\end{thebibliography}
+
+\appendix
+
+\section{Audit Details}
+
+\subsection{Window Leakage Counts}
+For D4v2, evidence positions are sampled from body positions $0,\ldots,8$
+and the callback is at position 9.  Audit A1 counts whether an evidence
+session falls in the callback scoring window.  At \texttt{window\_k=4},
+2926/5000 train chains and 298/500 validation chains leak at least one
+evidence session.  At \texttt{window\_k=3}, the corresponding counts are
+2068/5000 and 217/500.  At \texttt{window\_k=2}, they are 1088/5000 and
+114/500.  Only \texttt{window\_k=1} eliminates this direct path.
+
+\subsection{Redaction Variants}
+Audit A2 evaluates five floor variants: original evidence (match),
+default distractor-pool redaction, cross-chain non-evidence redaction,
+skip-evidence, and zeroed-token evidence.  On v15a/best, the
+redaction-style spread is 0.038 nats; on v15b/best it is 0.0066 nats.
+The default floor is slightly worse than cross/zero, so the default is
+not hiding evidence in the dangerous direction.
+
+\subsection{Template Prior Construction}
+Audit A3 parses $(\mathrm{category},\mathrm{item})$ from D4v2 chain
+names and builds an add-half-smoothed empirical prior over each
+category.  The train counts range from 593 to 652 chains per category.
+The validation prior CE over the first 128 chains is $2.9087$ nats per
+callback-mask token.  The per-item mean is essentially $\log 32$; the
+per-token mean is lower because 40/128 validation items are multi-token.
+
+\section{Callback-Aware Metric Definition}
+
+Let $S_c$ be the callback session of chain $c$ and $A_c$ its annotated
+answer-token mask.  For a memory construction $r$, define
+\[
+\mathrm{CE}_r^{\mathrm{cb}}(c)=
+\frac{1}{|A_c|}\sum_{i\in A_c}
+  -\log p_\theta(x_i \mid x_{<i}, M_{\mathrm{c},r}(c)).
+\]
+The reported callback deltas are
+\[
+\dnm^{\mathrm{cb}}=
+\mathrm{CE}_{\mathrm{nomem}}^{\mathrm{cb}}-
+\mathrm{CE}_{\mathrm{mem}}^{\mathrm{cb}},\qquad
+\dsh^{\mathrm{cb}}=
+\mathrm{CE}_{\mathrm{shuffle}}^{\mathrm{cb}}-
+\mathrm{CE}_{\mathrm{mem}}^{\mathrm{cb}},
+\]
+and
+\[
+\elift =
+\dnm^{\mathrm{cb}} -
+\left(
+\mathrm{CE}_{\mathrm{nomem,floor}}^{\mathrm{cb}}-
+\mathrm{CE}_{\mathrm{mem,floor}}^{\mathrm{cb}}
+\right).
+\]
+Positive $\elift$ means evidence-bearing $\Mc$ helps more than
+evidence-redacted $\Mc$.
+
+\section{Additional Tables}
+
+\begin{table}[h]
+\centering
+\caption{Base callback CE without memory or fine-tuning on D4v2
+callback-mask tokens.}
+\label{tab:base_ce}
+\small
+\begin{tabular}{lr}
+\toprule
+Backbone & CE on callback tokens \\
+\midrule
+Qwen3-0.6B base & 7.686 \\
+Qwen3-1.7B base & 8.764 \\
+Uniform over 256 closed-set items & 5.545 \\
+Uniform within cued 32-item category & 3.466 \\
+Empirical per-token template prior & 2.909 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{A2 redaction audit summary.}
+\label{tab:redaction_summary}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Checkpoint & Match $\dnm$ & Default $\elift$ & Cross $\elift$ & Redaction spread \\
+\midrule
+v15a/best & +1.3377 & -0.0310 & -0.0634 & 0.038 \\
+v15b/best & +0.0074 & -0.0021 & -0.0078 & 0.0066 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitations}
+
+The paper is a first draft under an active experiment campaign.  Several
+v17 and TTT-readout numbers are intentionally left as placeholders.  The
+D5 corpus removes the most obvious D4v2 prior but still uses synthetic
+templates; future natural-memory benchmarks such as LoCoMo and MSC
+should be reported with the same no-memory, prior, redaction, and
+shuffle controls.  Finally, Memory Residuals itself is only one
+architecture.  The central claim of this paper is methodological:
+without these controls, any recurrent-memory architecture can appear to
+work through hidden pathways.
+
+\end{document}

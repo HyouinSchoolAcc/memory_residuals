@@ -70,3 +70,9 @@ tools/cloud_watchdog/.ntfy_topic
 .idea/
 *.swp
 *~
+
+# Local secrets (OpenRouter / cloud audit creds). Never commit.
+env.local.bat
+env.local.sh
+.env
+.env.local

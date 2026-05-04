@@ -640,6 +640,105 @@ def parse_args() -> argparse.Namespace:
                         "collapses to uniform within 500 steps, M_c "
                         "locked at zero matrix' collapse signature.  "
                         "Default off for init-parity / older ckpts.")
+    # ----- v17 / F2: writer-side extractive supervision knobs -----
+    p.add_argument("--writer_probe_enabled", action="store_true",
+                   help="Construct a WriterProbeHead on top of M_c "
+                        "(see modeling_memres.WriterProbeHead).  When "
+                        "set, the trainer additionally back-props CE "
+                        "of probe(M_c) against the chain's first "
+                        "answer-token id with weight "
+                        "`--writer_probe_loss_weight`.  Gradient from "
+                        "the probe loss flows only through the writer "
+                        "(extract+judge) and the probe head -- the LM "
+                        "head, depth router, and cross-attention "
+                        "readout are not in the probe-loss graph.  "
+                        "v17 / F2 fix for the v15..v16 "
+                        "writer-content-blind diagnosis.")
+    p.add_argument("--writer_probe_loss_weight", type=float, default=1.0,
+                   help="Steady-state weight on the probe loss.  "
+                        "Total loss is loss_match + this * loss_probe "
+                        "(after warmup).  1.0 puts probe and LM-NLL "
+                        "on equal footing per step.  No effect if "
+                        "--writer_probe_enabled is off.")
+    p.add_argument("--writer_probe_warmup_steps", type=int, default=0,
+                   help="Linear warmup over this many steps for the "
+                        "probe loss weight (0 -> writer_probe_loss_"
+                        "weight).  Useful when the probe head starts "
+                        "with random init: at step 0 the probe loss "
+                        "is ~log(V) which would dominate the gradient "
+                        "if applied at full weight without warmup.  "
+                        "Recommend 200-500 for stable training.")
+    p.add_argument("--writer_probe_n_queries", type=int, default=1,
+                   help="Number of learned query vectors in the probe "
+                        "head (n_q in WriterProbeHead).  >1 averages "
+                        "n_q independent attention readouts of M_c.")
+    p.add_argument("--writer_probe_warmup_only", action="store_true",
+                   help="Disable the probe loss after "
+                        "writer_probe_warmup_steps.  Use this to run "
+                        "pure F2 warmup -> joint LM phase 2 schedules; "
+                        "in that mode the probe head is consulted only "
+                        "during the warmup window.")
+    # ----- v18 / F3: read-side extractive supervision knobs -----
+    p.add_argument("--readout_probe_enabled", action="store_true",
+                   help="Construct a ReadoutProbeHead that consumes "
+                        "m_t (the actual MemoryReadout output) at the "
+                        "callback session's first answer-token "
+                        "position and projects to vocab.  When set, "
+                        "the trainer additionally back-props CE of "
+                        "probe(m_t_at_cb) against the chain's first "
+                        "answer-token id with weight "
+                        "`--readout_probe_loss_weight`.  Unlike the "
+                        "writer probe (F2), the read-side probe's "
+                        "gradient flows through MemoryReadout's OWN "
+                        "W_Q/W_K/W_V (m_t = readout(embed(input_ids), "
+                        "M_c)), pressuring the cross-attention "
+                        "readout to encode chain-specific content "
+                        "rather than the joint-trained content-blind "
+                        "configuration that the §5 TTT-on-M_c "
+                        "capacity probe falsified across v14k/v15a/"
+                        "v15e.  Compose with --writer_probe_enabled "
+                        "for joint F2+F3.")
+    p.add_argument("--readout_probe_loss_weight", type=float, default=1.0,
+                   help="Steady-state weight on the read-side probe "
+                        "loss.  Total loss is loss_match + writer_w * "
+                        "loss_writer_probe + readout_w * "
+                        "loss_readout_probe.  1.0 puts the read-side "
+                        "probe on equal footing with LM-NLL.  No "
+                        "effect if --readout_probe_enabled is off.")
+    p.add_argument("--readout_probe_warmup_steps", type=int, default=0,
+                   help="Linear warmup over this many steps for the "
+                        "read-side probe loss weight (0 -> "
+                        "readout_probe_loss_weight).  Recommend "
+                        "200-500 to let the probe head's random-init "
+                        "proj saturate before its full-weight "
+                        "gradient hits MemoryReadout.W_Q/W_K/W_V.")
+    # ----- v19: multi-layer readout refinement depth -----
+    p.add_argument("--memres_readout_depth", type=int, default=0,
+                   help="Number of additional residual cross-attn "
+                        "refinement layers stacked on top of the "
+                        "single-layer MemoryReadout.  0 reproduces "
+                        "the v11..v18 single-layer readout exactly.  "
+                        ">0 stacks N additional layers, each "
+                        "operating as m_t^(i) = m_t^(i-1) + "
+                        "RMSNorm_i(softmax((X+m_t^(i-1)) W_Q_i, "
+                        "M_c W_K_i) @ M_c W_V_i).  v19 fix for the "
+                        "v18a §5 'single-layer readout at the edge "
+                        "of capacity' diagnosis (ttt_lift_vs_floor "
+                        "= +0.005 MIXED; v19a:2 / v19b:4 candidates).")
+    p.add_argument("--memres_readout_refine_zero_init",
+                   action="store_true",
+                   help="ReZero-style zero-init for each refinement "
+                        "layer's V projection.  When set, "
+                        "refine_W_V[i].weight = 0 at construction so "
+                        "the i-th refinement layer's contribution to "
+                        "m_t starts at exactly zero and grows only "
+                        "as the gradient demands.  v21 fix for the "
+                        "v19b/v20{a,b} failure mode where the "
+                        "depth=4 residual stack inflated "
+                        "||m^t||/||embed|| to 12-16x at random init "
+                        "regardless of M_c content.  No effect when "
+                        "--memres_readout_depth is 0; recommended "
+                        "ON whenever depth >= 2.")
     # v14 auxiliary-loss knobs.  These are read during fit() and
     # applied only when their weight is > 0; defaults preserve
     # pre-v14 behaviour exactly.
@@ -676,20 +775,29 @@ def parse_args() -> argparse.Namespace:
                         "so the model sees M_c states from a range of recurrence "
                         "depths during training.")
     p.add_argument("--save_best_metric",
-                   choices=("ce_mem", "composite", "phase_aligned"),
+                   choices=("ce_mem", "composite", "phase_aligned",
+                            "evidence_lift"),
                    default="phase_aligned",
                    help="ce_mem: legacy; minimised. "
                         "composite: maximise standard-eval "
                         "(delta_nomem_minus_mem + 2*delta_shuffle_minus_mem). "
-                        "phase_aligned (default; v8+): maximise "
+                        "phase_aligned (v8+): maximise "
                         "(pa_cb_dsh + 0.5 * pa_ws_dsh) on the phase-aligned "
                         "eval that matches the curriculum training "
-                        "distribution. The phase-aligned callback-token "
-                        "delta_sh-m is the only metric that actually "
-                        "measures whether the readout is content- "
-                        "discriminative on the tokens we care about, "
-                        "without being polluted by the train/eval "
-                        "distribution mismatch on M_c statistics.")
+                        "distribution. NOTE (v16, 2026-05-03): "
+                        "phase_aligned can be gamed by a content-blind "
+                        "writer that learns the dataset's per-callback "
+                        "marginal as a static prior tensor -- on D4v2 "
+                        "v14k/v15a/v15e all show pa_cb_dnm dominated by "
+                        "pa_cb_dnm_floor (memory built from a non- "
+                        "evidence filler session). "
+                        "evidence_lift (v16): maximise pa_cb_evidence_lift "
+                        "= (pa_cb_dnm - pa_cb_dnm_floor). This is the only "
+                        "metric that gates on the writer/readout actually "
+                        "extracting input-specific content; saving on "
+                        "evidence_lift is the right default for any cell "
+                        "claiming the architecture is doing memory "
+                        "retrieval and not just emitting a learnt prior.")
     p.add_argument("--phase_aligned_eval_n_chains", type=int, default=48,
                    help="Number of LME chains (with cb_pos >= 1) to use "
                         "for the phase-aligned eval. The eval picks one "
@@ -736,6 +844,37 @@ def parse_args() -> argparse.Namespace:
                         "Concentrates gradient on the response tail "
                         "where memory should matter most.  Default 1.0 "
                         "= legacy (score the entire content).")
+    # v16 (2026-05-03) -- vision-aligned evidence-only training.
+    p.add_argument(
+        "--mask_evidence_session_loss", action="store_true",
+        help="v16: zero the LM loss on every position of every EVIDENCE "
+             "session in the window. Requires the corpus blob to carry "
+             "`session_role` (synthd5 onwards). Vision-aligned "
+             "rationale: under D4v2 the LM head was directly supervised "
+             "on `Your favorite color is red` inside the evidence "
+             "session itself (the assistant turn echoes the binding), "
+             "so the LM head learns the dataset's per-category marginal "
+             "without ever needing memory. Masking evidence-session loss "
+             "removes that direct-supervision pathway. The writer is "
+             "still trained (evidence is still compressed into M_c "
+             "after the LM forward) so memory is the only pathway with "
+             "non-trivial pressure on the callback's answer span. "
+             "Default OFF for backwards compatibility.")
+    p.add_argument(
+        "--constant_mc_control", action="store_true",
+        help="v16 control: replace the per-chain compressed M_c with a "
+             "single learnable parameter shared across all chains. "
+             "Diagnostic: if `pa_cb_dnm` under this control matches the "
+             "v14k/v15a frozen-backbone numbers (~+1.4 nats), then "
+             "v14k's apparent memory benefit was actually a learnt "
+             "output-side prior, not content-dependent retrieval. The "
+             "writer / judge / extract stack is bypassed entirely "
+             "(saves compute) and only the readout, router, and the "
+             "constant_M_c parameter are trained on the memres group. "
+             "Forces `--memres_extract_source embed` (no extract path "
+             "is exercised) and is incompatible with "
+             "`--contrastive_infonce_*` and `--alpha_mem_floor_*` "
+             "(those losses depend on chain-specific M_c statistics).")
 
     # IO + logging
     p.add_argument("--out_dir", default="output/chain_run")
@@ -824,6 +963,27 @@ class ChainCorpus:
             self.session_callback_mask = torch.zeros_like(
                 self.session_ids, dtype=torch.int8
             )
+        # v16 (2026-05-03): per-session role (0=filler, 1=evidence,
+        # 2=callback) and per-token evidence-id mask. Optional for back-
+        # compat with D4v2 / LME / MSC blobs; absent fields default to
+        # zeros which is a no-op for `--mask_evidence_session_loss` and
+        # the audit hooks. Synthd5+ corpora populate both.
+        if "session_role" in blob:
+            self.session_role: torch.Tensor = (
+                blob["session_role"].to(torch.int8)
+            )
+        else:
+            self.session_role = torch.zeros(
+                self.session_ids.shape[0], dtype=torch.int8
+            )
+        if "session_evidence_mask" in blob:
+            self.session_evidence_mask: torch.Tensor = (
+                blob["session_evidence_mask"].to(torch.int8)
+            )
+        else:
+            self.session_evidence_mask = torch.zeros_like(
+                self.session_ids, dtype=torch.int8
+            )
         if "chain_callback_position" in blob:
             self.chain_callback_position: torch.Tensor = (
                 blob["chain_callback_position"].long()
@@ -880,17 +1040,27 @@ class ChainCorpus:
         s = int(self.chain_starts[chain_idx])
         return self.session_callback_mask[s + start : s + start + k]
 
+    def chain_window_role(
+        self, chain_idx: int, start: int, k: int,
+    ) -> torch.Tensor:
+        """Per-session role for a contiguous window. v16+."""
+        s = int(self.chain_starts[chain_idx])
+        return self.session_role[s + start : s + start + k]
+
     def chain_curriculum_window(
         self,
         chain_idx: int,
         positions: list[int],
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Stack a non-contiguous window of sessions in the order given.
 
         ``positions`` is a list of session indices within the chain (each
-        in ``[0, chain_lengths[chain_idx])``); the result is a tensor of
-        shape ``(len(positions), session_len)`` with sessions in the
-        listed order, plus the matching callback mask of the same shape.
+        in ``[0, chain_lengths[chain_idx])``); the result is a tuple of
+        three tensors all of shape ``(len(positions), ...)``:
+            - session_ids: (len(positions), session_len)
+            - callback_mask: (len(positions), session_len)
+            - session_role: (len(positions),)        v16+
+
         Used by the curriculum sampler to construct
         ``[evidence, ...intermediates, callback]`` windows that collapse
         the credit-assignment path between an early-session fact and a
@@ -901,6 +1071,7 @@ class ChainCorpus:
         return (
             self.session_ids.index_select(0, idxs),
             self.session_callback_mask.index_select(0, idxs),
+            self.session_role.index_select(0, idxs),
         )
 
     def chain_prefix(self, chain_idx: int, end: int) -> torch.Tensor:
@@ -1029,8 +1200,11 @@ class ChainSampler:
 
     def sample_window(
         self,
-    ) -> tuple[int, int, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
-        """Sample a (chain_idx, start, window, burn_in, callback_mask) tuple.
+    ) -> tuple[
+        int, int, torch.Tensor,
+        torch.Tensor | None, torch.Tensor | None, torch.Tensor,
+    ]:
+        """Sample (chain_idx, start, window, burn_in, callback_mask, role).
 
         ``start`` is the position of the FIRST included session in the chain.
         For contiguous windows it indexes ``window`` exactly. For curriculum
@@ -1038,6 +1212,10 @@ class ChainSampler:
         intermediate / callback positions are not exposed; the precomputed
         ``callback_mask`` is then non-None and the trainer must use it
         instead of re-slicing the corpus mask via (start, window_k).
+
+        ``role`` is a (window_k,) int8 tensor with 0=filler, 1=evidence,
+        2=callback. v16+; for non-synthd5 corpora it's all zeros, which
+        makes the evidence-mask hook in _train_step a no-op.
         """
         r = self.rng.random() * self.total
         # binary search
@@ -1184,7 +1362,7 @@ class ChainSampler:
                 positions = [noise_pos, evidence_pos, cb_pos]
                 anchor = noise_pos
             if positions:
-                window, cb_mask = self.corpus.chain_curriculum_window(
+                window, cb_mask, role = self.corpus.chain_curriculum_window(
                     chain_idx, positions
                 )
                 # Pad to window_k if window_k > 3 by re-using the first
@@ -1195,10 +1373,10 @@ class ChainSampler:
                 if self.window_k > 3:
                     pad_n = self.window_k - 3
                     pad_pos = [positions[0]] * pad_n + positions
-                    window, cb_mask = self.corpus.chain_curriculum_window(
+                    window, cb_mask, role = self.corpus.chain_curriculum_window(
                         chain_idx, pad_pos
                     )
-                return chain_idx, anchor, window, None, cb_mask
+                return chain_idx, anchor, window, None, cb_mask, role
 
         # Branch 1: curriculum [evidence, ...intermediates, callback]. Requires
         # an annotated callback position and enough room to fit window_k - 1
@@ -1219,19 +1397,19 @@ class ChainSampler:
                 if len(gap) >= n_intermediate:
                     intermediates = sorted(self.rng.sample(gap, n_intermediate))
                     positions = [evidence_pos, *intermediates, cb_pos]
-                    window, cb_mask = self.corpus.chain_curriculum_window(
+                    window, cb_mask, role = self.corpus.chain_curriculum_window(
                         chain_idx, positions
                     )
                     # No burn-in for curriculum: M_c starts fresh at evidence
                     # so the credit-assignment chain is exactly [evidence -> ... -> callback].
-                    return chain_idx, evidence_pos, window, None, cb_mask
+                    return chain_idx, evidence_pos, window, None, cb_mask, role
             else:
                 # window_k == 2: just [evidence, callback]
                 positions = [evidence_pos, cb_pos]
-                window, cb_mask = self.corpus.chain_curriculum_window(
+                window, cb_mask, role = self.corpus.chain_curriculum_window(
                     chain_idx, positions
                 )
-                return chain_idx, evidence_pos, window, None, cb_mask
+                return chain_idx, evidence_pos, window, None, cb_mask, role
 
         # Branch 2: callback alignment (existing behavior). Window is
         # contiguous and ends at cb_pos.
@@ -1249,7 +1427,8 @@ class ChainSampler:
         burn_in = (
             self.corpus.chain_window(chain_idx, 0, start) if start > 0 else None
         )
-        return chain_idx, start, window, burn_in, None
+        role = self.corpus.chain_window_role(chain_idx, start, self.window_k)
+        return chain_idx, start, window, burn_in, None, role
 
 
 # ---------------------------------------------------------------------------
@@ -1283,6 +1462,49 @@ class Trainer:
         if args.gradient_checkpointing:
             self.model.gradient_checkpointing_enable()
         self._apply_freeze()
+
+        # v16 (2026-05-03) -- constant-M_c control. A single learnable
+        # parameter shared across all chains replaces the chain-specific
+        # compressed M_c. Diagnostic value: tests whether v14k's apparent
+        # callback advantage is just the writer learning a chain-blind
+        # output prior. See --constant_mc_control help.
+        self._const_mc: torch.nn.Parameter | None = None
+        if args.constant_mc_control:
+            cfg = self.model.config
+            K = int(cfg.memres_num_vectors)
+            d = int(cfg.hidden_size)
+            init = torch.zeros(1, K, d, dtype=torch.bfloat16)
+            init.normal_(mean=0.0, std=0.02)
+            self._const_mc = torch.nn.Parameter(init.to(self.device))
+            if args.contrastive_infonce_weight > 0.0:
+                raise SystemExit(
+                    "--constant_mc_control is incompatible with "
+                    "--contrastive_infonce_weight (the contrastive loss "
+                    "depends on chain-specific M_c statistics; with a "
+                    "single shared M_c the loss is degenerate)."
+                )
+            if args.alpha_mem_floor_aux_weight > 0.0:
+                raise SystemExit(
+                    "--constant_mc_control is incompatible with "
+                    "--alpha_mem_floor_aux_weight (alpha-trace collection "
+                    "wants the writer's per-chain M_c)."
+                )
+            if args.neg_chain_weight > 0.0:
+                raise SystemExit(
+                    "--constant_mc_control is incompatible with "
+                    "--neg_chain_weight (no per-chain shuffle exists)."
+                )
+            if args.curriculum_competition_bias > 0.0:
+                # Competition curriculum sources its 'distractor' from a
+                # different-chain sample whose M_c will be identical to
+                # the on-chain M_c under this control. Force-disable.
+                if self.is_main:
+                    print(
+                        "  [const_Mc] forcing curriculum_competition_bias=0 "
+                        "(no per-chain M_c to compete)", flush=True,
+                    )
+                args.curriculum_competition_bias = 0.0
+
         self.wrapped = self._wrap_model()
         self.optimizer, self.scheduler = self._build_optimizer()
 
@@ -1441,6 +1663,11 @@ class Trainer:
             memres_slot_positional=a.memres_slot_positional,
             memres_judge_qk_layernorm=a.memres_judge_qk_layernorm,
             memres_extract_input_norm=a.memres_extract_input_norm,
+            writer_probe_enabled=a.writer_probe_enabled,
+            writer_probe_n_queries=a.writer_probe_n_queries,
+            readout_probe_enabled=a.readout_probe_enabled,
+            memres_readout_depth=a.memres_readout_depth,
+            memres_readout_refine_zero_init=a.memres_readout_refine_zero_init,
         )
         if a.pretrained:
             # A memres checkpoint saves model_type="qwen3_memres", which
@@ -1507,6 +1734,22 @@ class Trainer:
                     # values at construction time, which are immediately
                     # overwritten by the loaded checkpoint anyway.
                     "memres_queries_init",
+                    # v17 / F2: probe-head construction is independent of
+                    # the existing writer/judge/readout shape (the probe
+                    # adds its own Q/K/V/proj parameters that fresh-init
+                    # at warm-start; from_pretrained's missing-keys
+                    # warning is expected for those names and benign).
+                    # We allow CLI override so a v15a/best can be
+                    # warm-started into v17a with probe enabled.
+                    "writer_probe_enabled",
+                    "writer_probe_n_queries",
+                    # v18 / F3: read-side probe-head construction is
+                    # likewise independent of the existing readout shape
+                    # (it adds its own RMSNorm + proj that fresh-init at
+                    # warm-start).  Allow CLI override so a v15a/best
+                    # or v17a/best can be warm-started into v18 with
+                    # the read-side probe enabled.
+                    "readout_probe_enabled",
                 }
                 merged = dict(base_cfg.to_dict())
                 for k, v in memres_kwargs.items():
@@ -1696,6 +1939,12 @@ class Trainer:
                 memres_params.append(p)
             else:
                 backbone_params.append(p)
+        # v16 const-Mc control: include the shared M_c parameter in the
+        # memres group so it gets the memres LR (and the backbone group
+        # LR is irrelevant under --freeze_backbone, which is the only
+        # supported configuration for this control).
+        if self._const_mc is not None:
+            memres_params.append(self._const_mc)
         groups = []
         if memres_params:
             groups.append({"params": memres_params, "lr": a.lr, "name": "memres"})
@@ -1832,13 +2081,14 @@ class Trainer:
         # tail-truncated (we keep the most recent burn_in_max sessions).
         windows = []
         callback_masks: list[torch.Tensor] = []
+        roles: list[torch.Tensor] = []
         burn_ins: list[torch.Tensor | None] = []
         # Long-horizon training protocol: when --burn_in_resample is set, draw
         # a per-chain burn-in length from {0, 4, 8, ..., burn_in_max} so the
         # judge step sees M_c at a range of recurrence depths each batch.
         # Otherwise, behave as before: cap at burn_in_max, full prefix.
         for _ in range(a.batch_size):
-            ci, st, w, b, cb_mask = self.train_sampler.sample_window()
+            ci, st, w, b, cb_mask, role = self.train_sampler.sample_window()
             if a.burn_in_resample and a.burn_in_max > 0 and b is not None:
                 step = max(4, a.burn_in_max // 5)
                 choices = [0] + list(range(step, a.burn_in_max + 1, step))
@@ -1860,11 +2110,14 @@ class Trainer:
                     ci, st, a.window_k
                 )
             callback_masks.append(cb_mask)
+            roles.append(role)
             burn_ins.append(b)
         # (B, k, S)
         window = torch.stack(windows).to(self.device)
         # (B, k, S) int8 with 1's at callback supervision positions.
         callback_mask_window = torch.stack(callback_masks).to(self.device)
+        # (B, k) int8 with per-session role: 0=filler, 1=evidence, 2=callback.
+        role_window = torch.stack(roles).to(self.device)
 
         model = self._model()
         cfg = model.config
@@ -1878,6 +2131,14 @@ class Trainer:
         else:
             M_c = torch.zeros(B, K, d, device=self.device, dtype=torch.bfloat16)
 
+        # v16 const-Mc control: replace the per-chain compressed M_c
+        # with the shared learnable parameter, broadcast across the
+        # batch. The writer / extract / judge stack is bypassed in
+        # this branch (no compress_session calls inside the per-session
+        # loop or burn-in). The readout, router, and the const_mc
+        # parameter are the only memres path receiving gradient.
+        const_mc_active = self._const_mc is not None
+
         # Snapshot M_c at the START of the TBPTT window (after burn-in,
         # after carry-state).  The intra-chain contrastive loss
         # re-builds a perturbed M_c starting from this exact state, so
@@ -1888,7 +2149,7 @@ class Trainer:
         # Burn-in: process each batch element's prefix under no_grad, building
         # a per-element M_c at the right recurrence depth, then stack.
         # Non-uniform burn-in lengths require we process each element separately.
-        if any(b is not None for b in burn_ins):
+        if not const_mc_active and any(b is not None for b in burn_ins):
             with torch.no_grad():
                 burn_M = []
                 for bi in range(B):
@@ -1902,6 +2163,11 @@ class Trainer:
                             m = model.model.compress_session(C_j, m)
                     burn_M.append(m)
                 M_c = torch.cat(burn_M, dim=0).detach()
+        if const_mc_active:
+            # Materialise the shared learnable M_c once; broadcast to (B, K, d).
+            # Note: NOT detached -- this is the single trainable handle
+            # under this control.
+            M_c = self._const_mc.expand(B, K, d).to(torch.bfloat16)
         M_c_window_start = M_c.detach().clone()
 
         # Pre-compute a trivial causal mask we can always pass; we'll
@@ -1944,6 +2210,18 @@ class Trainer:
             labels = self._build_labels(input_ids)
             # Per-session callback mask (B, S-1) aligned with input_ids.
             cb_mask_t = callback_mask_window[:, t, :-1]
+            # v16 (2026-05-03): mask LM loss on EVIDENCE sessions when
+            # --mask_evidence_session_loss is on. role_window: (B, k);
+            # role==1 marks evidence. We zero the labels (-100) for any
+            # batch element whose session t is an evidence session, so
+            # F.cross_entropy(ignore_index=-100) drops those positions.
+            # When the corpus has no role labels (D4v2/MSC/LME) the mask
+            # is all-zeros and this branch is a no-op.
+            if a.mask_evidence_session_loss:
+                ev_sess = (role_window[:, t] == 1)  # (B,)
+                if bool(ev_sess.any().item()):
+                    labels = labels.clone()
+                    labels[ev_sess] = -100
 
             # Memory dropout: zero out M_c (don't change topology).
             drop_mem = rng.random() < a.memory_dropout
@@ -2019,11 +2297,224 @@ class Trainer:
             # extract_source honours config.memres_extract_source: 'embed'
             # for legacy bag-of-token-embeddings, 'hidden_<L>' for the
             # contextualised mid-layer hidden state path.
-            C_t = model.model.extract_source(input_ids)
-            M_c = model.model.compress_session(C_t, M_c)
+            #
+            # v16 const-Mc control: bypass entirely. The shared learnable
+            # M_c is the only memory the readout sees, and we keep the
+            # already-broadcast tensor in M_c. (We MUST NOT re-assign
+            # from self._const_mc here -- that would discard the graph
+            # piece read_M points into above.)
+            if const_mc_active:
+                pass
+            else:
+                C_t = model.model.extract_source(input_ids)
+                M_c = model.model.compress_session(C_t, M_c)
 
         loss_match = torch.stack(losses).mean()
         total_loss = loss_match
+
+        # ------------------------------------------------------------
+        # v17 / F2: writer-side extractive probe loss.
+        # ------------------------------------------------------------
+        # The probe head reads from M_c (built by the writer over the
+        # current window's evidence + filler sessions) and is supervised
+        # against the chain's first answer-token id (taken from the
+        # last session's callback mask).  Gradient flows through the
+        # probe -> M_c -> judge -> extract pathway *only* (the LM head,
+        # depth router, and cross-attention readout are bypassed by
+        # the probe's separate Q/K/V/proj parameters).  This installs
+        # the missing chain-specific gradient channel on the writer
+        # that v11..v16's LM-NLL pipeline never provided.
+        #
+        # Implementation note: we use ``last_M_c_pre`` (= M_c right
+        # before the last session's LM forward) as the probe input.
+        # Under the standard curriculum_competition_bias=0.0 schedule
+        # the last session of a window is the callback session, so
+        # last_M_c_pre is M_c after the writer has consumed the chain's
+        # evidence + filler sessions but before the callback's
+        # information has been compressed.  This is exactly the M_c
+        # the readout sees at scoring time, hence the natural choice
+        # for probing.  When `last_cb_mask` has zero positives (the
+        # window does not contain a callback) the probe loss is
+        # skipped for this batch.
+        self._last_writer_probe_loss = 0.0
+        self._last_writer_probe_weight = 0.0
+        self._last_writer_probe_first_ce = 0.0
+        if (
+            getattr(a, "writer_probe_enabled", False)
+            and last_M_c_pre is not None
+            and last_cb_mask is not None
+            and last_labels is not None
+        ):
+            # Resolve probe weight schedule.
+            warm = max(0, int(getattr(a, "writer_probe_warmup_steps", 0)))
+            base_w = float(getattr(a, "writer_probe_loss_weight", 1.0))
+            warmup_only = bool(getattr(a, "writer_probe_warmup_only", False))
+            if warmup_only and warm > 0 and self.global_step >= warm:
+                cur_probe_w = 0.0
+            elif warm > 0:
+                cur_probe_w = base_w * min(1.0, self.global_step / float(warm))
+            else:
+                cur_probe_w = base_w
+            self._last_writer_probe_weight = cur_probe_w
+
+            if cur_probe_w > 0.0:
+                # Find the first answer-token id per chain.  cb_mask
+                # is (B, S-1) int8; labels is (B, S-1) long where
+                # positions outside cb_mask MAY be -100 (mask_padding
+                # _loss / mask_evidence_session_loss).  We pick, per
+                # row, the first position where cb_mask is True AND
+                # the label is a valid token id (>=0).
+                B_local = last_cb_mask.shape[0]
+                first_ids: list[int] = []
+                row_indices: list[int] = []
+                for bi in range(B_local):
+                    cb_row = last_cb_mask[bi].bool()
+                    if not bool(cb_row.any().item()):
+                        continue
+                    # First True position in cb_mask.
+                    fp = int(cb_row.nonzero(as_tuple=False).flatten()[0].item())
+                    tid = int(last_labels[bi, fp].item())
+                    if tid < 0:
+                        continue
+                    first_ids.append(tid)
+                    row_indices.append(bi)
+
+                if first_ids:
+                    target_t = torch.tensor(
+                        first_ids, dtype=torch.long, device=self.device
+                    )
+                    rows_t = torch.tensor(
+                        row_indices, dtype=torch.long, device=self.device
+                    )
+                    M_for_probe = last_M_c_pre.index_select(0, rows_t)
+                    probe_logits = self._model().writer_probe_head(M_for_probe)
+                    # NaN/Inf guard on probe logits (bf16 overflow can fire
+                    # at random init even with normal-distributed weights;
+                    # promoting to fp32 for the CE prevents the obvious
+                    # softmax overflow but doesn't help if the linear
+                    # produced NaN to begin with).
+                    if torch.isfinite(probe_logits).all():
+                        loss_probe = F.cross_entropy(probe_logits, target_t)
+                        if torch.isfinite(loss_probe):
+                            total_loss = total_loss + cur_probe_w * loss_probe.to(
+                                total_loss.dtype
+                            )
+                            self._last_writer_probe_loss = float(loss_probe.detach().item())
+                            self._last_writer_probe_first_ce = self._last_writer_probe_loss
+                        else:
+                            # Surface the silent NaN so the trainer log
+                            # shows it rather than reporting probe=0.
+                            self._last_writer_probe_loss = float("nan")
+                    else:
+                        self._last_writer_probe_loss = float("nan")
+                else:
+                    # Fired but no chains had a callback in this window.
+                    self._last_writer_probe_loss = -1.0  # sentinel
+
+        # ------------------------------------------------------------
+        # v18 / F3: read-side extractive probe loss.
+        # ------------------------------------------------------------
+        # Symmetric counterpart to v17's writer-probe block above.
+        # Whereas the writer probe attends its OWN Q/K/V into M_c
+        # (gradient bypasses the readout entirely), the read-side
+        # probe consumes m_t -- the actual MemoryReadout output at
+        # the callback session's first answer-token position -- so
+        # the probe-loss gradient flows back through
+        # MemoryReadout.W_Q/W_K/W_V and onward to M_c, judge, extract.
+        # This installs the missing read-side gradient channel
+        # falsified by §5 (tools/eval_ttt_mc.py: 6/6 NEG with the
+        # entire read-side frozen and only M_c TTT-able).
+        #
+        # Implementation note: we re-compute m_t for the last
+        # session inside this block.  The main LM forward path
+        # already consumed it inside the model's forward(), but the
+        # output is not exposed (we'd need a return_m_t flag).
+        # Re-computing is one extra readout cross-attn per step
+        # (cheap: O(B * S * K * d) at the K=128 typical config),
+        # and keeps the read-side probe wholly self-contained.
+        self._last_readout_probe_loss = 0.0
+        self._last_readout_probe_weight = 0.0
+        if (
+            getattr(a, "readout_probe_enabled", False)
+            and last_M_c_pre is not None
+            and last_cb_mask is not None
+            and last_labels is not None
+            and last_input_ids is not None
+        ):
+            warm_r = max(0, int(getattr(a, "readout_probe_warmup_steps", 0)))
+            base_w_r = float(getattr(a, "readout_probe_loss_weight", 1.0))
+            if warm_r > 0:
+                cur_readout_w = base_w_r * min(1.0, self.global_step / float(warm_r))
+            else:
+                cur_readout_w = base_w_r
+            self._last_readout_probe_weight = cur_readout_w
+
+            if cur_readout_w > 0.0:
+                # Find first cb position + first answer-token id per row.
+                # Same selection logic as the writer-probe block above:
+                # restrict to rows whose last session has a callback
+                # span and whose first masked-label position is a real
+                # token id (not -100).
+                B_local_r = last_cb_mask.shape[0]
+                first_ids_r: list[int] = []
+                first_pos_r: list[int] = []
+                row_indices_r: list[int] = []
+                for bi in range(B_local_r):
+                    cb_row = last_cb_mask[bi].bool()
+                    if not bool(cb_row.any().item()):
+                        continue
+                    fp = int(cb_row.nonzero(as_tuple=False).flatten()[0].item())
+                    tid = int(last_labels[bi, fp].item())
+                    if tid < 0:
+                        continue
+                    first_ids_r.append(tid)
+                    first_pos_r.append(fp)
+                    row_indices_r.append(bi)
+
+                if first_ids_r:
+                    target_t_r = torch.tensor(
+                        first_ids_r, dtype=torch.long, device=self.device
+                    )
+                    rows_t_r = torch.tensor(
+                        row_indices_r, dtype=torch.long, device=self.device
+                    )
+                    pos_t_r = torch.tensor(
+                        first_pos_r, dtype=torch.long, device=self.device
+                    )
+
+                    # Gather selected rows of last_input_ids and last_M_c_pre.
+                    sel_input_ids = last_input_ids.index_select(0, rows_t_r)
+                    sel_M_c = last_M_c_pre.index_select(0, rows_t_r)
+                    # Compute m_t for the selected rows.  This uses the
+                    # SAME MemoryReadout.W_Q/W_K/W_V the LM sees in the
+                    # forward pass above -- the gradient on the probe
+                    # loss therefore lands on those exact projections.
+                    sel_embeds = self._model().model.embed_tokens(sel_input_ids)
+                    sel_m_t = self._model().model.readout_memory(
+                        sel_embeds, sel_M_c
+                    )  # (B', S-1, d)
+                    # Index per-row at the first cb position.
+                    batch_idx_r = torch.arange(
+                        sel_m_t.shape[0], device=self.device
+                    )
+                    m_t_at_cb = sel_m_t[batch_idx_r, pos_t_r, :]  # (B', d)
+
+                    probe_logits_r = self._model().readout_probe_head(m_t_at_cb)
+                    if torch.isfinite(probe_logits_r).all():
+                        loss_probe_r = F.cross_entropy(probe_logits_r, target_t_r)
+                        if torch.isfinite(loss_probe_r):
+                            total_loss = total_loss + cur_readout_w * loss_probe_r.to(
+                                total_loss.dtype
+                            )
+                            self._last_readout_probe_loss = float(
+                                loss_probe_r.detach().item()
+                            )
+                        else:
+                            self._last_readout_probe_loss = float("nan")
+                    else:
+                        self._last_readout_probe_loss = float("nan")
+                else:
+                    self._last_readout_probe_loss = -1.0  # sentinel
 
         # v14 alpha_mem floor auxiliary loss.  MoE-style load-balance:
         # penalise per-sublayer mean(alpha_mem) dropping below
@@ -2081,7 +2572,7 @@ class Trainer:
             with torch.no_grad():
                 shuffle_windows = []
                 for _ in range(a.batch_size):
-                    _, _, sw, sb, _ = self.train_sampler.sample_window()
+                    _, _, sw, sb, _, _ = self.train_sampler.sample_window()
                     if sb is not None and a.burn_in_max > 0 and sb.shape[0] > a.burn_in_max:
                         sb = sb[-a.burn_in_max:]
                     elif a.burn_in_max == 0:
@@ -2168,7 +2659,7 @@ class Trainer:
             with torch.no_grad():
                 distractor_list = []
                 for _ in range(B):
-                    _, _, dw, _, _ = self.train_sampler.sample_window()
+                    _, _, dw, _, _, _ = self.train_sampler.sample_window()
                     distractor_list.append(dw[0])
                 distractor_slot = torch.stack(distractor_list).to(self.device)
 
@@ -3264,12 +3755,24 @@ class Trainer:
                             f"a_floor {getattr(self, '_last_alpha_floor_loss', 0.0):.4f} "
                             f"a_mean {getattr(self, '_last_alpha_mem_batch_mean', 0.0):.4f} | "
                         )
+                    probe_str = ""
+                    if getattr(a, "writer_probe_enabled", False):
+                        probe_str = (
+                            f"wprobe {getattr(self, '_last_writer_probe_loss', 0.0):.3f} "
+                            f"w={getattr(self, '_last_writer_probe_weight', 0.0):.2f} | "
+                        )
+                    if getattr(a, "readout_probe_enabled", False):
+                        probe_str = probe_str + (
+                            f"rprobe {getattr(self, '_last_readout_probe_loss', 0.0):.3f} "
+                            f"w={getattr(self, '_last_readout_probe_weight', 0.0):.2f} | "
+                        )
                     print(
                         f"step {self.global_step:6d} | loss {loss_t.item():.4f} | "
                         f"lrs {lr_now} | grad_norm {float(grad_norm):.3f} | "
                         f"gate_mean {gate_mean:+.4f} max {gate_max:.4f} | "
                         f"{nce_str}"
                         f"{floor_str}"
+                        f"{probe_str}"
                         f"{tok_sec/1e3:.1f}k tok/s",
                         flush=True,
                     )
@@ -3575,9 +4078,6 @@ class Trainer:
                     elif a.save_best_metric == "phase_aligned":
                         cb_dsh = metrics.get("pa_cb_dsh", float("nan"))
                         ws_dsh = metrics.get("pa_ws_dsh", float("nan"))
-                        # If the phase-aligned eval failed to score
-                        # anything (no eligible chains), fall back to
-                        # the composite to avoid saving every checkpoint.
                         if math.isnan(cb_dsh) and math.isnan(ws_dsh):
                             d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
                             d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0
@@ -3586,6 +4086,27 @@ class Trainer:
                             cb_term = 0.0 if math.isnan(cb_dsh) else cb_dsh
                             ws_term = 0.0 if math.isnan(ws_dsh) else ws_dsh
                             score = -(cb_term + 0.5 * ws_term)
+                    elif a.save_best_metric == "evidence_lift":
+                        # v16 vision-aligned best-metric. The score is
+                        # the *evidence_lift* (memory-with-evidence MINUS
+                        # memory-with-non-evidence), with a small tie-
+                        # break on pa_cb_dsh so two ties on lift get
+                        # broken by overall callback discrimination.
+                        # Lower-is-better convention => negate.
+                        ev_lift = metrics.get(
+                            "pa_cb_evidence_lift", float("nan")
+                        )
+                        cb_dsh = metrics.get("pa_cb_dsh", float("nan"))
+                        if math.isnan(ev_lift):
+                            # No evidence-labelled chains in this eval
+                            # => fall back to composite so we still save
+                            # *something* during sub-sample dropouts.
+                            d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
+                            d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0
+                            score = -(d_nm + 2.0 * d_sh)
+                        else:
+                            tie = 0.0 if math.isnan(cb_dsh) else cb_dsh
+                            score = -(ev_lift + 0.05 * tie)
                     else:  # composite
                         d_nm = metrics.get("delta_nomem_minus_mem", 0.0) or 0.0
                         d_sh = metrics.get("delta_shuffle_minus_mem", 0.0) or 0.0

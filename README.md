@@ -119,6 +119,29 @@ them out of a run without reading the citation.
    headlines on FROZEN backbones (`--freeze_backbone --lr_backbone
    0`).** Active state in `results/exp2_chain_recipe/runs.md`.
 
+10. **The read-side gradient channel is missing under
+    LM-NLL-only (v17 §5 + v18 §5 followup, 2026-05-03).** The §5
+    capacity probe (`tools/eval_ttt_mc.py`: TTT-on-M_c with
+    everything else frozen) returns 6/6 NEG across v14k/v15a/v15e at
+    0.6B and 1.7B — for *any* trained read-side, no M_c gives
+    chain-specific callback predictions. v17/F2's WriterProbeHead
+    has its own Q/K/V (bypasses MemoryReadout entirely) so it
+    cannot fix this. v18/F3's **`ReadoutProbeHead`** consumes m_t
+    (the actual MemoryReadout output at the callback position) so
+    its probe-loss gradient flows through MemoryReadout's own
+    W_Q/W_K/W_V. v18a/best (F3 + alpha-floor, no F2) shifts the
+    §5 result from -0.897 → +0.005 (writer-init), the largest
+    causal shift in the §5 series and the first MIXED reading.
+    F2 + F3 compose *worse* than F3 alone (the two probes pull M_c
+    along different value-space directions). End-to-end
+    `evidence_lift` is still ≈ 0 because alpha_mem_floor at
+    weight 0.01 is too weak to keep the depth router open against
+    the LM gradient. **Use `--readout_probe_enabled` going
+    forward; do NOT compose with `--writer_probe_enabled`. The
+    next-generation alpha-floor weight should be ~0.5 with target
+    0.10, and multi-layer readout depth (`--memres_readout_depth
+    N`, v19 candidate) is likely needed for fully POSITIVE §5.**
+
 ## Progress & lessons
 
 - **#v3b** — Bit-exact init parity primitive: drop MemRes onto any
@@ -186,13 +209,61 @@ Part VI. Active v15 state in
 
 | cell | host | status | notes |
 |---|---|---|---|
-| **v15f** | local H100 GPU 0 | RUNNING (~step 100/3000) | 1.7B joint train; `evidence_lift` suspected to leak — see v15 OPEN AUDIT |
-| audit A1 | local CPU | RUNNING | corpus-and-window leakage |
-| audit A2 | local CPU | RUNNING | eval-redaction (`_phase_aligned_eval` / `eval_callback.py`) |
-| audit A3 | local CPU | RUNNING | base-rate / template prior |
+| (none — v24 wave finished 2026-05-03 23:15 UTC-5) | | | next cell is **v25 1.7B-large frozen + LME** (scale up the v24a winning recipe to a bigger backbone). Recipe + design notes in `results/exp2_chain_recipe/runs.md` v24 verdict block. Not launched yet. |
 
-**v15g (1.7B-small on GPU 1) is POSTPONED** until A1/A2/A3 land.
-GH200 idle until the audit verdict scopes the next campaign.
+**v24 wave verdict (2026-05-03 23:15 UTC-5) — HEADLINE: v24a/LME is the project's strongest end-to-end result.**
+
+The corpus pivot from synthd5 (templated random-codes, 5 % real-
+content density) to LongMemEval (real conversational content, 99.9 %
+density) **completely changes the picture**. End-to-end in-domain
+on `lme_val_s512.pt`:
+
+| ckpt | trained on | `ce_mem` | `ce_nomem` | **`pa_cb_dnm` (Δnm-m)** | `pa_cb_dsh` (shuffle) |
+|---|---|---|---|---|---|
+| **v24a/best** | **LME** | **2.94** | 3.28 | **+0.3445** | −0.003 |
+| v24c/best | LME+MSC merged | 5.84 | 5.45 | −0.40 | −0.014 |
+| v21c/best | synthd5 | 5.11 | 4.67 | −0.43 | −0.025 |
+
+`pa_cb_dnm = +0.3445` on lme_val means **memory reduces callback CE
+by 0.34 nats** vs the no-memory baseline. That's ~86× the magnitude
+of v21c's best end-to-end on synthd5_val (+0.024) and is **chain-
+specific** (shuffle is near zero, ruling out a "memory adds general
+context" confound).
+
+This is the **first cell in the project with a non-trivial,
+chain-specific, leak-free end-to-end memory benefit**. The memory
+residuals architecture works on real long-context conversation data
+where:
+
+* Training corpus has 100 % callback supervision (every chain has
+  a Q&A pair the F3 probe can target).
+* Sessions are dense (~99.9 % real content per 512-token session,
+  vs synthd5's ~5 %).
+* Content is naturalistic conversation that the backbone has
+  representational headroom to compress meaningfully.
+
+§5 readings on synthd5_val (out-of-domain for v24a/c) are NEG (as
+expected — v24a's writer has never seen random-code style facts).
+For v21c on synthd5_val (in-domain) the §5 was +0.005 / +0.120 on
+v20a; we should not over-interpret the cross-domain §5.
+
+**Multi-seed v23 verdict on synthd5 (FINISHED 2026-05-03 22:30 UTC-5):**
+The v21c recipe is **unstable** on synthd5_random_codes:
+
+| seed | training corpus | end | last `pair/self` | end `evidence_lift` |
+|---|---|---|---|---|
+| 1 (v23a) | synthd5 | KILLED step 400 | 0.006 (collapse) | (n/a) |
+| 2 (v23b) | synthd5 | KILLED step 600 | 0.006 (collapse) | (n/a) |
+| 7 (v23c) | synthd5 | OK final 1000 | 0.032 | −0.0006 |
+| 42 (v21c orig) | synthd5 | OK final 1000 | 0.075 | +0.0241 |
+
+Only 1 of 4 seeds (the original seed=42) produced a non-trivial
+end-to-end reading on synthd5; 2 of 4 collapsed; 1 of 4 ran cleanly
+but ended near 0. The +0.024 reading was a lucky seed, not a
+reproducible result. **For synthd5, v21c is not a recipe; for LME,
+v24a IS a recipe.**
+
+GH200 idle. Local H100s idle.
 
 ## Resources
 

@@ -1,0 +1,216 @@
+{
+  "train": {
+    "n_chains": 5000,
+    "n_evidence_per_chain": 2,
+    "callback_pos_distribution": {
+      "9": 5000
+    },
+    "chain_length_distribution": {
+      "10": 5000
+    },
+    "by_k": {
+      "1": {
+        "k": 1,
+        "leak_any_count": 0,
+        "leak_any_frac": 0.0,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 0,
+        "leak_both_count": 0,
+        "rank_hits": {},
+        "offset_histogram": {}
+      },
+      "2": {
+        "k": 2,
+        "leak_any_count": 1088,
+        "leak_any_frac": 0.2176,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 1088,
+        "leak_both_count": 0,
+        "rank_hits": {
+          "1": 1088
+        },
+        "offset_histogram": {
+          "1": 1088
+        }
+      },
+      "3": {
+        "k": 3,
+        "leak_any_count": 2068,
+        "leak_any_frac": 0.4136,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 1899,
+        "leak_both_count": 169,
+        "rank_hits": {
+          "1": 2068,
+          "0": 169
+        },
+        "offset_histogram": {
+          "2": 1149,
+          "1": 1088
+        }
+      },
+      "4": {
+        "k": 4,
+        "leak_any_count": 2926,
+        "leak_any_frac": 0.5852,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 2493,
+        "leak_both_count": 433,
+        "rank_hits": {
+          "1": 2926,
+          "0": 433
+        },
+        "offset_histogram": {
+          "3": 1122,
+          "2": 1149,
+          "1": 1088
+        }
+      },
+      "5": {
+        "k": 5,
+        "leak_any_count": 3616,
+        "leak_any_frac": 0.7232,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 2743,
+        "leak_both_count": 873,
+        "rank_hits": {
+          "0": 873,
+          "1": 3616
+        },
+        "offset_histogram": {
+          "4": 1130,
+          "3": 1122,
+          "2": 1149,
+          "1": 1088
+        }
+      }
+    }
+  },
+  "val": {
+    "n_chains": 500,
+    "n_evidence_per_chain": 2,
+    "callback_pos_distribution": {
+      "9": 500
+    },
+    "chain_length_distribution": {
+      "10": 500
+    },
+    "by_k": {
+      "1": {
+        "k": 1,
+        "leak_any_count": 0,
+        "leak_any_frac": 0.0,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 0,
+        "leak_both_count": 0,
+        "rank_hits": {},
+        "offset_histogram": {}
+      },
+      "2": {
+        "k": 2,
+        "leak_any_count": 114,
+        "leak_any_frac": 0.228,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 114,
+        "leak_both_count": 0,
+        "rank_hits": {
+          "1": 114
+        },
+        "offset_histogram": {
+          "1": 114
+        }
+      },
+      "3": {
+        "k": 3,
+        "leak_any_count": 217,
+        "leak_any_frac": 0.434,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 204,
+        "leak_both_count": 13,
+        "rank_hits": {
+          "1": 217,
+          "0": 13
+        },
+        "offset_histogram": {
+          "1": 114,
+          "2": 116
+        }
+      },
+      "4": {
+        "k": 4,
+        "leak_any_count": 298,
+        "leak_any_frac": 0.596,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 252,
+        "leak_both_count": 46,
+        "rank_hits": {
+          "1": 298,
+          "0": 46
+        },
+        "offset_histogram": {
+          "3": 114,
+          "1": 114,
+          "2": 116
+        }
+      },
+      "5": {
+        "k": 5,
+        "leak_any_count": 356,
+        "leak_any_frac": 0.712,
+        "leak_first_only_count": 0,
+        "leak_second_only_count": 268,
+        "leak_both_count": 88,
+        "rank_hits": {
+          "0": 88,
+          "1": 356
+        },
+        "offset_histogram": {
+          "4": 100,
+          "3": 114,
+          "1": 114,
+          "2": 116
+        }
+      }
+    }
+  },
+  "base_ce": {
+    "0.6B-base": {
+      "tag": "0.6B-base",
+      "ckpt": "Qwen/Qwen3-0.6B",
+      "n_eval": 128,
+      "mean_ce_nats": 7.685853952541947,
+      "median_ce_nats": 7.558475971221924,
+      "stdev_ce_nats": 3.4741169453523195,
+      "min_ce_nats": 2.3252007961273193,
+      "max_ce_nats": 16.364479064941406,
+      "multi_token_items": 40,
+      "avg_answer_tokens": 1.3515625
+    },
+    "1.7B-base": {
+      "tag": "1.7B-base",
+      "ckpt": "Qwen/Qwen3-1.7B",
+      "n_eval": 128,
+      "mean_ce_nats": 8.764467931042114,
+      "median_ce_nats": 7.74967360496521,
+      "stdev_ce_nats": 4.031923581271872,
+      "min_ce_nats": 1.362181544303894,
+      "max_ce_nats": 17.64541244506836,
+      "multi_token_items": 40,
+      "avg_answer_tokens": 1.3515625
+    }
+  },
+  "n_chains_for_ce": 128,
+  "ks": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "theoretical": {
+    "log_256": 5.545177444479562,
+    "log_32": 3.4657359027997265
+  },
+  "train_blob": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4v2_persona_callback_train_s512.pt",
+  "val_blob": "/home/exx/Desktop/fine-tune/memory_residuals/paper_artifacts/chains/synthd4v2_persona_callback_val_s512.pt"
+}

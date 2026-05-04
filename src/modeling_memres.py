@@ -357,6 +357,69 @@ class Qwen3MemResConfig(Qwen3Config):
         # cells should set this to True when memres_extract_source
         # starts with "hidden_".
         memres_extract_input_norm: bool = False,
+        # v17 / F2 (2026-05-03): writer-side extractive probe head.
+        # When `writer_probe_enabled` is True an auxiliary head is
+        # constructed on top of M_c that, given a single learned query
+        # vector, attends the K memory slots and projects to vocab via
+        # the (tied) embedding table. The trainer can then back-prop a
+        # cross-entropy loss against the chain's *answer* token id with
+        # gradient flowing only through the writer (extract+judge) and
+        # the probe parameters -- the LM head, depth router, and
+        # cross-attention readout are bypassed entirely. This installs
+        # a content-specific gradient channel on the writer that the
+        # v11..v16 LM-NLL pathway never provided (cf. v17_wildcards
+        # §1, runs.md v15 OPEN AUDIT, and the writer-content-blind
+        # diagnosis confirmed by D5 readout-TTT and v16a/b
+        # near-zero evidence_lift on the leak-free random-codes corpus).
+        # Default off to preserve init parity with v11..v16 saved
+        # checkpoints; set True to enable v17 F2 training cells.
+        writer_probe_enabled: bool = False,
+        # Number of learned query vectors in the WriterProbeHead. >1
+        # lets the probe attend to multiple slot-axis projections of
+        # M_c and average them (poor-man's multi-head). 1 keeps the
+        # head small enough to train cheaply at warmup time.
+        writer_probe_n_queries: int = 1,
+        # v18 / F3 (2026-05-03): READ-side extractive probe head.
+        # Symmetric counterpart to writer_probe_enabled / WriterProbeHead.
+        # The §5 TTT-on-M_c capacity probe (`tools/eval_ttt_mc.py`)
+        # returned 6/6 NEG with the entire read-side frozen and only
+        # M_c TTT-able -- falsifying the v15-era prior that the
+        # cross-attention readout could decode any informative M_c
+        # into chain-specific callback predictions.  v17 / F2
+        # (WriterProbeHead) installs a chain-specific gradient channel
+        # on the WRITER, but it bypasses MemoryReadout entirely
+        # (separate Q/K/V/proj), so writer training under F2 still
+        # leaves the readout with the joint-training-collapsed
+        # configuration that §5 falsified.
+        #
+        # ReadoutProbeHead consumes m_t -- the actual MemoryReadout
+        # output at the callback session's first answer-token position
+        # -- and projects to vocab.  Because m_t is a function of
+        # MemoryReadout.W_Q/W_K/W_V and M_c, the probe-loss gradient
+        # flows BACK THROUGH the readout's projections (and onward to
+        # M_c, judge, extract).  This is the missing read-side
+        # gradient channel.  At eval time the probe head is unused;
+        # the LM head reads m_t through its normal pathway, exactly
+        # as in v11..v17.  Default off to preserve init parity with
+        # v11..v17 saved checkpoints; set True to enable v18 cells.
+        readout_probe_enabled: bool = False,
+        # v19 (2026-05-03): multi-layer readout refinement depth.
+        # 0 reproduces the v11..v18 single-layer cross-attn readout
+        # (m^t = RMSNorm(softmax(X W_Q, M_c W_K) @ M_c W_V)); >0
+        # stacks `memres_readout_depth` additional residual cross-
+        # attn refinement layers on top of the base (Perceiver-style
+        # iterative refinement of m_t against the same M_c).  See
+        # MemoryReadout.__init__ docstring for the recurrence.  Init
+        # parity is preserved by the per-sublayer MemoryGate zero-
+        # init downstream regardless of depth.
+        memres_readout_depth: int = 0,
+        # v21 (2026-05-03): ReZero-style zero-init for refinement
+        # layers' W_V projections.  See ``self.memres_readout_refine_
+        # zero_init`` assignment below for the full rationale.  v19/
+        # v20 cells used the default (False); v21+ cells exploring
+        # depth=4 should set this True to prevent the unbounded
+        # ||m^t|| growth that swamped the LM head in v19b/v20{a,b}.
+        memres_readout_refine_zero_init: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -420,6 +483,37 @@ class Qwen3MemResConfig(Qwen3Config):
         self.memres_judge_qk_layernorm = bool(memres_judge_qk_layernorm)
         # v14 extraction-input normaliser (see __init__ docstring above).
         self.memres_extract_input_norm = bool(memres_extract_input_norm)
+        # v17 / F2 writer-probe head (see __init__ docstring above).
+        self.writer_probe_enabled = bool(writer_probe_enabled)
+        self.writer_probe_n_queries = int(writer_probe_n_queries)
+        # v18 / F3 read-side probe head (see __init__ docstring above).
+        self.readout_probe_enabled = bool(readout_probe_enabled)
+        # v19 multi-layer readout refinement depth (see __init__
+        # docstring above).
+        if int(memres_readout_depth) < 0:
+            raise ValueError(
+                f"memres_readout_depth must be >= 0; got "
+                f"{memres_readout_depth!r}"
+            )
+        self.memres_readout_depth = int(memres_readout_depth)
+        # v21 (2026-05-03): ReZero-style zero-init for refinement
+        # layers' W_V projections.  When True, each refine_W_V[i]
+        # weight is filled with 0 at construction so the i-th
+        # refinement layer's contribution m_t^(i) - m_t^(i-1) =
+        # RMSNorm_i(softmax(...) @ M_c @ 0) = 0 at step 0.  As
+        # training progresses, refine_W_V[i] can grow only as the
+        # gradient demands -- preventing the v19b/v20{a,b} failure
+        # mode where the depth=4 residual stack accumulated
+        # ||m^t||/||embed|| to 12-16x at random init *regardless*
+        # of what M_c contained.  Init parity vs the bare backbone
+        # is unaffected (already guaranteed by MemoryGate=0
+        # downstream); this is a stronger constraint that also
+        # makes m_t magnitude grow only when the LM-NLL or F3
+        # probe gradient asks for it.  Default off to preserve
+        # bit-exact match with v19a/v19b/v20 saved checkpoints.
+        self.memres_readout_refine_zero_init = bool(
+            memres_readout_refine_zero_init
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +616,22 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
         if getattr(module, "update_mode", "competitive") == "gated":
             nn.init.zeros_(module.write_gate.weight)
             nn.init.constant_(module.write_gate.bias, -1.0)
+    elif isinstance(module, WriterProbeHead):
+        # F2 / v17: explicit init for the WriterProbeHead's raw
+        # parameters.  HF's from_pretrained materialises the model on
+        # the meta device (when low_cpu_mem_usage=True is implicit on
+        # post-2024 transformers), and `nn.Parameter(torch.randn(...))`
+        # set in our __init__ does NOT survive meta -> real
+        # materialisation: the query parameter ends up as
+        # uninitialised memory and the first probe forward returns
+        # NaN logits.  We re-randomise here, where _init_weights is
+        # called *after* materialisation.
+        with torch.no_grad():
+            nn.init.normal_(module.query, mean=0.0, std=hidden_size ** -0.5)
+        # The W_K, W_V, proj Linear submodules and the `norm` RMSNorm
+        # are init'd by HF's default Qwen3 _init_weights (Linear:
+        # normal(0, initializer_range); RMSNorm: weight=1.0); we don't
+        # need to touch them here.
     elif isinstance(module, MemoryReadout):
         # Read-out V projection stays at the default normal init so m^t has
         # well-scaled non-zero magnitude at step 0; the augmented model is
@@ -539,6 +649,42 @@ def _init_memres_params(module: nn.Module, hidden_size: int) -> None:
         scale = float(getattr(module, "_out_norm_init", 1.0))
         with torch.no_grad():
             module.out_norm.weight.fill_(scale)
+            # v19: each refinement-layer RMSNorm is calibrated to the
+            # same scale as the base readout's out_norm so the
+            # additive contribution of each layer is bounded to the
+            # same magnitude regardless of depth.
+            refine_norms = getattr(module, "refine_out_norm", None)
+            if refine_norms is not None:
+                for rn in refine_norms:
+                    rn.weight.fill_(scale)
+            # v21 (2026-05-03): ReZero-style zero-init for each
+            # refinement layer's V projection.  When the readout was
+            # constructed with ``refine_zero_init=True``, set each
+            # refine_W_V[i].weight = 0 so the i-th refinement layer's
+            # contribution to m_t starts at zero and grows only as
+            # the gradient demands.  Diagnostic for the
+            # v19b/v20{a,b} failure mode where the depth=4 residual
+            # stack inflated ||m^t||/||embed|| to 12-16x at random
+            # init regardless of M_c content; ReZero forces the
+            # readout to start at depth=0-equivalent magnitude and
+            # earn each refinement layer's contribution.
+            if getattr(module, "_refine_zero_init", False):
+                refine_W_V = getattr(module, "refine_W_V", None)
+                if refine_W_V is not None:
+                    for w_v in refine_W_V:
+                        nn.init.zeros_(w_v.weight)
+    elif isinstance(module, WriterProbeHead):
+        # F2 / v17: explicit init for WriterProbeHead.query.  HF's
+        # from_pretrained constructs the model on the meta device and
+        # the `nn.Parameter(torch.randn(...))` line in our __init__
+        # does NOT carry through meta->real materialisation: the
+        # parameter materialises with uninitialised storage (NaN).  We
+        # re-randomise here where _init_weights runs *after*
+        # materialisation.  W_K/W_V/proj Linear submodules and the
+        # `norm` RMSNorm get the default Qwen3 init from
+        # super()._init_weights, so we leave them alone.
+        with torch.no_grad():
+            nn.init.normal_(module.query, mean=0.0, std=hidden_size ** -0.5)
     elif isinstance(module, BlockAttnResRouter):
         for w in module.w:
             nn.init.zeros_(w)
@@ -1205,9 +1351,12 @@ class MemoryReadout(nn.Module):
         hidden_size: int,
         eps: float = 1e-6,
         out_norm_init: float = 1.0,
+        depth: int = 0,
+        refine_zero_init: bool = False,
     ):
         super().__init__()
         self.scale = hidden_size**-0.5
+        self._refine_zero_init = bool(refine_zero_init)
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
@@ -1221,6 +1370,51 @@ class MemoryReadout(nn.Module):
         # the readout magnitude over training as needed.
         self.out_norm = Qwen3RMSNorm(hidden_size, eps=eps)
         self._out_norm_init = float(out_norm_init)
+        # v19 (2026-05-03): multi-layer readout refinement. depth=0
+        # reproduces the v11..v18 single-layer readout exactly. depth>0
+        # stacks `depth` additional residual cross-attn refinement
+        # layers on top:
+        #
+        #     m_t^(0) = RMSNorm( softmax(X W_Q, M_c W_K) @ M_c W_V )
+        #     m_t^(i) = m_t^(i-1) + RMSNorm_i(
+        #                 softmax((X + m_t^(i-1)) W_Q_i, M_c W_K_i)
+        #                 @ M_c W_V_i )
+        #
+        # Motivation: v18a §5 returned ttt_lift_vs_floor = +0.005
+        # (MIXED) -- the read-side probe loss restored capacity in
+        # the right direction but the single cross-attn layer is at
+        # the edge of capacity for the chain-specific lookup the
+        # callback requires. Each refinement layer can re-query M_c
+        # using the previous m_t as additional context (Perceiver-
+        # style iterative refinement; the (X + m_t^(i-1)) input lets
+        # later layers condition both on the original query and on
+        # what's been read so far).
+        #
+        # Init parity is preserved by the MemoryGate zero-init
+        # downstream: h + 0 * m_t = h at step 0 regardless of m_t
+        # magnitude. We init each refine_out_norm.weight to
+        # ``out_norm_init`` (same as the base layer's RMSNorm
+        # calibration) so the additive contribution of each
+        # refinement layer is bounded to the same scale as the base
+        # readout output.
+        self.depth = int(depth)
+        if self.depth > 0:
+            self.refine_W_Q = nn.ModuleList(
+                [nn.Linear(hidden_size, hidden_size, bias=False)
+                 for _ in range(self.depth)]
+            )
+            self.refine_W_K = nn.ModuleList(
+                [nn.Linear(hidden_size, hidden_size, bias=False)
+                 for _ in range(self.depth)]
+            )
+            self.refine_W_V = nn.ModuleList(
+                [nn.Linear(hidden_size, hidden_size, bias=False)
+                 for _ in range(self.depth)]
+            )
+            self.refine_out_norm = nn.ModuleList(
+                [Qwen3RMSNorm(hidden_size, eps=eps)
+                 for _ in range(self.depth)]
+            )
 
     def forward(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
         """X: (B, S, d) queries;  M_c: (B, K, d) memory slots  ->  (B, S, d)"""
@@ -1228,7 +1422,189 @@ class MemoryReadout(nn.Module):
         K = self.W_K(M_c)
         V = self.W_V(M_c)
         attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
-        return self.out_norm(attn @ V)
+        m_t = self.out_norm(attn @ V)
+        for i in range(self.depth):
+            q_in = X + m_t
+            Qi = self.refine_W_Q[i](q_in)
+            Ki = self.refine_W_K[i](M_c)
+            Vi = self.refine_W_V[i](M_c)
+            attn_i = F.softmax(Qi @ Ki.transpose(-2, -1) * self.scale, dim=-1)
+            m_t = m_t + self.refine_out_norm[i](attn_i @ Vi)
+        return m_t
+
+
+# ---------------------------------------------------------------------------
+# Writer Probe Head  (v17 / F2: writer-side extractive supervision)
+# ---------------------------------------------------------------------------
+
+
+class WriterProbeHead(nn.Module):
+    """Lightweight extractive head that scores M_c -> answer-token logits.
+
+    F2 / v17 fix.  v11..v16 trained the writer (extract+judge) only via
+    LM-NLL backprop through the cross-attention readout, the depth
+    router and the LM head.  D5 readout-TTT (v15a, v15e) shows callback
+    CE drops by <=10% even with 250 SGD steps on the readout's W_Q/W_K
+    /W_V; v16a/v16b on the leak-free random-codes corpus end with
+    `evidence_lift` indistinguishable from zero.  Both observations are
+    consistent with the v17_wildcards diagnosis that *no path in the
+    v11..v16 loss graph couples M_c content to a chain-specific
+    target* -- the LM head can satisfy callback NLL by emitting a
+    content-blind output prior, the depth router can satisfy NCE by
+    learning a chain-identity hash that is invariant to evidence, and
+    the slot writer sits at its symmetric fixed point.
+
+    The probe head installs the missing channel: given M_c (B, K, d),
+    a small set of learned query vectors attends to the K slots
+    (single-head softmax cross-attention), the result is RMS-normed,
+    and projected to the vocabulary via the (tied) embedding table.
+    The trainer back-props CE against the chain's first answer-token
+    id (taken from `session_callback_mask`).  Gradient flows through
+    the probe -> M_c -> judge -> extract.  Backbone, depth router,
+    cross-attention readout, and LM head are *not* in the probe-loss
+    graph (the probe carries its own Q/K/V).  This is precisely the
+    "M_c -> answer without LM head" pathway flagged as missing by v14k
+    /v16a (cf. `runs.md` v15 OPEN AUDIT and v17_wildcards.md sections
+    1 + 4).
+
+    Why NOT tie `proj` to `embed_tokens`: tying would route the probe
+    gradient through the embedding table, polluting the LM-head input
+    distribution that the depth router sees in standard mode.  We
+    therefore keep `proj` as a separate `nn.Linear(d, V, bias=False)`.
+    The probe is *training-only*: at eval time the LM head is the
+    sole reader of M_c, so the probe head's parameters never affect
+    the reported callback CE.
+
+    Anti-circularity: the probe uses its own Q/K/V matrices and a
+    separate vocab projection.  A trained probe cannot help eval -- it
+    is unused there.  The probe's pressure on M_c, however, is
+    measurable downstream: a writer that learns chain-specific content
+    under probe supervision should also drive `pa_cb_evidence_lift`
+    upward as the readout learns to consume it (the empirical
+    falsification check).
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        vocab_size: int,
+        n_queries: int = 1,
+        eps: float = 1e-6,
+    ):
+        super().__init__()
+        self.n_queries = int(n_queries)
+        self.scale = hidden_size ** -0.5
+        # Learned query vectors (n_q, d).  Small init so initial probe
+        # logits are near-uniform and cross-entropy gives clean
+        # gradient on every example from step 0.
+        self.query = nn.Parameter(
+            torch.randn(self.n_queries, hidden_size) * (hidden_size ** -0.5)
+        )
+        self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.norm = Qwen3RMSNorm(hidden_size, eps=eps)
+        # Independent vocab projection (NOT tied to embed_tokens; see
+        # docstring "Why NOT tie `proj`").
+        self.proj = nn.Linear(hidden_size, vocab_size, bias=False)
+
+    def forward(self, M_c: torch.Tensor) -> torch.Tensor:
+        """M_c: (B, K, d) -> logits: (B, V).
+
+        Returns logits cast to fp32 so the trainer can call
+        F.cross_entropy without a dtype-promotion warning.  Internal
+        matmuls run in M_c's dtype (typically bf16) for speed.
+        """
+        proj_dtype = self.proj.weight.dtype
+        # Run query in M_c's dtype so matmuls stay homogeneous.
+        q = self.query.to(M_c.dtype).unsqueeze(0).expand(M_c.shape[0], -1, -1)
+        K_proj = self.W_K(M_c)                       # (B, K, d)
+        V_proj = self.W_V(M_c)                       # (B, K, d)
+        scores = torch.matmul(q, K_proj.transpose(-2, -1)) * self.scale  # (B, n_q, K)
+        attn = F.softmax(scores.float(), dim=-1).to(M_c.dtype)
+        v = torch.matmul(attn, V_proj)               # (B, n_q, d)
+        v = v.mean(dim=1)                            # (B, d)
+        v = self.norm(v)
+        # Match proj weight dtype before linear (proj is loaded in
+        # whatever dtype the parent model used; usually bf16 under
+        # `from_pretrained(..., dtype=torch.bfloat16)`).
+        return self.proj(v.to(proj_dtype)).float()    # (B, V) in fp32 for CE
+
+
+# ---------------------------------------------------------------------------
+# Readout Probe Head  (v18 / F3: read-side extractive supervision)
+# ---------------------------------------------------------------------------
+
+
+class ReadoutProbeHead(nn.Module):
+    """Lightweight extractive head that scores m_t -> answer-token logits.
+
+    F3 / v18 fix.  v17's WriterProbeHead (F2) installs a chain-specific
+    gradient channel on the WRITER (extract+judge) by attending its own
+    Q/K/V into M_c.  The §5 capacity probe (`tools/eval_ttt_mc.py`)
+    showed this is necessary but not sufficient: even with M_c TTT-able
+    against evidence-session NLL on a frozen read-side, callback CE
+    *worsens* relative to the evidence-redacted floor on every cell
+    (6/6 NEG across v14k/v15a/v15e at 0.6B and 1.7B, D4v2 and D5).
+
+    The §5 verdict localised the residual bottleneck to the read-side:
+    ``MemoryReadout`` + ``BlockAttnResRouter`` + ``LM head`` jointly
+    cannot decode chain-specific recall from any M_c -- a pathology of
+    the *trained* read-side, not of the writer.  ReadoutProbeHead
+    closes this gap by routing a read-side probe-loss gradient through
+    ``MemoryReadout``'s OWN W_Q/W_K/W_V (rather than bypassing them
+    with separate parameters as F2 does).
+
+    Mechanics: at training time the trainer extracts m_t -- the actual
+    ``MemoryReadout`` output at the callback session's first
+    answer-token position -- and feeds it through this probe head:
+
+        logits = proj(RMSNorm(m_t_at_cb))          # (B, V)
+        loss   = CE(logits, answer_first_token)
+
+    Because ``m_t = MemoryReadout(inputs_embeds, M_c)``, the probe-loss
+    gradient flows back through W_Q^read, W_K^read, W_V^read -> M_c ->
+    judge -> extract.  This is the symmetric read-side analog of
+    WriterProbeHead's writer-side channel; combined, F2 + F3 cover
+    both halves of the v15..v17 content-blind diagnosis.
+
+    Why NOT tie ``proj`` to ``embed_tokens``: tying would route the
+    probe gradient through the embedding table, polluting the LM head's
+    input distribution.  We keep ``proj`` as a separate
+    ``nn.Linear(d, V, bias=False)``.
+
+    Anti-circularity: the probe head is *training-only*.  At eval time
+    the LM head is the sole reader of m_t (through the
+    BlockAttnResRouter's depth-wise pool), so the probe head's
+    parameters never affect reported callback CE.  A trained
+    ReadoutProbeHead cannot help eval; its pressure on
+    MemoryReadout.W_Q/W_K/W_V, however, is measurable downstream.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        vocab_size: int,
+        eps: float = 1e-6,
+    ):
+        super().__init__()
+        self.norm = Qwen3RMSNorm(hidden_size, eps=eps)
+        # Independent vocab projection (NOT tied to embed_tokens; see
+        # docstring "Why NOT tie ``proj``").
+        self.proj = nn.Linear(hidden_size, vocab_size, bias=False)
+
+    def forward(self, m_t_at_cb: torch.Tensor) -> torch.Tensor:
+        """m_t_at_cb: (B, d) -> logits: (B, V).
+
+        Returns logits cast to fp32 so the trainer can call
+        F.cross_entropy without a dtype-promotion warning.  The internal
+        norm runs in m_t's dtype (typically bf16 during training); we
+        cast to ``proj.weight.dtype`` before the linear to avoid
+        ``mat1 != mat2`` dtype errors that bit WriterProbeHead at
+        first integration.
+        """
+        proj_dtype = self.proj.weight.dtype
+        h = self.norm(m_t_at_cb)
+        return self.proj(h.to(proj_dtype)).float()    # (B, V) in fp32 for CE
 
 
 # ---------------------------------------------------------------------------
@@ -1473,6 +1849,10 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             config.hidden_size,
             eps=config.rms_norm_eps,
             out_norm_init=getattr(config, "memres_readout_norm_init", 1.0),
+            depth=getattr(config, "memres_readout_depth", 0),
+            refine_zero_init=getattr(
+                config, "memres_readout_refine_zero_init", False
+            ),
         )
         assert self.memory_block.hidden_size == config.hidden_size
         assert self.memory_readout.W_V.out_features == config.hidden_size
@@ -2033,6 +2413,31 @@ class Qwen3MemResForCausalLM(Qwen3PreTrainedModel, GenerationMixin):
         self.model = Qwen3MemResModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        # v17 / F2: optional writer-side extractive probe head.  Default
+        # off; trainer sets `--writer_probe_enabled` and reaches into
+        # this attribute when computing the probe loss.  Saved/loaded
+        # with the model checkpoint so a v17a/best can be re-evaluated
+        # with the probe head intact (the probe is unused at eval, but
+        # we keep it so the checkpoint round-trips cleanly).
+        if getattr(config, "writer_probe_enabled", False):
+            self.writer_probe_head = WriterProbeHead(
+                hidden_size=config.hidden_size,
+                vocab_size=config.vocab_size,
+                n_queries=getattr(config, "writer_probe_n_queries", 1),
+            )
+        else:
+            self.writer_probe_head = None
+        # v18 / F3: optional read-side probe head.  Constructed
+        # symmetrically to writer_probe_head; saved/loaded with the
+        # checkpoint so v18a/best round-trips cleanly even though the
+        # probe is unused at eval.
+        if getattr(config, "readout_probe_enabled", False):
+            self.readout_probe_head = ReadoutProbeHead(
+                hidden_size=config.hidden_size,
+                vocab_size=config.vocab_size,
+            )
+        else:
+            self.readout_probe_head = None
         self.post_init()
 
     def _init_weights(self, module):

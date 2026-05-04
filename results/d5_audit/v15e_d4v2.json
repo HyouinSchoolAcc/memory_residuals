@@ -1,0 +1,79 @@
+{
+  "ckpt": "output/chain_v15e_d4v2_1p7b_norm_local/best",
+  "train_corpus": "paper_artifacts/chains/synthd4v2_persona_callback_train_s512.pt",
+  "eval_corpus": "paper_artifacts/chains/synthd4v2_persona_callback_val_s512.pt",
+  "steps": 400,
+  "batch_size": 4,
+  "lr": 0.001,
+  "max_burn_in": 12,
+  "history": [
+    {
+      "step": 0,
+      "callback_ce": 4.357378858362319,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 50,
+      "callback_ce": 4.55814836480025,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 100,
+      "callback_ce": 4.4418860205336115,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 150,
+      "callback_ce": 4.263628959655762,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 200,
+      "callback_ce": 4.185662266836001,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 250,
+      "callback_ce": 4.124439468962609,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 300,
+      "callback_ce": 4.0832914844413715,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 350,
+      "callback_ce": 4.008335361590964,
+      "n_chains": 128,
+      "n_tokens": 173
+    },
+    {
+      "step": 400,
+      "callback_ce": 4.006143268133174,
+      "n_chains": 128,
+      "n_tokens": 173
+    }
+  ],
+  "baseline": {
+    "callback_ce": 4.357378858362319,
+    "n_chains": 128,
+    "n_tokens": 173
+  },
+  "final": {
+    "step": 400,
+    "callback_ce": 4.006143268133174,
+    "n_chains": 128,
+    "n_tokens": 173
+  },
+  "delta": -0.35123559022914463,
+  "delta_pct": -8.060708091863129,
+  "verdict": "LIKELY W: TTT moves callback CE only marginally; the writer is the bottleneck."
+}
