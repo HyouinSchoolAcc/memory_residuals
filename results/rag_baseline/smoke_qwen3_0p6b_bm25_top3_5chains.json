@@ -1,0 +1,109 @@
+{
+  "config": {
+    "base_model": "Qwen/Qwen3-0.6B",
+    "corpus": "paper_artifacts/chains/lme_val_s512_evpos.pt",
+    "rag_method": "bm25",
+    "top_k": 3,
+    "encoder": null,
+    "max_total_len": 8192,
+    "n_chains_max": 5
+  },
+  "n_chains_scored": 5,
+  "ce_rag": 5.173742341995239,
+  "ce_nomem": 4.498611402511597,
+  "ce_shuffle": 5.496960067749024,
+  "pa_cb_drag": -0.6751309394836422,
+  "pa_cb_dsh": 0.3232177257537847,
+  "stdev_per_chain_drag": 0.7246807493655021,
+  "n_chains_per_chain_positive": 1,
+  "per_chain": [
+    {
+      "chain_id": "longmemeval_gpt4_59149c78",
+      "callback_pos": 51,
+      "n_callback_tok": 6,
+      "retrieved": [
+        2,
+        35,
+        46
+      ],
+      "prefix_tokens": 1536,
+      "ce_rag": 5.409636974334717,
+      "ce_nomem": 4.511507987976074,
+      "ce_shuffle": 5.624442100524902,
+      "evidence_positions": [
+        2,
+        29
+      ]
+    },
+    {
+      "chain_id": "longmemeval_a346bb18",
+      "callback_pos": 49,
+      "n_callback_tok": 3,
+      "retrieved": [
+        1,
+        23,
+        24
+      ],
+      "prefix_tokens": 1536,
+      "ce_rag": 2.8403615951538086,
+      "ce_nomem": 2.0174782276153564,
+      "ce_shuffle": 2.761803150177002,
+      "evidence_positions": [
+        1,
+        23
+      ]
+    },
+    {
+      "chain_id": "longmemeval_95228167",
+      "callback_pos": 49,
+      "n_callback_tok": 62,
+      "retrieved": [
+        1,
+        24,
+        38
+      ],
+      "prefix_tokens": 1536,
+      "ce_rag": 3.375908613204956,
+      "ce_nomem": 3.185150623321533,
+      "ce_shuffle": 3.378450393676758,
+      "evidence_positions": [
+        27
+      ]
+    },
+    {
+      "chain_id": "longmemeval_5d3d2817",
+      "callback_pos": 53,
+      "n_callback_tok": 7,
+      "retrieved": [
+        18,
+        40,
+        46
+      ],
+      "prefix_tokens": 1536,
+      "ce_rag": 4.66080379486084,
+      "ce_nomem": 4.874382019042969,
+      "ce_shuffle": 5.125792980194092,
+      "evidence_positions": [
+        26
+      ]
+    },
+    {
+      "chain_id": "longmemeval_b01defab",
+      "callback_pos": 50,
+      "n_callback_tok": 2,
+      "retrieved": [
+        2,
+        46,
+        47
+      ],
+      "prefix_tokens": 1536,
+      "ce_rag": 9.582000732421875,
+      "ce_nomem": 7.904538154602051,
+      "ce_shuffle": 10.594311714172363,
+      "evidence_positions": [
+        2,
+        46
+      ]
+    }
+  ]
+}

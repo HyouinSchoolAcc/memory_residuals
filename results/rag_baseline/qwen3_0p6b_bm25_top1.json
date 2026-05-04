@@ -1,0 +1,803 @@
+{
+  "config": {
+    "base_model": "Qwen/Qwen3-0.6B",
+    "corpus": "paper_artifacts/chains/lme_val_s512_evpos.pt",
+    "rag_method": "bm25",
+    "top_k": 1,
+    "encoder": null,
+    "max_total_len": 8192,
+    "n_chains_max": null
+  },
+  "n_chains_scored": 50,
+  "ce_rag": 4.284320570230484,
+  "ce_nomem": 4.3174645972251895,
+  "ce_shuffle": 4.790334894657135,
+  "pa_cb_drag": 0.0331440269947052,
+  "pa_cb_dsh": 0.5060143244266504,
+  "stdev_per_chain_drag": 1.1525594956236216,
+  "n_chains_per_chain_positive": 20,
+  "per_chain": [
+    {
+      "chain_id": "longmemeval_gpt4_59149c78",
+      "callback_pos": 51,
+      "n_callback_tok": 6,
+      "retrieved": [
+        46
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 5.56842041015625,
+      "ce_nomem": 4.511507987976074,
+      "ce_shuffle": 5.645322322845459,
+      "evidence_positions": [
+        2,
+        29
+      ]
+    },
+    {
+      "chain_id": "longmemeval_a346bb18",
+      "callback_pos": 49,
+      "n_callback_tok": 3,
+      "retrieved": [
+        1
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.3125722408294678,
+      "ce_nomem": 2.0174782276153564,
+      "ce_shuffle": 2.8902950286865234,
+      "evidence_positions": [
+        1,
+        23
+      ]
+    },
+    {
+      "chain_id": "longmemeval_95228167",
+      "callback_pos": 49,
+      "n_callback_tok": 62,
+      "retrieved": [
+        1
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.3606605529785156,
+      "ce_nomem": 3.185150623321533,
+      "ce_shuffle": 3.3577382564544678,
+      "evidence_positions": [
+        27
+      ]
+    },
+    {
+      "chain_id": "longmemeval_5d3d2817",
+      "callback_pos": 53,
+      "n_callback_tok": 7,
+      "retrieved": [
+        18
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.540853023529053,
+      "ce_nomem": 4.874382019042969,
+      "ce_shuffle": 5.132676124572754,
+      "evidence_positions": [
+        26
+      ]
+    },
+    {
+      "chain_id": "longmemeval_b01defab",
+      "callback_pos": 50,
+      "n_callback_tok": 2,
+      "retrieved": [
+        46
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 9.447734832763672,
+      "ce_nomem": 7.904538154602051,
+      "ce_shuffle": 9.515826225280762,
+      "evidence_positions": [
+        2,
+        46
+      ]
+    },
+    {
+      "chain_id": "longmemeval_0862e8bf_abs",
+      "callback_pos": 52,
+      "n_callback_tok": 18,
+      "retrieved": [
+        28
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.009214878082275,
+      "ce_nomem": 3.96724534034729,
+      "ce_shuffle": 4.122918128967285,
+      "evidence_positions": [
+        17
+      ]
+    },
+    {
+      "chain_id": "longmemeval_gpt4_59c863d7",
+      "callback_pos": 47,
+      "n_callback_tok": 79,
+      "retrieved": [
+        1
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.3979403972625732,
+      "ce_nomem": 3.172841787338257,
+      "ce_shuffle": 3.221977710723877,
+      "evidence_positions": [
+        1,
+        32,
+        40,
+        43
+      ]
+    },
+    {
+      "chain_id": "longmemeval_993da5e2",
+      "callback_pos": 49,
+      "n_callback_tok": 18,
+      "retrieved": [
+        41
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.904430866241455,
+      "ce_nomem": 3.464765787124634,
+      "ce_shuffle": 3.9490585327148438,
+      "evidence_positions": [
+        27,
+        41
+      ]
+    },
+    {
+      "chain_id": "longmemeval_4fd1909e",
+      "callback_pos": 55,
+      "n_callback_tok": 4,
+      "retrieved": [
+        23
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.149964332580566,
+      "ce_nomem": 7.172762870788574,
+      "ce_shuffle": 8.704431533813477,
+      "evidence_positions": [
+        23
+      ]
+    },
+    {
+      "chain_id": "longmemeval_6b168ec8",
+      "callback_pos": 50,
+      "n_callback_tok": 2,
+      "retrieved": [
+        35
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 10.006455421447754,
+      "ce_nomem": 8.976533889770508,
+      "ce_shuffle": 11.231348991394043,
+      "evidence_positions": [
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_8e9d538c",
+      "callback_pos": 48,
+      "n_callback_tok": 3,
+      "retrieved": [
+        34
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.457559585571289,
+      "ce_nomem": 2.1611828804016113,
+      "ce_shuffle": 3.373387098312378,
+      "evidence_positions": [
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_e5ba910e_abs",
+      "callback_pos": 48,
+      "n_callback_tok": 21,
+      "retrieved": [
+        22
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.047342300415039,
+      "ce_nomem": 2.911597967147827,
+      "ce_shuffle": 3.1522605419158936,
+      "evidence_positions": [
+        22,
+        42
+      ]
+    },
+    {
+      "chain_id": "longmemeval_ce6d2d27",
+      "callback_pos": 51,
+      "n_callback_tok": 2,
+      "retrieved": [
+        17
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 7.029515266418457,
+      "ce_nomem": 7.357452869415283,
+      "ce_shuffle": 8.890616416931152,
+      "evidence_positions": [
+        1,
+        17
+      ]
+    },
+    {
+      "chain_id": "longmemeval_0a34ad58",
+      "callback_pos": 42,
+      "n_callback_tok": 51,
+      "retrieved": [
+        13
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.6716361045837402,
+      "ce_nomem": 3.629704713821411,
+      "ce_shuffle": 4.0313029289245605,
+      "evidence_positions": [
+        13
+      ]
+    },
+    {
+      "chain_id": "longmemeval_58bf7951",
+      "callback_pos": 57,
+      "n_callback_tok": 6,
+      "retrieved": [
+        29
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 5.386650085449219,
+      "ce_nomem": 4.709201812744141,
+      "ce_shuffle": 6.00499153137207,
+      "evidence_positions": [
+        29
+      ]
+    },
+    {
+      "chain_id": "longmemeval_60d45044",
+      "callback_pos": 51,
+      "n_callback_tok": 6,
+      "retrieved": [
+        10
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.938689231872559,
+      "ce_nomem": 4.416620254516602,
+      "ce_shuffle": 4.910129070281982,
+      "evidence_positions": [
+        32
+      ]
+    },
+    {
+      "chain_id": "longmemeval_0100672e",
+      "callback_pos": 49,
+      "n_callback_tok": 4,
+      "retrieved": [
+        36
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 8.51015853881836,
+      "ce_nomem": 7.227800369262695,
+      "ce_shuffle": 7.416595458984375,
+      "evidence_positions": [
+        36,
+        45
+      ]
+    },
+    {
+      "chain_id": "longmemeval_gpt4_68e94288",
+      "callback_pos": 44,
+      "n_callback_tok": 13,
+      "retrieved": [
+        34
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 1.6259243488311768,
+      "ce_nomem": 3.6940386295318604,
+      "ce_shuffle": 3.2031409740448,
+      "evidence_positions": [
+        31,
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_6ae235be",
+      "callback_pos": 48,
+      "n_callback_tok": 24,
+      "retrieved": [
+        34
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 1.7160719633102417,
+      "ce_nomem": 2.800464630126953,
+      "ce_shuffle": 2.711615562438965,
+      "evidence_positions": [
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_1de5cff2",
+      "callback_pos": 45,
+      "n_callback_tok": 3,
+      "retrieved": [
+        41
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 8.40799331665039,
+      "ce_nomem": 9.038858413696289,
+      "ce_shuffle": 9.2354736328125,
+      "evidence_positions": [
+        41
+      ]
+    },
+    {
+      "chain_id": "longmemeval_2133c1b5",
+      "callback_pos": 51,
+      "n_callback_tok": 3,
+      "retrieved": [
+        40
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.5743918418884277,
+      "ce_nomem": 1.7284481525421143,
+      "ce_shuffle": 1.8246002197265625,
+      "evidence_positions": [
+        23,
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_87f22b4a",
+      "callback_pos": 47,
+      "n_callback_tok": 5,
+      "retrieved": [
+        34
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.999988079071045,
+      "ce_nomem": 5.267437934875488,
+      "ce_shuffle": 5.2948994636535645,
+      "evidence_positions": [
+        12,
+        34
+      ]
+    },
+    {
+      "chain_id": "longmemeval_8464fc84",
+      "callback_pos": 45,
+      "n_callback_tok": 4,
+      "retrieved": [
+        26
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.648938179016113,
+      "ce_nomem": 8.051105499267578,
+      "ce_shuffle": 7.646648406982422,
+      "evidence_positions": [
+        26
+      ]
+    },
+    {
+      "chain_id": "longmemeval_e47becba",
+      "callback_pos": 53,
+      "n_callback_tok": 3,
+      "retrieved": [
+        48
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 7.694501876831055,
+      "ce_nomem": 5.760591506958008,
+      "ce_shuffle": 6.28243350982666,
+      "evidence_positions": [
+        51
+      ]
+    },
+    {
+      "chain_id": "longmemeval_46a3abf7",
+      "callback_pos": 50,
+      "n_callback_tok": 2,
+      "retrieved": [
+        32
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.8582191467285156,
+      "ce_nomem": 2.0361599922180176,
+      "ce_shuffle": 2.666501522064209,
+      "evidence_positions": [
+        8,
+        17,
+        36
+      ]
+    },
+    {
+      "chain_id": "longmemeval_81507db6",
+      "callback_pos": 50,
+      "n_callback_tok": 2,
+      "retrieved": [
+        16
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.0384907722473145,
+      "ce_nomem": 1.7402710914611816,
+      "ce_shuffle": 1.5083179473876953,
+      "evidence_positions": [
+        3,
+        10,
+        16,
+        27,
+        31
+      ]
+    },
+    {
+      "chain_id": "longmemeval_8c18457d",
+      "callback_pos": 41,
+      "n_callback_tok": 16,
+      "retrieved": [
+        30
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.8463706970214844,
+      "ce_nomem": 2.9558119773864746,
+      "ce_shuffle": 2.6275973320007324,
+      "evidence_positions": [
+        9,
+        30
+      ]
+    },
+    {
+      "chain_id": "longmemeval_41275add",
+      "callback_pos": 53,
+      "n_callback_tok": 41,
+      "retrieved": [
+        25
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 0.9299241900444031,
+      "ce_nomem": 2.757387638092041,
+      "ce_shuffle": 2.879387378692627,
+      "evidence_positions": [
+        25
+      ]
+    },
+    {
+      "chain_id": "longmemeval_4388e9dd",
+      "callback_pos": 43,
+      "n_callback_tok": 11,
+      "retrieved": [
+        2
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.226580858230591,
+      "ce_nomem": 4.0275468826293945,
+      "ce_shuffle": 4.54238748550415,
+      "evidence_positions": [
+        2
+      ]
+    },
+    {
+      "chain_id": "longmemeval_d905b33f",
+      "callback_pos": 48,
+      "n_callback_tok": 3,
+      "retrieved": [
+        11
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 1.5928235054016113,
+      "ce_nomem": 1.1169531345367432,
+      "ce_shuffle": 1.450106143951416,
+      "evidence_positions": [
+        18,
+        33
+      ]
+    },
+    {
+      "chain_id": "longmemeval_f4f1d8a4_abs",
+      "callback_pos": 50,
+      "n_callback_tok": 22,
+      "retrieved": [
+        21
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.210847854614258,
+      "ce_nomem": 2.927488327026367,
+      "ce_shuffle": 3.3952255249023438,
+      "evidence_positions": [
+        30
+      ]
+    },
+    {
+      "chain_id": "longmemeval_gpt4_a56e767c",
+      "callback_pos": 48,
+      "n_callback_tok": 6,
+      "retrieved": [
+        38
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.41510009765625,
+      "ce_nomem": 3.7662856578826904,
+      "ce_shuffle": 3.546374797821045,
+      "evidence_positions": [
+        6,
+        29,
+        32
+      ]
+    },
+    {
+      "chain_id": "longmemeval_778164c6",
+      "callback_pos": 50,
+      "n_callback_tok": 9,
+      "retrieved": [
+        47
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.1991217136383057,
+      "ce_nomem": 3.032238483428955,
+      "ce_shuffle": 2.9379518032073975,
+      "evidence_positions": [
+        47
+      ]
+    },
+    {
+      "chain_id": "longmemeval_6aeb4375_abs",
+      "callback_pos": 46,
+      "n_callback_tok": 17,
+      "retrieved": [
+        34
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.565065383911133,
+      "ce_nomem": 4.018034934997559,
+      "ce_shuffle": 4.152095317840576,
+      "evidence_positions": [
+        32,
+        36
+      ]
+    },
+    {
+      "chain_id": "longmemeval_f35224e0",
+      "callback_pos": 53,
+      "n_callback_tok": 3,
+      "retrieved": [
+        32
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.196038246154785,
+      "ce_nomem": 2.5730228424072266,
+      "ce_shuffle": 3.680647611618042,
+      "evidence_positions": [
+        32,
+        45
+      ]
+    },
+    {
+      "chain_id": "longmemeval_e6041065",
+      "callback_pos": 45,
+      "n_callback_tok": 3,
+      "retrieved": [
+        3
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.451044797897339,
+      "ce_nomem": 1.475511908531189,
+      "ce_shuffle": 2.0402088165283203,
+      "evidence_positions": [
+        3,
+        37
+      ]
+    },
+    {
+      "chain_id": "longmemeval_gpt4_e061b84g",
+      "callback_pos": 58,
+      "n_callback_tok": 8,
+      "retrieved": [
+        46
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.574849605560303,
+      "ce_nomem": 4.720566272735596,
+      "ce_shuffle": 4.5413970947265625,
+      "evidence_positions": [
+        11,
+        32,
+        38
+      ]
+    },
+    {
+      "chain_id": "longmemeval_5e1b23de",
+      "callback_pos": 45,
+      "n_callback_tok": 2,
+      "retrieved": [
+        13
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.6878132820129395,
+      "ce_nomem": 2.4585185050964355,
+      "ce_shuffle": 4.124383449554443,
+      "evidence_positions": [
+        14
+      ]
+    },
+    {
+      "chain_id": "longmemeval_a96c20ee",
+      "callback_pos": 51,
+      "n_callback_tok": 4,
+      "retrieved": [
+        8
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 4.197221279144287,
+      "ce_nomem": 4.696242332458496,
+      "ce_shuffle": 4.957881927490234,
+      "evidence_positions": [
+        8,
+        12
+      ]
+    },
+    {
+      "chain_id": "longmemeval_dccbc061",
+      "callback_pos": 49,
+      "n_callback_tok": 4,
+      "retrieved": [
+        17
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 6.145419120788574,
+      "ce_nomem": 8.567498207092285,
+      "ce_shuffle": 9.219470977783203,
+      "evidence_positions": [
+        17
+      ]
+    },
+    {
+      "chain_id": "longmemeval_e9327a54",
+      "callback_pos": 50,
+      "n_callback_tok": 7,
+      "retrieved": [
+        36
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 7.646778583526611,
+      "ce_nomem": 7.544710636138916,
+      "ce_shuffle": 7.932791709899902,
+      "evidence_positions": [
+        10
+      ]
+    },
+    {
+      "chain_id": "longmemeval_8cf51dda",
+      "callback_pos": 46,
+      "n_callback_tok": 44,
+      "retrieved": [
+        38
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 0.5543103218078613,
+      "ce_nomem": 1.34285569190979,
+      "ce_shuffle": 1.130340814590454,
+      "evidence_positions": [
+        38
+      ]
+    },
+    {
+      "chain_id": "longmemeval_dad224aa",
+      "callback_pos": 48,
+      "n_callback_tok": 6,
+      "retrieved": [
+        6
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 0.42693591117858887,
+      "ce_nomem": 1.196730613708496,
+      "ce_shuffle": 1.4083665609359741,
+      "evidence_positions": [
+        2,
+        47
+      ]
+    },
+    {
+      "chain_id": "longmemeval_4100d0a0",
+      "callback_pos": 50,
+      "n_callback_tok": 7,
+      "retrieved": [
+        37
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 5.882518291473389,
+      "ce_nomem": 4.988105773925781,
+      "ce_shuffle": 5.424106121063232,
+      "evidence_positions": [
+        49
+      ]
+    },
+    {
+      "chain_id": "longmemeval_35a27287",
+      "callback_pos": 51,
+      "n_callback_tok": 54,
+      "retrieved": [
+        45
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 2.946302890777588,
+      "ce_nomem": 2.9197983741760254,
+      "ce_shuffle": 2.9348337650299072,
+      "evidence_positions": [
+        40
+      ]
+    },
+    {
+      "chain_id": "longmemeval_bc149d6b",
+      "callback_pos": 46,
+      "n_callback_tok": 4,
+      "retrieved": [
+        9
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 1.4969654083251953,
+      "ce_nomem": 2.477848529815674,
+      "ce_shuffle": 2.7051424980163574,
+      "evidence_positions": [
+        9,
+        10
+      ]
+    },
+    {
+      "chain_id": "longmemeval_c4ea545c",
+      "callback_pos": 46,
+      "n_callback_tok": 2,
+      "retrieved": [
+        32
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 7.711767196655273,
+      "ce_nomem": 7.983796119689941,
+      "ce_shuffle": 9.626145362854004,
+      "evidence_positions": [
+        7,
+        29
+      ]
+    },
+    {
+      "chain_id": "longmemeval_001be529",
+      "callback_pos": 51,
+      "n_callback_tok": 4,
+      "retrieved": [
+        21
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 6.181545734405518,
+      "ce_nomem": 5.408857822418213,
+      "ce_shuffle": 5.772072792053223,
+      "evidence_positions": [
+        42
+      ]
+    },
+    {
+      "chain_id": "longmemeval_32260d93",
+      "callback_pos": 46,
+      "n_callback_tok": 33,
+      "retrieved": [
+        22
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 3.629523754119873,
+      "ce_nomem": 3.5409815311431885,
+      "ce_shuffle": 3.5112555027008057,
+      "evidence_positions": [
+        37
+      ]
+    },
+    {
+      "chain_id": "longmemeval_0862e8bf",
+      "callback_pos": 50,
+      "n_callback_tok": 3,
+      "retrieved": [
+        27
+      ],
+      "prefix_tokens": 512,
+      "ce_rag": 9.196842193603516,
+      "ce_nomem": 7.598294258117676,
+      "ce_shuffle": 9.052066802978516,
+      "evidence_positions": [
+        27
+      ]
+    }
+  ]
+}

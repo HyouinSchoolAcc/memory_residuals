@@ -1,0 +1,465 @@
+{
+  "lme_val": {
+    "n_chains_scored": 50,
+    "ce_mem": 2.497819321155548,
+    "ce_nomem": 2.690843155384064,
+    "ce_shuffle": 2.4897657942771914,
+    "ce_mem_floor": 2.497304329872131,
+    "pa_cb_dnm": 0.19302383422851577,
+    "pa_cb_dsh": -0.00805352687835681,
+    "pa_cb_dnm_floor": 0.1935388255119328,
+    "pa_cb_evidence_lift": -0.0005149912834170323,
+    "per_chain": [
+      {
+        "chain_id": "longmemeval_gpt4_59149c78",
+        "callback_pos": 51,
+        "n_callback_tok": 6,
+        "ce_mem": 2.4312825202941895,
+        "ce_nomem": 2.567657947540283,
+        "ce_shuffle": 2.363943576812744,
+        "ce_mem_floor": 2.3806257247924805
+      },
+      {
+        "chain_id": "longmemeval_a346bb18",
+        "callback_pos": 49,
+        "n_callback_tok": 3,
+        "ce_mem": 1.6652336120605469,
+        "ce_nomem": 1.5113691091537476,
+        "ce_shuffle": 1.6283758878707886,
+        "ce_mem_floor": 1.6561040878295898
+      },
+      {
+        "chain_id": "longmemeval_95228167",
+        "callback_pos": 49,
+        "n_callback_tok": 62,
+        "ce_mem": 2.580889940261841,
+        "ce_nomem": 2.537806510925293,
+        "ce_shuffle": 2.5649526119232178,
+        "ce_mem_floor": 2.5703742504119873
+      },
+      {
+        "chain_id": "longmemeval_5d3d2817",
+        "callback_pos": 53,
+        "n_callback_tok": 7,
+        "ce_mem": 3.923840045928955,
+        "ce_nomem": 4.349704742431641,
+        "ce_shuffle": 3.9067211151123047,
+        "ce_mem_floor": 3.9150307178497314
+      },
+      {
+        "chain_id": "longmemeval_b01defab",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 4.357529640197754,
+        "ce_nomem": 5.0277838706970215,
+        "ce_shuffle": 4.256772994995117,
+        "ce_mem_floor": 4.504078388214111
+      },
+      {
+        "chain_id": "longmemeval_0862e8bf_abs",
+        "callback_pos": 52,
+        "n_callback_tok": 18,
+        "ce_mem": 3.5421833992004395,
+        "ce_nomem": 3.5148255825042725,
+        "ce_shuffle": 3.5843446254730225,
+        "ce_mem_floor": 3.5606324672698975
+      },
+      {
+        "chain_id": "longmemeval_gpt4_59c863d7",
+        "callback_pos": 47,
+        "n_callback_tok": 79,
+        "ce_mem": 2.495990753173828,
+        "ce_nomem": 2.469820022583008,
+        "ce_shuffle": 2.5161330699920654,
+        "ce_mem_floor": 2.493168592453003
+      },
+      {
+        "chain_id": "longmemeval_993da5e2",
+        "callback_pos": 49,
+        "n_callback_tok": 18,
+        "ce_mem": 3.350351572036743,
+        "ce_nomem": 3.1892151832580566,
+        "ce_shuffle": 3.3202648162841797,
+        "ce_mem_floor": 3.3638975620269775
+      },
+      {
+        "chain_id": "longmemeval_4fd1909e",
+        "callback_pos": 55,
+        "n_callback_tok": 4,
+        "ce_mem": 3.304464101791382,
+        "ce_nomem": 3.110165596008301,
+        "ce_shuffle": 3.3181400299072266,
+        "ce_mem_floor": 3.282963752746582
+      },
+      {
+        "chain_id": "longmemeval_6b168ec8",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 2.8559772968292236,
+        "ce_nomem": 3.782789707183838,
+        "ce_shuffle": 2.6105704307556152,
+        "ce_mem_floor": 2.3313491344451904
+      },
+      {
+        "chain_id": "longmemeval_8e9d538c",
+        "callback_pos": 48,
+        "n_callback_tok": 3,
+        "ce_mem": 1.6251777410507202,
+        "ce_nomem": 1.7523338794708252,
+        "ce_shuffle": 1.6419899463653564,
+        "ce_mem_floor": 1.848907232284546
+      },
+      {
+        "chain_id": "longmemeval_e5ba910e_abs",
+        "callback_pos": 48,
+        "n_callback_tok": 21,
+        "ce_mem": 2.465726375579834,
+        "ce_nomem": 2.27268123626709,
+        "ce_shuffle": 2.4582464694976807,
+        "ce_mem_floor": 2.4327902793884277
+      },
+      {
+        "chain_id": "longmemeval_ce6d2d27",
+        "callback_pos": 51,
+        "n_callback_tok": 2,
+        "ce_mem": 2.085995674133301,
+        "ce_nomem": 2.3366775512695312,
+        "ce_shuffle": 1.9541891813278198,
+        "ce_mem_floor": 2.0428261756896973
+      },
+      {
+        "chain_id": "longmemeval_0a34ad58",
+        "callback_pos": 42,
+        "n_callback_tok": 51,
+        "ce_mem": 3.1095480918884277,
+        "ce_nomem": 3.062685012817383,
+        "ce_shuffle": 3.1087265014648438,
+        "ce_mem_floor": 3.109140157699585
+      },
+      {
+        "chain_id": "longmemeval_58bf7951",
+        "callback_pos": 57,
+        "n_callback_tok": 6,
+        "ce_mem": 1.8415803909301758,
+        "ce_nomem": 2.607942581176758,
+        "ce_shuffle": 1.7316277027130127,
+        "ce_mem_floor": 1.921091079711914
+      },
+      {
+        "chain_id": "longmemeval_60d45044",
+        "callback_pos": 51,
+        "n_callback_tok": 6,
+        "ce_mem": 2.3366241455078125,
+        "ce_nomem": 2.320918083190918,
+        "ce_shuffle": 2.390401840209961,
+        "ce_mem_floor": 2.3108253479003906
+      },
+      {
+        "chain_id": "longmemeval_0100672e",
+        "callback_pos": 49,
+        "n_callback_tok": 4,
+        "ce_mem": 1.7705148458480835,
+        "ce_nomem": 2.9079084396362305,
+        "ce_shuffle": 1.5200711488723755,
+        "ce_mem_floor": 1.57529616355896
+      },
+      {
+        "chain_id": "longmemeval_gpt4_68e94288",
+        "callback_pos": 44,
+        "n_callback_tok": 13,
+        "ce_mem": 3.008578300476074,
+        "ce_nomem": 3.2336373329162598,
+        "ce_shuffle": 3.0376482009887695,
+        "ce_mem_floor": 3.042546510696411
+      },
+      {
+        "chain_id": "longmemeval_6ae235be",
+        "callback_pos": 48,
+        "n_callback_tok": 24,
+        "ce_mem": 1.9397170543670654,
+        "ce_nomem": 2.046513319015503,
+        "ce_shuffle": 1.9246084690093994,
+        "ce_mem_floor": 1.9322853088378906
+      },
+      {
+        "chain_id": "longmemeval_1de5cff2",
+        "callback_pos": 45,
+        "n_callback_tok": 3,
+        "ce_mem": 4.366846084594727,
+        "ce_nomem": 4.486540794372559,
+        "ce_shuffle": 4.389684677124023,
+        "ce_mem_floor": 4.377163887023926
+      },
+      {
+        "chain_id": "longmemeval_2133c1b5",
+        "callback_pos": 51,
+        "n_callback_tok": 3,
+        "ce_mem": 2.3318347930908203,
+        "ce_nomem": 2.8944334983825684,
+        "ce_shuffle": 2.3140816688537598,
+        "ce_mem_floor": 2.267319440841675
+      },
+      {
+        "chain_id": "longmemeval_87f22b4a",
+        "callback_pos": 47,
+        "n_callback_tok": 5,
+        "ce_mem": 0.9872032999992371,
+        "ce_nomem": 2.205512762069702,
+        "ce_shuffle": 0.9428631663322449,
+        "ce_mem_floor": 0.9262441992759705
+      },
+      {
+        "chain_id": "longmemeval_8464fc84",
+        "callback_pos": 45,
+        "n_callback_tok": 4,
+        "ce_mem": 2.7743782997131348,
+        "ce_nomem": 3.150174617767334,
+        "ce_shuffle": 2.7773547172546387,
+        "ce_mem_floor": 2.7715799808502197
+      },
+      {
+        "chain_id": "longmemeval_e47becba",
+        "callback_pos": 53,
+        "n_callback_tok": 3,
+        "ce_mem": 2.932745933532715,
+        "ce_nomem": 3.10453462600708,
+        "ce_shuffle": 3.029967784881592,
+        "ce_mem_floor": 3.1458163261413574
+      },
+      {
+        "chain_id": "longmemeval_46a3abf7",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 1.1791372299194336,
+        "ce_nomem": 0.5978915691375732,
+        "ce_shuffle": 1.1673970222473145,
+        "ce_mem_floor": 1.3636531829833984
+      },
+      {
+        "chain_id": "longmemeval_81507db6",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 1.533621907234192,
+        "ce_nomem": 1.5772870779037476,
+        "ce_shuffle": 1.5801522731781006,
+        "ce_mem_floor": 1.5091784000396729
+      },
+      {
+        "chain_id": "longmemeval_8c18457d",
+        "callback_pos": 41,
+        "n_callback_tok": 16,
+        "ce_mem": 2.402623176574707,
+        "ce_nomem": 2.5200693607330322,
+        "ce_shuffle": 2.374077320098877,
+        "ce_mem_floor": 2.393009662628174
+      },
+      {
+        "chain_id": "longmemeval_41275add",
+        "callback_pos": 53,
+        "n_callback_tok": 41,
+        "ce_mem": 2.096472978591919,
+        "ce_nomem": 2.1069929599761963,
+        "ce_shuffle": 2.089418649673462,
+        "ce_mem_floor": 2.081592321395874
+      },
+      {
+        "chain_id": "longmemeval_4388e9dd",
+        "callback_pos": 43,
+        "n_callback_tok": 11,
+        "ce_mem": 2.9420502185821533,
+        "ce_nomem": 2.9462807178497314,
+        "ce_shuffle": 2.94846773147583,
+        "ce_mem_floor": 2.93794846534729
+      },
+      {
+        "chain_id": "longmemeval_d905b33f",
+        "callback_pos": 48,
+        "n_callback_tok": 3,
+        "ce_mem": 0.9530488848686218,
+        "ce_nomem": 1.7002400159835815,
+        "ce_shuffle": 0.9955935478210449,
+        "ce_mem_floor": 0.939886748790741
+      },
+      {
+        "chain_id": "longmemeval_f4f1d8a4_abs",
+        "callback_pos": 50,
+        "n_callback_tok": 22,
+        "ce_mem": 2.940463066101074,
+        "ce_nomem": 2.8370707035064697,
+        "ce_shuffle": 2.8991408348083496,
+        "ce_mem_floor": 2.9450833797454834
+      },
+      {
+        "chain_id": "longmemeval_gpt4_a56e767c",
+        "callback_pos": 48,
+        "n_callback_tok": 6,
+        "ce_mem": 2.2218966484069824,
+        "ce_nomem": 2.0072250366210938,
+        "ce_shuffle": 2.15670108795166,
+        "ce_mem_floor": 2.220736265182495
+      },
+      {
+        "chain_id": "longmemeval_778164c6",
+        "callback_pos": 50,
+        "n_callback_tok": 9,
+        "ce_mem": 2.1132147312164307,
+        "ce_nomem": 2.516317129135132,
+        "ce_shuffle": 2.126420259475708,
+        "ce_mem_floor": 2.150520086288452
+      },
+      {
+        "chain_id": "longmemeval_6aeb4375_abs",
+        "callback_pos": 46,
+        "n_callback_tok": 17,
+        "ce_mem": 2.694251775741577,
+        "ce_nomem": 2.9019200801849365,
+        "ce_shuffle": 2.6944828033447266,
+        "ce_mem_floor": 2.6798224449157715
+      },
+      {
+        "chain_id": "longmemeval_f35224e0",
+        "callback_pos": 53,
+        "n_callback_tok": 3,
+        "ce_mem": 2.3713788986206055,
+        "ce_nomem": 2.810042381286621,
+        "ce_shuffle": 2.3142127990722656,
+        "ce_mem_floor": 2.3652071952819824
+      },
+      {
+        "chain_id": "longmemeval_e6041065",
+        "callback_pos": 45,
+        "n_callback_tok": 3,
+        "ce_mem": 1.6408828496932983,
+        "ce_nomem": 1.8845313787460327,
+        "ce_shuffle": 1.580157995223999,
+        "ce_mem_floor": 1.6495616436004639
+      },
+      {
+        "chain_id": "longmemeval_gpt4_e061b84g",
+        "callback_pos": 58,
+        "n_callback_tok": 8,
+        "ce_mem": 2.9839673042297363,
+        "ce_nomem": 2.959836721420288,
+        "ce_shuffle": 2.9638874530792236,
+        "ce_mem_floor": 2.990290403366089
+      },
+      {
+        "chain_id": "longmemeval_5e1b23de",
+        "callback_pos": 45,
+        "n_callback_tok": 2,
+        "ce_mem": 1.3917313814163208,
+        "ce_nomem": 1.5277411937713623,
+        "ce_shuffle": 1.5433993339538574,
+        "ce_mem_floor": 1.3599902391433716
+      },
+      {
+        "chain_id": "longmemeval_a96c20ee",
+        "callback_pos": 51,
+        "n_callback_tok": 4,
+        "ce_mem": 1.6583325862884521,
+        "ce_nomem": 1.719609260559082,
+        "ce_shuffle": 1.656122088432312,
+        "ce_mem_floor": 1.6425420045852661
+      },
+      {
+        "chain_id": "longmemeval_dccbc061",
+        "callback_pos": 49,
+        "n_callback_tok": 4,
+        "ce_mem": 4.4275970458984375,
+        "ce_nomem": 4.809142112731934,
+        "ce_shuffle": 4.2281341552734375,
+        "ce_mem_floor": 4.48675012588501
+      },
+      {
+        "chain_id": "longmemeval_e9327a54",
+        "callback_pos": 50,
+        "n_callback_tok": 7,
+        "ce_mem": 5.799895286560059,
+        "ce_nomem": 5.882007122039795,
+        "ce_shuffle": 5.786179065704346,
+        "ce_mem_floor": 5.8252763748168945
+      },
+      {
+        "chain_id": "longmemeval_8cf51dda",
+        "callback_pos": 46,
+        "n_callback_tok": 44,
+        "ce_mem": 0.9158145189285278,
+        "ce_nomem": 0.9362262487411499,
+        "ce_shuffle": 0.9114992022514343,
+        "ce_mem_floor": 0.912856936454773
+      },
+      {
+        "chain_id": "longmemeval_dad224aa",
+        "callback_pos": 48,
+        "n_callback_tok": 6,
+        "ce_mem": 0.9941695928573608,
+        "ce_nomem": 0.9369604587554932,
+        "ce_shuffle": 0.970952033996582,
+        "ce_mem_floor": 1.014488935470581
+      },
+      {
+        "chain_id": "longmemeval_4100d0a0",
+        "callback_pos": 50,
+        "n_callback_tok": 7,
+        "ce_mem": 3.011300563812256,
+        "ce_nomem": 2.8969483375549316,
+        "ce_shuffle": 3.020310878753662,
+        "ce_mem_floor": 3.0304348468780518
+      },
+      {
+        "chain_id": "longmemeval_35a27287",
+        "callback_pos": 51,
+        "n_callback_tok": 54,
+        "ce_mem": 2.714268922805786,
+        "ce_nomem": 2.6823086738586426,
+        "ce_shuffle": 2.7257192134857178,
+        "ce_mem_floor": 2.722254514694214
+      },
+      {
+        "chain_id": "longmemeval_bc149d6b",
+        "callback_pos": 46,
+        "n_callback_tok": 4,
+        "ce_mem": 2.4637293815612793,
+        "ce_nomem": 2.552799701690674,
+        "ce_shuffle": 2.404496669769287,
+        "ce_mem_floor": 2.466141700744629
+      },
+      {
+        "chain_id": "longmemeval_c4ea545c",
+        "callback_pos": 46,
+        "n_callback_tok": 2,
+        "ce_mem": 2.0985755920410156,
+        "ce_nomem": 3.4716084003448486,
+        "ce_shuffle": 2.3305892944335938,
+        "ce_mem_floor": 2.2324156761169434
+      },
+      {
+        "chain_id": "longmemeval_001be529",
+        "callback_pos": 51,
+        "n_callback_tok": 4,
+        "ce_mem": 2.5960896015167236,
+        "ce_nomem": 2.6317262649536133,
+        "ce_shuffle": 3.0320944786071777,
+        "ce_mem_floor": 2.512047290802002
+      },
+      {
+        "chain_id": "longmemeval_32260d93",
+        "callback_pos": 46,
+        "n_callback_tok": 33,
+        "ce_mem": 2.855104446411133,
+        "ce_nomem": 2.8536648750305176,
+        "ce_shuffle": 2.8654377460479736,
+        "ce_mem_floor": 2.8585987091064453
+      },
+      {
+        "chain_id": "longmemeval_0862e8bf",
+        "callback_pos": 50,
+        "n_callback_tok": 3,
+        "ce_mem": 1.8071335554122925,
+        "ce_nomem": 1.832077980041504,
+        "ce_shuffle": 1.8315651416778564,
+        "ce_mem_floor": 1.8128721714019775
+      }
+    ]
+  }
+}
