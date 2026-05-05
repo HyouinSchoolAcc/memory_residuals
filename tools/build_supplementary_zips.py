@@ -294,15 +294,18 @@ def build_p1(stage: Path) -> None:
     stage_files(stage, [
         ("src", "code/src"),
         ("tools/eval_callback.py", "code/tools/eval_callback.py"),
+        ("tools/eval_callback_categories.py", "code/tools/eval_callback_categories.py"),
         ("tools/eval_chain.py", "code/tools/eval_chain.py"),
         ("tools/eval_ttt_mc.py", "code/tools/eval_ttt_mc.py"),
-        ("tests", "code/tests"),
-        ("NEURIPS_NUMBERS.md", "numbers/NEURIPS_NUMBERS.md"),
+        ("tools/aggregate_per_category_eval.py", "code/tools/aggregate_per_category_eval.py"),
+        ("tools/bootstrap_ci.py", "code/tools/bootstrap_ci.py"),
+        ("requirements.txt", "code/requirements.txt"),
+        ("paper/drafts/NEURIPS_NUMBERS.md", "numbers/NEURIPS_NUMBERS.md"),
     ])
 
     n_recipes = 0
     for pat in ("train_v27*.sh", "train_v28*.sh", "train_v24a*.sh"):
-        n_recipes += stage_glob(stage, "Scripts", pat, "recipes")
+        n_recipes += stage_glob(stage, "scripts", pat, "recipes")
     print(f"  staged {n_recipes} recipe scripts")
 
     n_evals = stage_glob(
@@ -321,8 +324,8 @@ def build_p2(stage: Path) -> None:
         ("src", "code/src"),
         ("tools/eval_callback.py", "code/tools/eval_callback.py"),
         ("tools/eval_chain.py", "code/tools/eval_chain.py"),
-        ("NEURIPS_NUMBERS.md", "ledgers/NEURIPS_NUMBERS.md"),
-        ("results/exp2_chain_recipe/runs.md", "ledgers/runs.md"),
+        ("paper/drafts/NEURIPS_NUMBERS.md", "ledgers/NEURIPS_NUMBERS.md"),
+        ("runs.md", "ledgers/runs.md"),
     ])
 
     n_audits = 0
@@ -361,7 +364,7 @@ def build_p3(stage: Path) -> None:
         "train_v11k_*.sh",
         "train_v11l_*.sh",
     ):
-        n_scripts += stage_glob(stage, "Scripts", pat, "scripts")
+        n_scripts += stage_glob(stage, "scripts", pat, "scripts")
     print(f"  staged {n_scripts} pair-recipe scripts")
 
     figs = ROOT / "results/exp1_pair_recipe/figures"

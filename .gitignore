@@ -74,3 +74,8 @@ env.local.bat
 env.local.sh
 .env
 .env.local
+
+# Staging directory for `tools/build_supplementary_zips.py`. The
+# anonymised + caches-stripped tree lives here before being zipped.
+# Only the resulting *_supplementary.zip files are committed.
+supplementary_build/
