@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 LOG="logs/paper_a_autorebuild.log"
 EVAL_DIR="results/eval_v25_seed_pack_evpos"
-PAPER_DIR="paper_a"
+PAPER_DIR="paper"
 
 POLL_INTERVAL="${POLL_INTERVAL:-120}"
 MAX_HOURS="${MAX_HOURS:-24}"

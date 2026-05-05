@@ -9,27 +9,25 @@ data_pipeline/
 tea_debug.log
 wandb/
 
-# Training runs (heavy checkpoints + logs). Each promoted run is
-# referenced by name in results/exp2_chain_recipe/runs.md; the
-# artifacts live outside git.
-Runs/
+# Training runs (heavy checkpoints). One folder per cell; each
+# promoted run is referenced by name in runs.md.
+runs/
 output
-# ^ `output` is a backwards-compat symlink to `Runs/` kept while the
-#   currently-running v11 cell still has the literal `output/...`
-#   path baked into its launch command.
+# ^ `output` is a backwards-compat symlink to `runs/` kept because
+#   many train scripts have the literal `output/...` path baked into
+#   their launch command.
 
-# Training & sync logs. Kept on disk; never committed.
+# Training & sync logs (one .log per cell, paired with runs/<cell>/).
 logs/
 
 # Large pre-tokenised corpora. Built by tools/build_*; cited in
 # runs.md by filename. Too big for git; regenerable from source.
-# Stored under paper_artifacts/chains/ (also reachable via the `data/`
-# symlink) so that any historical script that hard-codes the old path
-# still works.
 paper_artifacts/chains/*.pt
 paper_artifacts/locomo_chains/
 paper_artifacts/msc_chains_test/
-data/*.pt
+
+# Compiled paper PDFs are committed for reviewer access; LaTeX
+# byproducts below are not.
 
 # Cloud watchdog state directories.
 tools/cloud_watchdog/queue/

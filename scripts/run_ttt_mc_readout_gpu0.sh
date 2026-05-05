@@ -26,7 +26,7 @@ declare -a CELLS=(
 
 for cell in "${CELLS[@]}"; do
   IFS='|' read -r tag ckpt corpus <<<"$cell"
-  CKPT=Runs/${ckpt}/best
+  CKPT=runs/${ckpt}/best
   CORPUS=paper_artifacts/chains/${corpus}.pt
   for mode in qkv qkv_reset; do
     for init in writer iid; do

@@ -625,6 +625,30 @@ def parse_args() -> argparse.Namespace:
                         "uniform-attention pathology measured on v13r "
                         "@ step 10000 (Zhai et al. 2023 entropy-"
                         "collapse direction; inverse pathology here).")
+    p.add_argument("--memres_readout_topk_slot_softmax", type=int, default=0,
+                   help="v33 sparse-readout (friend's option 3 / 'Hard "
+                        "slot-routing in the readout').  If > 0, "
+                        "restrict the per-token MemoryReadout cross-"
+                        "attention softmax to the top-k highest-scoring "
+                        "slots per query position (others -> -inf).  "
+                        "Forces the readout to SELECT slots rather than "
+                        "dense-mix them; chain-specific facts then live "
+                        "in identifiable slots.  Applies to the base "
+                        "readout layer + every refinement layer.  0 = "
+                        "canonical dense softmax (default).  Useful k "
+                        "values: 4-16 out of K=128.")
+    p.add_argument("--memres_judge_topk_slot_softmax", type=int, default=0,
+                   help="v32 sparse-writer (Tier-3 (6) of the May-2026 "
+                        "friend's plan).  If > 0, restrict the judge "
+                        "SlotAttentionWriter's slot-axis softmax to "
+                        "the top-k highest-scoring slots per input "
+                        "column (others -> -inf).  Forces each candidate "
+                        "to bind to <= k slots, breaking the smooth-"
+                        "mixing path that a chain-class prior plausibly "
+                        "exploits.  Useful k values: 4-16 out of K=128 "
+                        "(3-13%% of slot pool).  0 = canonical dense "
+                        "softmax (default).  No-op when "
+                        "--memres_writer_kind is not slot_attention*.")
     p.add_argument("--memres_extract_input_norm", action="store_true",
                    help="Apply Qwen3RMSNorm to the extraction input C "
                         "BEFORE it enters MemoryBlock.extract.  When "
@@ -1662,6 +1686,8 @@ class Trainer:
             memres_queries_init=a.memres_queries_init,
             memres_slot_positional=a.memres_slot_positional,
             memres_judge_qk_layernorm=a.memres_judge_qk_layernorm,
+            memres_judge_topk_slot_softmax=a.memres_judge_topk_slot_softmax,
+            memres_readout_topk_slot_softmax=a.memres_readout_topk_slot_softmax,
             memres_extract_input_norm=a.memres_extract_input_norm,
             writer_probe_enabled=a.writer_probe_enabled,
             writer_probe_n_queries=a.writer_probe_n_queries,

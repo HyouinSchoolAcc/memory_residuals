@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Refresh Paper A once v28d-seed4 (1.7B, F3-off) finishes on GH200.
+# Refresh the paper once v28d-seed4 (1.7B, F3-off) finishes on GH200.
 # Steps:
-#   1. rsync the v28d checkpoint from GH200 to ./Runs/
+#   1. rsync the v28d checkpoint from GH200 to ./runs/
 #   2. eval it on LME (callback-aware, evpos)
 #   3. eval it cross-corpus (synthd4/d4v2/d5 + LoCoMo + MSC)
 #   4. rebuild paper (auto picks up n=4 at 1.7B)
@@ -25,18 +25,18 @@ if [ "$state" != "done" ]; then
 fi
 
 # ---- 2. rsync checkpoint to local ----
-mkdir -p Runs
+mkdir -p runs
 rsync -avz --partial \
     "$GH200:~/memory_residuals/output/$RUN/final/" \
-    "Runs/$RUN/final/"
+    "runs/$RUN/final/"
 rsync -avz --partial \
     "$GH200:~/memory_residuals/output/$RUN/best/" \
-    "Runs/$RUN/best/" 2>/dev/null || true
+    "runs/$RUN/best/" 2>/dev/null || true
 
 # ---- 3. eval on LME (callback-aware, evpos) ----
 echo "[refresh_v28d] LME eval..."
 CUDA_VISIBLE_DEVICES=0 python tools/eval_callback.py \
-    --model_path "Runs/$RUN/final" \
+    --model_path "runs/$RUN/final" \
     --corpora paper_artifacts/chains/lme_val_s512_evpos.pt \
     --names lme_val \
     --output "results/eval_v25_seed_pack_evpos/v28d_no_probe_seed4_final_lme_val_evpos.json"
@@ -44,9 +44,9 @@ CUDA_VISIBLE_DEVICES=0 python tools/eval_callback.py \
 # ---- 4. cross-corpus eval ----
 echo "[refresh_v28d] cross-corpus eval..."
 bash scripts/eval_cross_corpus.sh \
-    "Runs/$RUN/final" v28d_seed4 0
+    "runs/$RUN/final" v28d_seed4 0
 
 # ---- 5. rebuild paper ----
 echo "[refresh_v28d] rebuilding paper..."
-cd paper_a && bash build.sh
+cd paper && bash build.sh
 echo "[refresh_v28d] DONE — main.pdf now at n=4 at 1.7B."

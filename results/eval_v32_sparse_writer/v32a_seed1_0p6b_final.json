@@ -1,0 +1,1378 @@
+{
+  "synthd5_val": {
+    "n_chains_scored": 100,
+    "ce_mem": 4.961404440402984,
+    "ce_nomem": 6.2919651317596434,
+    "ce_shuffle": 4.969306161403656,
+    "ce_mem_floor": 4.963103106021881,
+    "pa_cb_dnm": 1.3305606913566592,
+    "pa_cb_dsh": 0.00790172100067199,
+    "pa_cb_dnm_floor": 1.3288620257377621,
+    "pa_cb_evidence_lift": 0.0016986656188970883,
+    "per_chain": [
+      {
+        "chain_id": "synthetic_random_codes_00000_locker_code_QEQ6D_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.495402812957764,
+        "ce_nomem": 6.446257591247559,
+        "ce_shuffle": 4.524350643157959,
+        "ce_mem_floor": 4.546965599060059
+      },
+      {
+        "chain_id": "synthetic_random_codes_00001_apartment_5ITOK_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 6.01314115524292,
+        "ce_nomem": 5.872472763061523,
+        "ce_shuffle": 6.0406951904296875,
+        "ce_mem_floor": 5.9521894454956055
+      },
+      {
+        "chain_id": "synthetic_random_codes_00002_apartment_WHPX7_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.792990207672119,
+        "ce_nomem": 6.492489814758301,
+        "ce_shuffle": 4.856057167053223,
+        "ce_mem_floor": 4.893385887145996
+      },
+      {
+        "chain_id": "synthetic_random_codes_00003_employee_id_HB7FI_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.325371742248535,
+        "ce_nomem": 7.331754207611084,
+        "ce_shuffle": 6.348288536071777,
+        "ce_mem_floor": 6.337106227874756
+      },
+      {
+        "chain_id": "synthetic_random_codes_00004_pin_161LK_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.835294485092163,
+        "ce_nomem": 4.510680675506592,
+        "ce_shuffle": 3.883610486984253,
+        "ce_mem_floor": 3.906944990158081
+      },
+      {
+        "chain_id": "synthetic_random_codes_00005_pin_VOUP3_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.217130184173584,
+        "ce_nomem": 9.388456344604492,
+        "ce_shuffle": 6.243925094604492,
+        "ce_mem_floor": 6.210387706756592
+      },
+      {
+        "chain_id": "synthetic_random_codes_00006_tracking_9RAP7_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.872735023498535,
+        "ce_nomem": 5.813521862030029,
+        "ce_shuffle": 4.82108736038208,
+        "ce_mem_floor": 4.727850437164307
+      },
+      {
+        "chain_id": "synthetic_random_codes_00007_tracking_EL9BO_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.618918418884277,
+        "ce_nomem": 8.530468940734863,
+        "ce_shuffle": 6.3515424728393555,
+        "ce_mem_floor": 6.515161037445068
+      },
+      {
+        "chain_id": "synthetic_random_codes_00008_locker_code_Z21F9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.1418843269348145,
+        "ce_nomem": 5.046261787414551,
+        "ce_shuffle": 4.115403652191162,
+        "ce_mem_floor": 4.1645307540893555
+      },
+      {
+        "chain_id": "synthetic_random_codes_00009_tracking_ENZGS_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.232302665710449,
+        "ce_nomem": 8.252628326416016,
+        "ce_shuffle": 5.044101238250732,
+        "ce_mem_floor": 5.295561790466309
+      },
+      {
+        "chain_id": "synthetic_random_codes_00010_tracking_6M89A_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.4536731243133545,
+        "ce_nomem": 4.588038444519043,
+        "ce_shuffle": 3.477271556854248,
+        "ce_mem_floor": 3.4437060356140137
+      },
+      {
+        "chain_id": "synthetic_random_codes_00011_voucher_SS9Y1_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.558009147644043,
+        "ce_nomem": 6.072485446929932,
+        "ce_shuffle": 4.599795341491699,
+        "ce_mem_floor": 4.562400817871094
+      },
+      {
+        "chain_id": "synthetic_random_codes_00012_pin_SC4FF_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.886202812194824,
+        "ce_nomem": 6.842492580413818,
+        "ce_shuffle": 5.869374752044678,
+        "ce_mem_floor": 5.867135047912598
+      },
+      {
+        "chain_id": "synthetic_random_codes_00013_tracking_CNRBC_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.247265815734863,
+        "ce_nomem": 7.562373161315918,
+        "ce_shuffle": 5.282774925231934,
+        "ce_mem_floor": 5.251896858215332
+      },
+      {
+        "chain_id": "synthetic_random_codes_00014_tracking_WTO6C_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.234813690185547,
+        "ce_nomem": 8.656251907348633,
+        "ce_shuffle": 6.1375861167907715,
+        "ce_mem_floor": 6.192128658294678
+      },
+      {
+        "chain_id": "synthetic_random_codes_00015_voucher_1X8XJ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.7030954360961914,
+        "ce_nomem": 4.789558410644531,
+        "ce_shuffle": 3.6178958415985107,
+        "ce_mem_floor": 3.6810474395751953
+      },
+      {
+        "chain_id": "synthetic_random_codes_00016_apartment_2MO8V_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.209099292755127,
+        "ce_nomem": 5.1843180656433105,
+        "ce_shuffle": 4.237861633300781,
+        "ce_mem_floor": 4.1976189613342285
+      },
+      {
+        "chain_id": "synthetic_random_codes_00017_tracking_V9RKR_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.09024715423584,
+        "ce_nomem": 6.595343589782715,
+        "ce_shuffle": 5.03029727935791,
+        "ce_mem_floor": 5.016966342926025
+      },
+      {
+        "chain_id": "synthetic_random_codes_00018_employee_id_F0BMC_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.299141883850098,
+        "ce_nomem": 6.701391220092773,
+        "ce_shuffle": 5.345295429229736,
+        "ce_mem_floor": 5.272210121154785
+      },
+      {
+        "chain_id": "synthetic_random_codes_00019_employee_id_LV1WT_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 7.197612762451172,
+        "ce_nomem": 9.269573211669922,
+        "ce_shuffle": 7.235689163208008,
+        "ce_mem_floor": 7.200827598571777
+      },
+      {
+        "chain_id": "synthetic_random_codes_00020_apartment_25BK3_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.923161268234253,
+        "ce_nomem": 4.277712821960449,
+        "ce_shuffle": 4.101968288421631,
+        "ce_mem_floor": 4.044671058654785
+      },
+      {
+        "chain_id": "synthetic_random_codes_00021_employee_id_Q3R6G_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.5195419788360596,
+        "ce_nomem": 4.8787841796875,
+        "ce_shuffle": 3.49060320854187,
+        "ce_mem_floor": 3.498173236846924
+      },
+      {
+        "chain_id": "synthetic_random_codes_00022_tracking_VVSVR_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.098814487457275,
+        "ce_nomem": 6.355604648590088,
+        "ce_shuffle": 5.075015068054199,
+        "ce_mem_floor": 5.1065993309021
+      },
+      {
+        "chain_id": "synthetic_random_codes_00023_tracking_OP374_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.286913871765137,
+        "ce_nomem": 5.395741939544678,
+        "ce_shuffle": 4.2212300300598145,
+        "ce_mem_floor": 4.161592483520508
+      },
+      {
+        "chain_id": "synthetic_random_codes_00024_locker_code_84V1L_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.4309775829315186,
+        "ce_nomem": 4.370190620422363,
+        "ce_shuffle": 3.3402962684631348,
+        "ce_mem_floor": 3.314739942550659
+      },
+      {
+        "chain_id": "synthetic_random_codes_00025_apartment_8S3VZ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.319744825363159,
+        "ce_nomem": 4.583762168884277,
+        "ce_shuffle": 3.441577911376953,
+        "ce_mem_floor": 3.385979413986206
+      },
+      {
+        "chain_id": "synthetic_random_codes_00026_flight_DU872_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.14321231842041,
+        "ce_nomem": 4.710251808166504,
+        "ce_shuffle": 5.141361236572266,
+        "ce_mem_floor": 5.278965950012207
+      },
+      {
+        "chain_id": "synthetic_random_codes_00027_tracking_0VEPJ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.107183456420898,
+        "ce_nomem": 6.751288890838623,
+        "ce_shuffle": 4.994658470153809,
+        "ce_mem_floor": 4.925004005432129
+      },
+      {
+        "chain_id": "synthetic_random_codes_00028_flight_FIHOF_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 7.271365642547607,
+        "ce_nomem": 10.071867942810059,
+        "ce_shuffle": 7.167140483856201,
+        "ce_mem_floor": 7.217995643615723
+      },
+      {
+        "chain_id": "synthetic_random_codes_00029_apartment_SJK0M_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.78513240814209,
+        "ce_nomem": 7.362800598144531,
+        "ce_shuffle": 4.914374351501465,
+        "ce_mem_floor": 4.801888942718506
+      },
+      {
+        "chain_id": "synthetic_random_codes_00030_locker_code_JBD60_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.297435760498047,
+        "ce_nomem": 6.247197151184082,
+        "ce_shuffle": 4.270004749298096,
+        "ce_mem_floor": 4.298825263977051
+      },
+      {
+        "chain_id": "synthetic_random_codes_00031_locker_code_CJQ9O_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.992010116577148,
+        "ce_nomem": 7.415934085845947,
+        "ce_shuffle": 5.008991241455078,
+        "ce_mem_floor": 5.054154396057129
+      },
+      {
+        "chain_id": "synthetic_random_codes_00032_tracking_8HO4L_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.965510129928589,
+        "ce_nomem": 5.340531826019287,
+        "ce_shuffle": 3.975079298019409,
+        "ce_mem_floor": 3.930206775665283
+      },
+      {
+        "chain_id": "synthetic_random_codes_00033_pin_4MF4S_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.056813716888428,
+        "ce_nomem": 4.878070831298828,
+        "ce_shuffle": 4.174629211425781,
+        "ce_mem_floor": 4.112769603729248
+      },
+      {
+        "chain_id": "synthetic_random_codes_00034_confirmation_AXPVB_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.917226791381836,
+        "ce_nomem": 8.878896713256836,
+        "ce_shuffle": 6.960979461669922,
+        "ce_mem_floor": 6.907071590423584
+      },
+      {
+        "chain_id": "synthetic_random_codes_00035_flight_3LIDY_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.671335697174072,
+        "ce_nomem": 5.104802131652832,
+        "ce_shuffle": 4.54217004776001,
+        "ce_mem_floor": 4.618732929229736
+      },
+      {
+        "chain_id": "synthetic_random_codes_00036_confirmation_INCIU_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 7.174436092376709,
+        "ce_nomem": 6.284707546234131,
+        "ce_shuffle": 7.174203872680664,
+        "ce_mem_floor": 7.235785484313965
+      },
+      {
+        "chain_id": "synthetic_random_codes_00037_voucher_D4962_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.9077413082122803,
+        "ce_nomem": 4.708934783935547,
+        "ce_shuffle": 3.895768880844116,
+        "ce_mem_floor": 3.9616219997406006
+      },
+      {
+        "chain_id": "synthetic_random_codes_00038_tracking_SEL40_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.41287899017334,
+        "ce_nomem": 6.814263343811035,
+        "ce_shuffle": 6.463061809539795,
+        "ce_mem_floor": 6.517007350921631
+      },
+      {
+        "chain_id": "synthetic_random_codes_00039_apartment_DED9C_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.4474921226501465,
+        "ce_nomem": 5.676966190338135,
+        "ce_shuffle": 4.417776107788086,
+        "ce_mem_floor": 4.458259582519531
+      },
+      {
+        "chain_id": "synthetic_random_codes_00040_flight_YTV6U_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.087594985961914,
+        "ce_nomem": 7.225403785705566,
+        "ce_shuffle": 5.122356414794922,
+        "ce_mem_floor": 5.1083526611328125
+      },
+      {
+        "chain_id": "synthetic_random_codes_00041_tracking_QEZIZ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.263604164123535,
+        "ce_nomem": 9.748211860656738,
+        "ce_shuffle": 6.565110683441162,
+        "ce_mem_floor": 6.463025093078613
+      },
+      {
+        "chain_id": "synthetic_random_codes_00042_flight_9JASZ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.368014812469482,
+        "ce_nomem": 5.305845260620117,
+        "ce_shuffle": 4.303525447845459,
+        "ce_mem_floor": 4.434913158416748
+      },
+      {
+        "chain_id": "synthetic_random_codes_00043_tracking_QR9GG_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.443295955657959,
+        "ce_nomem": 7.043887138366699,
+        "ce_shuffle": 5.431234359741211,
+        "ce_mem_floor": 5.37636661529541
+      },
+      {
+        "chain_id": "synthetic_random_codes_00044_employee_id_JCSD2_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.279609680175781,
+        "ce_nomem": 6.9252848625183105,
+        "ce_shuffle": 6.283759117126465,
+        "ce_mem_floor": 6.205705165863037
+      },
+      {
+        "chain_id": "synthetic_random_codes_00045_employee_id_N3LVG_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.968125343322754,
+        "ce_nomem": 5.877992630004883,
+        "ce_shuffle": 4.956387519836426,
+        "ce_mem_floor": 4.92182731628418
+      },
+      {
+        "chain_id": "synthetic_random_codes_00046_confirmation_87JZW_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.100855350494385,
+        "ce_nomem": 4.971792697906494,
+        "ce_shuffle": 4.194678783416748,
+        "ce_mem_floor": 4.090697765350342
+      },
+      {
+        "chain_id": "synthetic_random_codes_00047_flight_R96I5_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.375290870666504,
+        "ce_nomem": 5.171586990356445,
+        "ce_shuffle": 4.5522942543029785,
+        "ce_mem_floor": 4.580998420715332
+      },
+      {
+        "chain_id": "synthetic_random_codes_00048_confirmation_ATCW3_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.942298889160156,
+        "ce_nomem": 7.623007774353027,
+        "ce_shuffle": 6.834224700927734,
+        "ce_mem_floor": 6.87952184677124
+      },
+      {
+        "chain_id": "synthetic_random_codes_00049_locker_code_J3EW4_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.4947991371154785,
+        "ce_nomem": 6.392866134643555,
+        "ce_shuffle": 4.581644535064697,
+        "ce_mem_floor": 4.527600288391113
+      },
+      {
+        "chain_id": "synthetic_random_codes_00050_flight_93UV9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.217788219451904,
+        "ce_nomem": 4.574624538421631,
+        "ce_shuffle": 4.039252758026123,
+        "ce_mem_floor": 4.176703453063965
+      },
+      {
+        "chain_id": "synthetic_random_codes_00051_apartment_8WQKB_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.533457279205322,
+        "ce_nomem": 5.221217155456543,
+        "ce_shuffle": 4.423696041107178,
+        "ce_mem_floor": 4.41472864151001
+      },
+      {
+        "chain_id": "synthetic_random_codes_00052_voucher_A37VC_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.678812026977539,
+        "ce_nomem": 6.446771144866943,
+        "ce_shuffle": 4.758335113525391,
+        "ce_mem_floor": 4.751325607299805
+      },
+      {
+        "chain_id": "synthetic_random_codes_00053_employee_id_N4WWO_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.294833183288574,
+        "ce_nomem": 6.531102180480957,
+        "ce_shuffle": 5.319421768188477,
+        "ce_mem_floor": 5.317587852478027
+      },
+      {
+        "chain_id": "synthetic_random_codes_00054_locker_code_PWT7T_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.975100517272949,
+        "ce_nomem": 6.4986958503723145,
+        "ce_shuffle": 5.079813480377197,
+        "ce_mem_floor": 5.037299156188965
+      },
+      {
+        "chain_id": "synthetic_random_codes_00055_employee_id_887G1_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.2558772563934326,
+        "ce_nomem": 3.1989502906799316,
+        "ce_shuffle": 3.2552294731140137,
+        "ce_mem_floor": 3.258716106414795
+      },
+      {
+        "chain_id": "synthetic_random_codes_00056_voucher_D6UI9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.090490341186523,
+        "ce_nomem": 6.792841911315918,
+        "ce_shuffle": 5.108650207519531,
+        "ce_mem_floor": 5.028740406036377
+      },
+      {
+        "chain_id": "synthetic_random_codes_00057_locker_code_TSFQB_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.435149669647217,
+        "ce_nomem": 8.533452987670898,
+        "ce_shuffle": 6.4380340576171875,
+        "ce_mem_floor": 6.464642524719238
+      },
+      {
+        "chain_id": "synthetic_random_codes_00058_employee_id_4UMY4_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.9645893573760986,
+        "ce_nomem": 4.444939613342285,
+        "ce_shuffle": 3.939974546432495,
+        "ce_mem_floor": 3.9503045082092285
+      },
+      {
+        "chain_id": "synthetic_random_codes_00059_locker_code_OSZ7D_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.0876874923706055,
+        "ce_nomem": 6.260687828063965,
+        "ce_shuffle": 5.1307268142700195,
+        "ce_mem_floor": 5.06291389465332
+      },
+      {
+        "chain_id": "synthetic_random_codes_00060_pin_4BPI5_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.8392090797424316,
+        "ce_nomem": 5.610898971557617,
+        "ce_shuffle": 3.900378942489624,
+        "ce_mem_floor": 3.8046014308929443
+      },
+      {
+        "chain_id": "synthetic_random_codes_00061_tracking_NZVV6_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.750003814697266,
+        "ce_nomem": 7.4413371086120605,
+        "ce_shuffle": 5.734196662902832,
+        "ce_mem_floor": 5.753942012786865
+      },
+      {
+        "chain_id": "synthetic_random_codes_00062_confirmation_5DP04_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.630962371826172,
+        "ce_nomem": 3.8339104652404785,
+        "ce_shuffle": 3.594123125076294,
+        "ce_mem_floor": 3.5943455696105957
+      },
+      {
+        "chain_id": "synthetic_random_codes_00063_confirmation_5K1BE_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.805410385131836,
+        "ce_nomem": 4.328823089599609,
+        "ce_shuffle": 3.814467191696167,
+        "ce_mem_floor": 3.8277032375335693
+      },
+      {
+        "chain_id": "synthetic_random_codes_00064_pin_NM7KM_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.491682052612305,
+        "ce_nomem": 7.755521774291992,
+        "ce_shuffle": 6.514203071594238,
+        "ce_mem_floor": 6.335527420043945
+      },
+      {
+        "chain_id": "synthetic_random_codes_00065_flight_LWYL9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.82792854309082,
+        "ce_nomem": 7.912528991699219,
+        "ce_shuffle": 6.800477981567383,
+        "ce_mem_floor": 6.795314311981201
+      },
+      {
+        "chain_id": "synthetic_random_codes_00066_pin_2HHGU_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.938718795776367,
+        "ce_nomem": 6.47808837890625,
+        "ce_shuffle": 4.892361640930176,
+        "ce_mem_floor": 4.950988292694092
+      },
+      {
+        "chain_id": "synthetic_random_codes_00067_flight_R4ZHT_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.87503719329834,
+        "ce_nomem": 7.406659126281738,
+        "ce_shuffle": 4.962298393249512,
+        "ce_mem_floor": 4.97915506362915
+      },
+      {
+        "chain_id": "synthetic_random_codes_00068_pin_7LGU7_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.050899505615234,
+        "ce_nomem": 4.568435192108154,
+        "ce_shuffle": 4.0555100440979,
+        "ce_mem_floor": 4.0655198097229
+      },
+      {
+        "chain_id": "synthetic_random_codes_00069_flight_AZVF4_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.5596747398376465,
+        "ce_nomem": 7.843883037567139,
+        "ce_shuffle": 5.648097991943359,
+        "ce_mem_floor": 5.5191755294799805
+      },
+      {
+        "chain_id": "synthetic_random_codes_00070_pin_7CPL2_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.930800199508667,
+        "ce_nomem": 5.115312099456787,
+        "ce_shuffle": 3.930903196334839,
+        "ce_mem_floor": 3.9129319190979004
+      },
+      {
+        "chain_id": "synthetic_random_codes_00071_locker_code_OTQ95_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.0323405265808105,
+        "ce_nomem": 6.221384048461914,
+        "ce_shuffle": 5.058612823486328,
+        "ce_mem_floor": 5.112687110900879
+      },
+      {
+        "chain_id": "synthetic_random_codes_00072_voucher_Z68JG_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.107212066650391,
+        "ce_nomem": 4.717817783355713,
+        "ce_shuffle": 4.112875461578369,
+        "ce_mem_floor": 4.122507572174072
+      },
+      {
+        "chain_id": "synthetic_random_codes_00073_locker_code_QCCBF_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 5.993106842041016,
+        "ce_nomem": 8.762591361999512,
+        "ce_shuffle": 6.093940734863281,
+        "ce_mem_floor": 5.967426300048828
+      },
+      {
+        "chain_id": "synthetic_random_codes_00074_flight_M9X59_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.6854827404022217,
+        "ce_nomem": 4.732276439666748,
+        "ce_shuffle": 3.6486504077911377,
+        "ce_mem_floor": 3.575587034225464
+      },
+      {
+        "chain_id": "synthetic_random_codes_00075_employee_id_75O7Q_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 6,
+        "ce_mem": 3.3977363109588623,
+        "ce_nomem": 4.371354103088379,
+        "ce_shuffle": 3.4334607124328613,
+        "ce_mem_floor": 3.4134626388549805
+      },
+      {
+        "chain_id": "synthetic_random_codes_00076_apartment_TY9N2_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.684624671936035,
+        "ce_nomem": 7.731096267700195,
+        "ce_shuffle": 4.810147285461426,
+        "ce_mem_floor": 4.797894477844238
+      },
+      {
+        "chain_id": "synthetic_random_codes_00077_tracking_XWYUK_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.114993572235107,
+        "ce_nomem": 5.913705348968506,
+        "ce_shuffle": 5.083413124084473,
+        "ce_mem_floor": 5.2306623458862305
+      },
+      {
+        "chain_id": "synthetic_random_codes_00078_tracking_179CV_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.77213978767395,
+        "ce_nomem": 4.404881954193115,
+        "ce_shuffle": 3.7431633472442627,
+        "ce_mem_floor": 3.8598549365997314
+      },
+      {
+        "chain_id": "synthetic_random_codes_00079_pin_4NNI9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.404480457305908,
+        "ce_nomem": 5.552703380584717,
+        "ce_shuffle": 4.345673084259033,
+        "ce_mem_floor": 4.389713287353516
+      },
+      {
+        "chain_id": "synthetic_random_codes_00080_voucher_O02FW_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.259450912475586,
+        "ce_nomem": 6.661036014556885,
+        "ce_shuffle": 5.190091133117676,
+        "ce_mem_floor": 5.251472473144531
+      },
+      {
+        "chain_id": "synthetic_random_codes_00081_voucher_SZMM9_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.220666408538818,
+        "ce_nomem": 7.264005184173584,
+        "ce_shuffle": 6.255242824554443,
+        "ce_mem_floor": 6.260748863220215
+      },
+      {
+        "chain_id": "synthetic_random_codes_00082_flight_JG0YJ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.9834229946136475,
+        "ce_nomem": 5.695841312408447,
+        "ce_shuffle": 3.993394136428833,
+        "ce_mem_floor": 3.9953479766845703
+      },
+      {
+        "chain_id": "synthetic_random_codes_00083_pin_3FYBQ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.741659164428711,
+        "ce_nomem": 4.979564189910889,
+        "ce_shuffle": 3.705019474029541,
+        "ce_mem_floor": 3.7442634105682373
+      },
+      {
+        "chain_id": "synthetic_random_codes_00084_pin_5E0HW_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.891331195831299,
+        "ce_nomem": 4.821904182434082,
+        "ce_shuffle": 3.838386297225952,
+        "ce_mem_floor": 3.9120266437530518
+      },
+      {
+        "chain_id": "synthetic_random_codes_00085_locker_code_9O5GE_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.338355541229248,
+        "ce_nomem": 5.646604537963867,
+        "ce_shuffle": 4.334140300750732,
+        "ce_mem_floor": 4.319409370422363
+      },
+      {
+        "chain_id": "synthetic_random_codes_00086_confirmation_VTCHO_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 2,
+        "ce_mem": 9.840123176574707,
+        "ce_nomem": 10.77509880065918,
+        "ce_shuffle": 10.014568328857422,
+        "ce_mem_floor": 9.990480422973633
+      },
+      {
+        "chain_id": "synthetic_random_codes_00087_tracking_S7LMU_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.581307411193848,
+        "ce_nomem": 6.867735862731934,
+        "ce_shuffle": 5.6221418380737305,
+        "ce_mem_floor": 5.635252952575684
+      },
+      {
+        "chain_id": "synthetic_random_codes_00088_voucher_IKTMH_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.806741714477539,
+        "ce_nomem": 8.021414756774902,
+        "ce_shuffle": 6.8882975578308105,
+        "ce_mem_floor": 6.863875389099121
+      },
+      {
+        "chain_id": "synthetic_random_codes_00089_pin_99RLC_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.878612995147705,
+        "ce_nomem": 5.09079122543335,
+        "ce_shuffle": 3.932373046875,
+        "ce_mem_floor": 3.841996908187866
+      },
+      {
+        "chain_id": "synthetic_random_codes_00090_confirmation_78GY7_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.815643787384033,
+        "ce_nomem": 4.682185649871826,
+        "ce_shuffle": 3.788806915283203,
+        "ce_mem_floor": 3.8454606533050537
+      },
+      {
+        "chain_id": "synthetic_random_codes_00091_apartment_Z4ISW_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 4.929572582244873,
+        "ce_nomem": 7.024012565612793,
+        "ce_shuffle": 4.9377946853637695,
+        "ce_mem_floor": 4.886974334716797
+      },
+      {
+        "chain_id": "synthetic_random_codes_00092_apartment_YE5NZ_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.299567699432373,
+        "ce_nomem": 9.438140869140625,
+        "ce_shuffle": 6.35873556137085,
+        "ce_mem_floor": 6.28737211227417
+      },
+      {
+        "chain_id": "synthetic_random_codes_00093_tracking_Z62K1_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.7886242866516113,
+        "ce_nomem": 4.62839412689209,
+        "ce_shuffle": 3.832474946975708,
+        "ce_mem_floor": 3.7719979286193848
+      },
+      {
+        "chain_id": "synthetic_random_codes_00094_employee_id_X6V4R_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 3.654280185699463,
+        "ce_nomem": 4.749614238739014,
+        "ce_shuffle": 3.6546554565429688,
+        "ce_mem_floor": 3.6192538738250732
+      },
+      {
+        "chain_id": "synthetic_random_codes_00095_voucher_XGRR0_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 4,
+        "ce_mem": 5.05800724029541,
+        "ce_nomem": 6.3027215003967285,
+        "ce_shuffle": 5.102747917175293,
+        "ce_mem_floor": 5.006939888000488
+      },
+      {
+        "chain_id": "synthetic_random_codes_00096_locker_code_EQET1_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.056588172912598,
+        "ce_nomem": 8.0673828125,
+        "ce_shuffle": 6.0632429122924805,
+        "ce_mem_floor": 6.029094696044922
+      },
+      {
+        "chain_id": "synthetic_random_codes_00097_pin_MAWOO_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 3,
+        "ce_mem": 6.5816969871521,
+        "ce_nomem": 7.773210525512695,
+        "ce_shuffle": 6.548659324645996,
+        "ce_mem_floor": 6.53406286239624
+      },
+      {
+        "chain_id": "synthetic_random_codes_00098_apartment_S0Z7J_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.06240177154541,
+        "ce_nomem": 6.082372665405273,
+        "ce_shuffle": 4.109996795654297,
+        "ce_mem_floor": 4.052308082580566
+      },
+      {
+        "chain_id": "synthetic_random_codes_00099_flight_0Y0GY_n2ev",
+        "callback_pos": 9,
+        "n_callback_tok": 5,
+        "ce_mem": 4.449410915374756,
+        "ce_nomem": 5.076982021331787,
+        "ce_shuffle": 4.4307475090026855,
+        "ce_mem_floor": 4.334934234619141
+      }
+    ]
+  },
+  "lme_val": {
+    "n_chains_scored": 50,
+    "ce_mem": 5.464440062046051,
+    "ce_nomem": 4.730415658950806,
+    "ce_shuffle": 5.401771335601807,
+    "ce_mem_floor": 5.457633576393127,
+    "pa_cb_dnm": -0.734024403095245,
+    "pa_cb_dsh": -0.06266872644424382,
+    "pa_cb_dnm_floor": -0.7272179174423217,
+    "pa_cb_evidence_lift": -0.0068064856529233,
+    "per_chain": [
+      {
+        "chain_id": "longmemeval_gpt4_59149c78",
+        "callback_pos": 51,
+        "n_callback_tok": 6,
+        "ce_mem": 4.49725866317749,
+        "ce_nomem": 4.398359775543213,
+        "ce_shuffle": 4.614521026611328,
+        "ce_mem_floor": 4.555695533752441
+      },
+      {
+        "chain_id": "longmemeval_a346bb18",
+        "callback_pos": 49,
+        "n_callback_tok": 3,
+        "ce_mem": 2.474409818649292,
+        "ce_nomem": 2.5961949825286865,
+        "ce_shuffle": 2.399498701095581,
+        "ce_mem_floor": 2.535611867904663
+      },
+      {
+        "chain_id": "longmemeval_95228167",
+        "callback_pos": 49,
+        "n_callback_tok": 62,
+        "ce_mem": 4.4752421379089355,
+        "ce_nomem": 3.360283374786377,
+        "ce_shuffle": 4.443500995635986,
+        "ce_mem_floor": 4.492577075958252
+      },
+      {
+        "chain_id": "longmemeval_5d3d2817",
+        "callback_pos": 53,
+        "n_callback_tok": 7,
+        "ce_mem": 5.388375759124756,
+        "ce_nomem": 5.352972030639648,
+        "ce_shuffle": 5.367189407348633,
+        "ce_mem_floor": 5.307197093963623
+      },
+      {
+        "chain_id": "longmemeval_b01defab",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 9.289976119995117,
+        "ce_nomem": 8.9513521194458,
+        "ce_shuffle": 9.239198684692383,
+        "ce_mem_floor": 9.302818298339844
+      },
+      {
+        "chain_id": "longmemeval_0862e8bf_abs",
+        "callback_pos": 52,
+        "n_callback_tok": 18,
+        "ce_mem": 4.509829044342041,
+        "ce_nomem": 4.035994529724121,
+        "ce_shuffle": 4.582779884338379,
+        "ce_mem_floor": 4.489729404449463
+      },
+      {
+        "chain_id": "longmemeval_gpt4_59c863d7",
+        "callback_pos": 47,
+        "n_callback_tok": 79,
+        "ce_mem": 4.742326736450195,
+        "ce_nomem": 3.749413013458252,
+        "ce_shuffle": 4.769031047821045,
+        "ce_mem_floor": 4.7657952308654785
+      },
+      {
+        "chain_id": "longmemeval_993da5e2",
+        "callback_pos": 49,
+        "n_callback_tok": 18,
+        "ce_mem": 3.830451488494873,
+        "ce_nomem": 3.7087597846984863,
+        "ce_shuffle": 3.79284930229187,
+        "ce_mem_floor": 3.816298723220825
+      },
+      {
+        "chain_id": "longmemeval_4fd1909e",
+        "callback_pos": 55,
+        "n_callback_tok": 4,
+        "ce_mem": 9.70100212097168,
+        "ce_nomem": 8.058503150939941,
+        "ce_shuffle": 9.485432624816895,
+        "ce_mem_floor": 9.323176383972168
+      },
+      {
+        "chain_id": "longmemeval_6b168ec8",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 11.386736869812012,
+        "ce_nomem": 9.756771087646484,
+        "ce_shuffle": 9.73802661895752,
+        "ce_mem_floor": 11.028667449951172
+      },
+      {
+        "chain_id": "longmemeval_8e9d538c",
+        "callback_pos": 48,
+        "n_callback_tok": 3,
+        "ce_mem": 2.2665367126464844,
+        "ce_nomem": 2.9509458541870117,
+        "ce_shuffle": 2.479848861694336,
+        "ce_mem_floor": 2.7343127727508545
+      },
+      {
+        "chain_id": "longmemeval_e5ba910e_abs",
+        "callback_pos": 48,
+        "n_callback_tok": 21,
+        "ce_mem": 3.595026731491089,
+        "ce_nomem": 3.074472427368164,
+        "ce_shuffle": 3.556997060775757,
+        "ce_mem_floor": 3.620279312133789
+      },
+      {
+        "chain_id": "longmemeval_ce6d2d27",
+        "callback_pos": 51,
+        "n_callback_tok": 2,
+        "ce_mem": 11.892802238464355,
+        "ce_nomem": 8.29555606842041,
+        "ce_shuffle": 11.814574241638184,
+        "ce_mem_floor": 12.882266998291016
+      },
+      {
+        "chain_id": "longmemeval_0a34ad58",
+        "callback_pos": 42,
+        "n_callback_tok": 51,
+        "ce_mem": 4.373044013977051,
+        "ce_nomem": 3.618083953857422,
+        "ce_shuffle": 4.3668599128723145,
+        "ce_mem_floor": 4.394950866699219
+      },
+      {
+        "chain_id": "longmemeval_58bf7951",
+        "callback_pos": 57,
+        "n_callback_tok": 6,
+        "ce_mem": 10.332260131835938,
+        "ce_nomem": 5.644032955169678,
+        "ce_shuffle": 10.166144371032715,
+        "ce_mem_floor": 10.353782653808594
+      },
+      {
+        "chain_id": "longmemeval_60d45044",
+        "callback_pos": 51,
+        "n_callback_tok": 6,
+        "ce_mem": 5.945634365081787,
+        "ce_nomem": 5.202915668487549,
+        "ce_shuffle": 6.017395973205566,
+        "ce_mem_floor": 5.985111236572266
+      },
+      {
+        "chain_id": "longmemeval_0100672e",
+        "callback_pos": 49,
+        "n_callback_tok": 4,
+        "ce_mem": 7.6509857177734375,
+        "ce_nomem": 7.362436294555664,
+        "ce_shuffle": 7.56121301651001,
+        "ce_mem_floor": 7.314464569091797
+      },
+      {
+        "chain_id": "longmemeval_gpt4_68e94288",
+        "callback_pos": 44,
+        "n_callback_tok": 13,
+        "ce_mem": 4.822361946105957,
+        "ce_nomem": 3.849433422088623,
+        "ce_shuffle": 4.724821090698242,
+        "ce_mem_floor": 4.7940354347229
+      },
+      {
+        "chain_id": "longmemeval_6ae235be",
+        "callback_pos": 48,
+        "n_callback_tok": 24,
+        "ce_mem": 4.721470832824707,
+        "ce_nomem": 3.47938871383667,
+        "ce_shuffle": 4.710021495819092,
+        "ce_mem_floor": 4.757072448730469
+      },
+      {
+        "chain_id": "longmemeval_1de5cff2",
+        "callback_pos": 45,
+        "n_callback_tok": 3,
+        "ce_mem": 10.587217330932617,
+        "ce_nomem": 9.1514310836792,
+        "ce_shuffle": 10.209732055664062,
+        "ce_mem_floor": 10.448099136352539
+      },
+      {
+        "chain_id": "longmemeval_2133c1b5",
+        "callback_pos": 51,
+        "n_callback_tok": 3,
+        "ce_mem": 2.069711685180664,
+        "ce_nomem": 2.0398852825164795,
+        "ce_shuffle": 2.0294902324676514,
+        "ce_mem_floor": 2.285830497741699
+      },
+      {
+        "chain_id": "longmemeval_87f22b4a",
+        "callback_pos": 47,
+        "n_callback_tok": 5,
+        "ce_mem": 6.7864089012146,
+        "ce_nomem": 5.795931339263916,
+        "ce_shuffle": 6.530982494354248,
+        "ce_mem_floor": 6.7133989334106445
+      },
+      {
+        "chain_id": "longmemeval_8464fc84",
+        "callback_pos": 45,
+        "n_callback_tok": 4,
+        "ce_mem": 8.908329010009766,
+        "ce_nomem": 8.311491012573242,
+        "ce_shuffle": 8.41887092590332,
+        "ce_mem_floor": 8.736591339111328
+      },
+      {
+        "chain_id": "longmemeval_e47becba",
+        "callback_pos": 53,
+        "n_callback_tok": 3,
+        "ce_mem": 5.810479640960693,
+        "ce_nomem": 6.039674282073975,
+        "ce_shuffle": 5.752208709716797,
+        "ce_mem_floor": 5.782932281494141
+      },
+      {
+        "chain_id": "longmemeval_46a3abf7",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 2.327018976211548,
+        "ce_nomem": 2.749701499938965,
+        "ce_shuffle": 2.5086891651153564,
+        "ce_mem_floor": 2.247305393218994
+      },
+      {
+        "chain_id": "longmemeval_81507db6",
+        "callback_pos": 50,
+        "n_callback_tok": 2,
+        "ce_mem": 3.650942802429199,
+        "ce_nomem": 2.2189197540283203,
+        "ce_shuffle": 3.7978618144989014,
+        "ce_mem_floor": 3.668658494949341
+      },
+      {
+        "chain_id": "longmemeval_8c18457d",
+        "callback_pos": 41,
+        "n_callback_tok": 16,
+        "ce_mem": 4.080754280090332,
+        "ce_nomem": 3.2029032707214355,
+        "ce_shuffle": 4.101650714874268,
+        "ce_mem_floor": 4.073724746704102
+      },
+      {
+        "chain_id": "longmemeval_41275add",
+        "callback_pos": 53,
+        "n_callback_tok": 41,
+        "ce_mem": 3.6791574954986572,
+        "ce_nomem": 3.081871509552002,
+        "ce_shuffle": 3.7131569385528564,
+        "ce_mem_floor": 3.684988498687744
+      },
+      {
+        "chain_id": "longmemeval_4388e9dd",
+        "callback_pos": 43,
+        "n_callback_tok": 11,
+        "ce_mem": 4.872859954833984,
+        "ce_nomem": 4.164292812347412,
+        "ce_shuffle": 4.998929977416992,
+        "ce_mem_floor": 4.981135368347168
+      },
+      {
+        "chain_id": "longmemeval_d905b33f",
+        "callback_pos": 48,
+        "n_callback_tok": 3,
+        "ce_mem": 2.1458687782287598,
+        "ce_nomem": 1.252386450767517,
+        "ce_shuffle": 1.9988245964050293,
+        "ce_mem_floor": 2.152829647064209
+      },
+      {
+        "chain_id": "longmemeval_f4f1d8a4_abs",
+        "callback_pos": 50,
+        "n_callback_tok": 22,
+        "ce_mem": 3.555586576461792,
+        "ce_nomem": 3.1201159954071045,
+        "ce_shuffle": 3.593106746673584,
+        "ce_mem_floor": 3.5673987865448
+      },
+      {
+        "chain_id": "longmemeval_gpt4_a56e767c",
+        "callback_pos": 48,
+        "n_callback_tok": 6,
+        "ce_mem": 5.126344680786133,
+        "ce_nomem": 5.136123180389404,
+        "ce_shuffle": 4.98411750793457,
+        "ce_mem_floor": 5.111178874969482
+      },
+      {
+        "chain_id": "longmemeval_778164c6",
+        "callback_pos": 50,
+        "n_callback_tok": 9,
+        "ce_mem": 4.020900249481201,
+        "ce_nomem": 3.4868860244750977,
+        "ce_shuffle": 3.9752023220062256,
+        "ce_mem_floor": 3.9711854457855225
+      },
+      {
+        "chain_id": "longmemeval_6aeb4375_abs",
+        "callback_pos": 46,
+        "n_callback_tok": 17,
+        "ce_mem": 4.363336086273193,
+        "ce_nomem": 4.084190845489502,
+        "ce_shuffle": 4.39387845993042,
+        "ce_mem_floor": 4.359812259674072
+      },
+      {
+        "chain_id": "longmemeval_f35224e0",
+        "callback_pos": 53,
+        "n_callback_tok": 3,
+        "ce_mem": 3.286371946334839,
+        "ce_nomem": 3.1483378410339355,
+        "ce_shuffle": 3.476792097091675,
+        "ce_mem_floor": 3.29890513420105
+      },
+      {
+        "chain_id": "longmemeval_e6041065",
+        "callback_pos": 45,
+        "n_callback_tok": 3,
+        "ce_mem": 2.9561259746551514,
+        "ce_nomem": 1.85006844997406,
+        "ce_shuffle": 2.8476531505584717,
+        "ce_mem_floor": 2.9498252868652344
+      },
+      {
+        "chain_id": "longmemeval_gpt4_e061b84g",
+        "callback_pos": 58,
+        "n_callback_tok": 8,
+        "ce_mem": 6.311756134033203,
+        "ce_nomem": 5.194392204284668,
+        "ce_shuffle": 6.368145942687988,
+        "ce_mem_floor": 6.260435104370117
+      },
+      {
+        "chain_id": "longmemeval_5e1b23de",
+        "callback_pos": 45,
+        "n_callback_tok": 2,
+        "ce_mem": 2.479093074798584,
+        "ce_nomem": 2.782275676727295,
+        "ce_shuffle": 2.7126455307006836,
+        "ce_mem_floor": 2.444885730743408
+      },
+      {
+        "chain_id": "longmemeval_a96c20ee",
+        "callback_pos": 51,
+        "n_callback_tok": 4,
+        "ce_mem": 4.997765064239502,
+        "ce_nomem": 5.153836250305176,
+        "ce_shuffle": 4.93601655960083,
+        "ce_mem_floor": 4.859938621520996
+      },
+      {
+        "chain_id": "longmemeval_dccbc061",
+        "callback_pos": 49,
+        "n_callback_tok": 4,
+        "ce_mem": 8.777196884155273,
+        "ce_nomem": 8.53209400177002,
+        "ce_shuffle": 8.501734733581543,
+        "ce_mem_floor": 8.89307975769043
+      },
+      {
+        "chain_id": "longmemeval_e9327a54",
+        "callback_pos": 50,
+        "n_callback_tok": 7,
+        "ce_mem": 8.64344310760498,
+        "ce_nomem": 7.173173427581787,
+        "ce_shuffle": 8.674532890319824,
+        "ce_mem_floor": 8.655445098876953
+      },
+      {
+        "chain_id": "longmemeval_8cf51dda",
+        "callback_pos": 46,
+        "n_callback_tok": 44,
+        "ce_mem": 2.1850595474243164,
+        "ce_nomem": 1.7002359628677368,
+        "ce_shuffle": 2.235469102859497,
+        "ce_mem_floor": 2.213315963745117
+      },
+      {
+        "chain_id": "longmemeval_dad224aa",
+        "callback_pos": 48,
+        "n_callback_tok": 6,
+        "ce_mem": 1.8088701963424683,
+        "ce_nomem": 1.6095575094223022,
+        "ce_shuffle": 1.9072635173797607,
+        "ce_mem_floor": 1.8924484252929688
+      },
+      {
+        "chain_id": "longmemeval_4100d0a0",
+        "callback_pos": 50,
+        "n_callback_tok": 7,
+        "ce_mem": 6.281683921813965,
+        "ce_nomem": 5.440763473510742,
+        "ce_shuffle": 6.223981857299805,
+        "ce_mem_floor": 6.305277347564697
+      },
+      {
+        "chain_id": "longmemeval_35a27287",
+        "callback_pos": 51,
+        "n_callback_tok": 54,
+        "ce_mem": 4.123007297515869,
+        "ce_nomem": 3.236100196838379,
+        "ce_shuffle": 4.084275722503662,
+        "ce_mem_floor": 4.093552112579346
+      },
+      {
+        "chain_id": "longmemeval_bc149d6b",
+        "callback_pos": 46,
+        "n_callback_tok": 4,
+        "ce_mem": 3.51353120803833,
+        "ce_nomem": 2.490147113800049,
+        "ce_shuffle": 3.3848257064819336,
+        "ce_mem_floor": 3.4485063552856445
+      },
+      {
+        "chain_id": "longmemeval_c4ea545c",
+        "callback_pos": 46,
+        "n_callback_tok": 2,
+        "ce_mem": 8.003545761108398,
+        "ce_nomem": 8.45808219909668,
+        "ce_shuffle": 7.944816589355469,
+        "ce_mem_floor": 7.746489524841309
+      },
+      {
+        "chain_id": "longmemeval_001be529",
+        "callback_pos": 51,
+        "n_callback_tok": 4,
+        "ce_mem": 8.386761665344238,
+        "ce_nomem": 6.0364837646484375,
+        "ce_shuffle": 8.571438789367676,
+        "ce_mem_floor": 8.142366409301758
+      },
+      {
+        "chain_id": "longmemeval_32260d93",
+        "callback_pos": 46,
+        "n_callback_tok": 33,
+        "ce_mem": 4.3989129066467285,
+        "ce_nomem": 3.837675094604492,
+        "ce_shuffle": 4.3484625816345215,
+        "ce_mem_floor": 4.363217830657959
+      },
+      {
+        "chain_id": "longmemeval_0862e8bf",
+        "callback_pos": 50,
+        "n_callback_tok": 3,
+        "ce_mem": 9.188230514526367,
+        "ce_nomem": 8.59588623046875,
+        "ce_shuffle": 9.033905029296875,
+        "ce_mem_floor": 9.075077056884766
+      }
+    ]
+  }
+}

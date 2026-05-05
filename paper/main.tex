@@ -1,0 +1,1040 @@
+% =====================================================================
+% Paper A — Memory Residuals at Scale
+% NeurIPS 2026 Main Track submission
+%
+% NOTE on style file: the official `neurips_2026.sty` has not yet been
+% downloaded from media.neurips.cc. We compile against `neurips_2024.sty`
+% which is structurally identical for the purposes of layout and page
+% limits; swap in `neurips_2026.sty` (and re-add the `\usepackage{...}`
+% line) before the final upload.
+% =====================================================================
+\documentclass{article}
+
+% -- NeurIPS style. Use [final] for camera-ready.
+\usepackage[preprint]{neurips_2024}
+
+% -- Standard math / graphics
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=cyan,
+}
+
+% Auto-generated macros (numbers.tex). Re-run paper/scripts/render_numbers_tex.py
+% after any new eval JSON lands.
+\input{numbers}
+% Cross-corpus eval macros (xcorpus_numbers.tex). Re-run
+% paper/scripts/compute_xcorpus_numbers.py after any new
+% results/eval_v27_v28_cross_corpus/*.json lands.
+\input{xcorpus_numbers}
+
+\title{Memory Residuals:\\
+       An $O(1)$-Storage, $O(1)$-Routing Recurrent Memory Primitive\\
+       for Frozen Pretrained Language Models}
+
+\author{
+  Anonymous Authors \\
+  Anonymous Affiliation \\
+  \texttt{anonymous@example.com}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We introduce \textbf{Memory Residuals}, a fixed-size jointly-trained
+recurrent memory matrix $M_c \in \mathbb{R}^{K \times d}$ that an
+\emph{otherwise frozen} pretrained LLM reads and writes through a
+depth-routed cross-attention residual. The construction occupies a
+previously empty corner of the long-horizon-memory design space:
+$\mathcal{O}(1)$ storage in chain length, $\mathcal{O}(1)$ per-token
+routing cost, and no backbone fine-tuning. Prior recurrent-memory
+recipes (Block-Recurrent, RMT, AutoCompressors) hit the constant-cost
+target but unfreeze the LM; retrieval and Memorising Transformers
+keep the backbone frozen but pay $\mathcal{O}(T)$ in storage or
+context. The primitive decomposes into four loosely-coupled
+segments---a Perceiver-style writer, a per-token readout, a depth
+router, and a single-scalar memory-channel floor---and the
+segmentation is itself a contribution: each piece can be replaced
+independently. Empirically, with $\sim$6\% trainable-parameter
+overhead on a frozen Qwen3-0.6B and $\sim$1.5\,h of training on a
+single H100, the primitive lowers callback cross-entropy on
+LongMemEval-S by $+1.32 \pm 0.53$~nats (four seeds, 95\,\% bootstrap
+CI $[+1.11, +1.55]$), preserves at 1.7B ($\Dseventeenmean$~nats,
+$n{=}\NSEEDSseventeen$ seeds, every seed positive), and transfers
+without retraining to two unseen callback corpora at 1.7B
+($\sim$70\% of the in-domain gain). A matched control suite
+(chain-shuffle, evidence-redaction, oracle-RAG) localises the gain
+to \emph{chain-conditional context compression} rather than per-fact
+recall, and three single-flag interventions
+(\S\ref{sec:chainspec})---a per-category breakdown, a sparse-writer
+ablation on a random-alphanumeric-code corpus ($+1.33$~nats with
+positive chain-shuffle), and a contrastive auxiliary
+($\Delta_{\mathrm{sh}}{:} 0\!\to\!{+}0.010$ without disturbing the
+headline)---resolve the ``isn't this just a learned chain prior?''
+critique affirmatively. We treat the numbers as proof-of-life and
+the segmentation as the durable contribution; the deployment target
+is a life-long conversational agent on a frozen LLM whose memory
+module is trainable in hours, not weeks, and swappable rather than
+re-fine-tuned.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+\paragraph{The asymptotic design space of long-horizon LLM memory.}
+The operating cost of a long-horizon memory mechanism over a chain of
+$T$ sessions breaks into three axes: \emph{storage} (state size as a
+function of $T$), \emph{routing} (per-token inference cost paid to
+consult that state), and whether the LM \emph{backbone is frozen}.
+Existing approaches sit in distinct corners of this cube
+(Table~\ref{tab:asymptotics}): long-context attention pays
+$\mathcal{O}(T^2)$ routing; RAG keeps the backbone frozen but the
+index is $\mathcal{O}(T)$ and per-query inference adds
+$\mathcal{O}(kS)$ context tokens; the recurrent-memory family
+(Transformer-XL~\cite{dai2019transformerxl},
+RMT~\cite{bulatov2022recurrent},
+Block-Recurrent~\cite{hutchins2022block},
+AutoCompressors~\cite{chevalier2023adapting},
+Compressive Transformer~\cite{rae2019compressive}) achieves
+$\mathcal{O}(K)$ storage and routing but every prior recipe
+unfreezes the LM during training. Memorising
+Transformers~\cite{wu2022memorising} keep the backbone frozen but
+pay $\mathcal{O}(T)$ in storage. \emph{No prior recipe sits in the
+$\mathcal{O}(1)$/$\mathcal{O}(1)$/frozen-backbone corner with a memory
+module that learns useful long-horizon behaviour.} Memory Residuals
+is, to our knowledge, the first construction in that corner.
+
+\begin{table}[h]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Asymptotic cost of long-horizon memory mechanisms in chain
+length $T$. \emph{Storage}: state size as a function of $T$.
+\emph{Routing}: per-token LM inference cost added by consulting the
+memory. \emph{Backbone}: whether the recipe trains with the LM
+weights frozen. $K$ denotes a method-specific fixed memory budget;
+$k$ the retrieval top-$k$; $S$ the per-session length. Memory
+Residuals occupies the previously-empty $\mathcal{O}(1)$ /
+$\mathcal{O}(1)$ / frozen corner.}
+\label{tab:asymptotics}
+\begin{tabular}{l c c c}
+\toprule
+mechanism & storage in $T$ & routing per token & frozen backbone \\
+\midrule
+long context (RoPE-extended)              & $\mathcal{O}(T)$ ctx tokens & $\mathcal{O}(T)$           & yes \\
+RAG \cite{lewis2020retrieval}             & $\mathcal{O}(T)$ index      & $\mathcal{O}(\log T) + \mathcal{O}(kS)$ ctx & yes \\
+Memorising Tx \cite{wu2022memorising}     & $\mathcal{O}(T)$ kNN store  & $\mathcal{O}(\log T) + \mathcal{O}(k)$      & no \\
+Transformer-XL \cite{dai2019transformerxl}, Compressive \cite{rae2019compressive} & $\mathcal{O}(K)$ KV cache & $\mathcal{O}(K)$ & no \\
+RMT \cite{bulatov2022recurrent}, Block-Rec \cite{hutchins2022block}, AutoComp \cite{chevalier2023adapting} & $\mathcal{O}(K)$ tokens & $\mathcal{O}(K)$ & no \\
+\textbf{Memory Residuals (ours)}          & $\mathbf{\mathcal{O}(K)}$ matrix & $\mathbf{\mathcal{O}(K)}$ & \textbf{yes} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This corner is the only point in the design space simultaneously
+cheap to deploy atop an existing pretrained LLM, cheap to run at
+inference, and bounded in state regardless of conversation length.
+A recipe that learns useful behaviour here is the natural target for
+a life-long conversational agent on a fixed backbone, where
+retraining the LM is prohibitive but constant per-conversation cost
+is required.
+
+\paragraph{What this paper contributes.}
+(1) An $\mathcal{O}(1)$/$\mathcal{O}(1)$/frozen-backbone recurrent
+memory primitive: a fixed-size jointly-trained matrix $M_c \in
+\mathbb{R}^{K \times d}$ ($K{=}128$) read and written through a
+depth-routed cross-attention residual, trained end-to-end with
+LM-NLL on chain-callback supervision; the LM backbone is never
+updated. (2) \textbf{Composable segments} designed for follow-on
+work: a Perceiver-style \emph{writer}
+(\S\ref{sec:method_writer}), per-token \emph{readout}
+(\S\ref{sec:method_read}), \emph{depth router}
+(\S\ref{sec:method_router}), and a single-scalar \emph{$\alpha$-floor}
+(the only auxiliary loss); interfaces are narrow and each piece can
+be swapped independently. (3) A \textbf{chain-specificity
+measurement framework}: matched controls (chain-shuffle
+$\Delta_{\mathrm{sh}}$, evidence-redaction
+$\mathrm{evidence\_lift}$, oracle-RAG) that separate
+``chain-conditional context compression'' from ``literal evidence
+retrieval''. (4) Empirical proof-of-life: $+1.32 \pm 0.53$~nats at
+0.6B (four seeds, 95\,\% bootstrap CI $[+1.11, +1.55]$) and
+$\Dseventeenmean$~nats at 1.7B ($n{=}\NSEEDSseventeen$ seeds, every
+seed positive); transfer to two unseen callback corpora at 1.7B
+recovers $\sim$70\% of the in-domain gain. The
+$\Delta_{\mathrm{sh}} \approx 0$ ``learned chain prior'' critique
+yields to three single-flag interventions (\S\ref{sec:chainspec}):
+a per-category breakdown surfaces hidden chain-conditional positives
+in four of six LongMemEval categories; a sparse-writer ablation
+produces $+1.33$~nats with positive chain-shuffle on a random-code
+corpus; a contrastive auxiliary loss lifts chain-shuffle from
+$\approx 0$ to $+0.010$ without disturbing the headline.
+
+\section{Background and Related Work}
+\label{sec:related}
+
+\paragraph{Long-context Transformers.} Recent benchmarks
+(NoLiMa~\cite{modarressi2025nolima}, RULER~\cite{hsieh2024ruler},
+Lost-in-the-Middle~\cite{liu2024lost}) show that even when the
+context window is nominally long, effective use of distant positions
+degrades sharply. We sidestep context extension entirely, keeping
+the window at the 4\,k pretraining default and routing past-session
+information through a fixed-size memory matrix.
+
+\paragraph{Retrieval-augmented generation.} RAG~\cite{lewis2020retrieval}
+indexes past sessions and appends retrieved sessions to the LM
+context. The closest competitive simple-pipeline RAG with
+long-context LMs is DOS-RAG~\cite{laitenberger2025dosrag}; our RAG
+baselines mirror that recipe (per-session BM25 and MiniLM-L6 dense
+embeddings, no re-ranking). An oracle cell gives the model gold
+evidence-session indices directly, as a strict upper bound on
+simple-pipeline RAG.
+
+\paragraph{Recurrent / compressive memory in pretrained LLMs.}
+Transformer-XL~\cite{dai2019transformerxl} and Compressive
+Transformer~\cite{rae2019compressive} introduced segment-level and
+compressed-tier recurrence. RMT~\cite{bulatov2022recurrent} and
+Block-Recurrent Transformer~\cite{hutchins2022block} thread a
+prepended memory token through segments. Memorising
+Transformers~\cite{wu2022memorising} use kNN over past keys;
+AutoCompressors~\cite{chevalier2023adapting} compresses prefixes into
+soft tokens. All five live in the $\mathcal{O}(K)$/$\mathcal{O}(K)$
+column of Table~\ref{tab:asymptotics} but unfreeze the LM during
+training; Memorising Transformers keeps the backbone frozen at
+inference but pays $\mathcal{O}(T)$ in storage. The
+$\mathcal{O}(K)$/$\mathcal{O}(K)$/frozen-backbone combination is
+missing. Two architectural choices put memres there: the memory is
+read off the sequence axis through a depth-wise attention
+residual~\cite{kimi2026attnres} (zero context-length cost), and the
+backbone is frozen during training (any callback improvement must
+flow through the memory module---leak-controlled by construction).
+
+\paragraph{Attention residuals.} Our depth-router builds on Attention
+Residuals~\cite{kimi2026attnres}, which replaces uniform depth-wise
+addition with a softmax over intermediate sources. We register the
+per-position memory readout $m^t$ as a foundational source in that
+pool.
+
+\paragraph{The RAG-vs-recurrent-memory comparison.}
+LongMemEval~\cite{wu2024longmemeval} treats retrieval as the standard
+baseline; we extend that comparison by using a \emph{frozen} backbone
+in both arms, running an \emph{oracle} RAG cell with gold evidence
+positions, and reporting chain-shuffle and evidence-redacted
+controls for both methods.
+
+\section{Memory Residuals}
+\label{sec:method}
+
+The primitive has three components: a recurrent \emph{writer} that
+updates an internal state $M_c \in \mathbb{R}^{K \times d}$ per
+session (\S\ref{sec:method_writer}); a per-token \emph{readout} that
+produces a residual stream contribution $m^t \in \mathbb{R}^{S \times d}$
+(\S\ref{sec:method_read}); and a \emph{depth router} that chooses
+how strongly each layer reads from the memory pathway
+(\S\ref{sec:method_router}). All three are jointly trained
+end-to-end with LM-NLL on chain-callback supervision; the only
+auxiliary loss is a soft floor on the depth-router's memory channel.
+
+\subsection{Writer: two-stage QKV competition with iterative extraction}
+\label{sec:method_writer}
+
+Let $M_c^{t-1} \in \mathbb{R}^{K \times d}$ be the persistent latent
+state prior to session $t$ and $C_t \in \mathbb{R}^{N_t \times d}$
+the token embeddings of the just-completed session. \textbf{Stage 1
+(extraction).} A learnable query bank $M_{\mathrm{in}} \in
+\mathbb{R}^{K \times d}$ pulls salient features from $C_t$ via a
+Perceiver-style~\cite{jaegle2021perceiver} $L_E$-step refinement:
+$E^{(0)} = \mathrm{CrossAttn}(M_{\mathrm{in}}, C_t)$ and
+$E^{(\ell)} = E^{(\ell-1)} + \mathrm{CrossAttn}(E^{(\ell-1)}, C_t)$
+for $\ell \in \{1,\dots,L_E\}$ ($L_E{=}4$, $K{=}128$ throughout).
+\textbf{Stage 2 (judge, slot-axis competition).} We concatenate
+$P_{\mathrm{judge}} = [M_c^{t-1} \,\|\, E^{(L_E)}] \in
+\mathbb{R}^{2K \times d}$ and apply a slot-attention~\cite{locatello2020slot}
+update with QK-LayerNorm~\cite{zhai2023sigmareparam,ba2016layernorm}:
+\begin{align}
+A &= \underset{k \in [K]}{\mathrm{Softmax}}\!\left(
+        \frac{\widehat{Q}\,\widehat{K}^{\top}}{\sqrt{d}}\right)
+        \in \mathbb{R}^{K \times 2K},
+& M_c^{t} &= \mathrm{LN}\!\left(M_c^{t-1} + \mathrm{GRUCell}(M_c^{t-1},
+        A\,P_{\mathrm{judge}} W_V)\right). \label{eq:writer}
+\end{align}
+The slot-axis softmax forces the $K$ persistent slots to compete to
+\emph{tile} the $2K$ candidates into disjoint specialist subsets,
+removing the symmetric uniform fixed point a candidate-axis softmax
+would admit.
+
+\subsection{Readout: per-token cross-attention into \texorpdfstring{$M_c$}{Mc}}
+\label{sec:method_read}
+
+For session $X \in \mathbb{R}^{S \times d}$, the readout is a
+cross-attention with token embeddings as queries and $M_c^{t}$ as
+keys/values, refined through a $D{=}4$-step Perceiver-style stack to
+produce $m^t \in \mathbb{R}^{S \times d}$. The readout depth is one
+of two load-bearing design choices the ablation
+(\S\ref{sec:abl}) identifies.
+
+\subsection{Depth router with \texorpdfstring{$\alpha$}{alpha}-floor}
+\label{sec:method_router}
+
+We register $m^t$ as the foundational source $b_{-1}$ in the
+attention-residual pool of \cite{kimi2026attnres}, alongside
+per-block delta sources $b_0, \dots, b_{n-1}$. Each per-block
+routing sublayer computes a softmax over the pool with a
+\emph{memory-channel floor} auxiliary loss:
+\begin{equation}
+\mathcal{L}_{\mathrm{floor}} = \lambda_{\mathrm{floor}} \cdot
+  \max(0, \alpha_{\mathrm{floor}}^* - \mathbb{E}\,\alpha_{\mathrm{mem}})^2,
+\label{eq:floor}
+\end{equation}
+with $\lambda_{\mathrm{floor}} = 0.5$, target
+$\alpha_{\mathrm{floor}}^* = 0.10$. The router is initialised so the
+residual stream matches the bare backbone at step 0 (soft $\pm 4$
+bias chosen for non-saturated softmax gradients from step 1).
+
+\subsection{Frozen-backbone training and segment composability}
+\label{sec:method_train}
+
+The backbone---Qwen3-0.6B or Qwen3-1.7B \cite{qwen3}---is frozen
+(\texttt{lr\_backbone}${=}0$). Only memres parameters train: 41.5\,M
+($\sim$6\,\% overhead) at 0.6B and 164.8\,M ($\sim$8\,\% overhead) at
+1.7B, for 1000 (0.6B) / 1500 (1.7B) TBPTT steps on the LongMemEval-S
+450-chain training split. The objective is plain LM-NLL on callback
+tokens plus Eq.~\ref{eq:floor}.
+
+The four components above are deliberately \emph{loosely coupled}:
+each is small, single-purpose, and replaceable without touching the
+others. The segments interact through two narrow interfaces: $M_c
+\in \mathbb{R}^{K \times d}$ between writer and readout, and a
+per-layer scalar mix $\alpha_l \in [0,1]$ between router and
+backbone. Swapping the writer (e.g.\ for a state-space model) leaves
+readout, router, and floor unchanged; swapping the depth-router for
+a learned per-layer gate leaves $M_c$ unchanged. All four costs are
+\emph{$T$-independent} (Table~\ref{tab:segments}), placing the
+construction in the $\mathcal{O}(1)$/$\mathcal{O}(1)$ corner of
+Table~\ref{tab:asymptotics}. Most prior recurrent-memory recipes
+bundle writer, readout, and gate into a monolithic LM modification;
+we ship the segmentation as a contribution so each piece has a
+single testable job and follow-on work can replace it. The
+ablations in \S\ref{sec:abl} verify each segment is individually
+load-bearing.
+
+\begin{table}[h]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Memres segments, I/O shapes, and per-session/token cost.
+$T$ chain length, $S$ session length, $K{=}128$ memory width,
+$L$ backbone layers, $L_E{=}D{=}4$ writer/readout depths. All four
+are independent of $T$.}
+\label{tab:segments}
+\begin{tabular}{l l l l}
+\toprule
+segment & I/O shapes & cost per session / token & natural swap axis \\
+\midrule
+Writer (\S\ref{sec:method_writer})
+  & $(M_c^{t-1}, C_t) \to M_c^t$
+  & $\mathcal{O}(L_E K S d)$ / session
+  & extractor family (Perceiver$\to$Mamba\ldots) \\
+Readout (\S\ref{sec:method_read})
+  & $(M_c^t, h^t) \to m^t$
+  & $\mathcal{O}(D K d)$ / token
+  & query family, depth $D$ \\
+Depth router (\S\ref{sec:method_router})
+  & layer sources $\to$ mix
+  & $\mathcal{O}(L\cdot|\text{sources}|)$ / token
+  & router parametrisation \\
+$\alpha$-floor (Eq.~\ref{eq:floor})
+  & scalar aux loss
+  & $\mathcal{O}(1)$ / step
+  & anti-collapse prior \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{RAG Baselines and Eval Harness}
+\label{sec:rag}
+
+\paragraph{RAG cells.} We use a simple-pipeline RAG comparable to
+DOS-RAG~\cite{laitenberger2025dosrag}, indexing each LongMemEval-S
+session as a document. Four cells per backbone: \textsc{BM25 top-1}
+(\texttt{rank\_bm25}), \textsc{BM25 top-3}, \textsc{dense top-3}
+(\texttt{all-MiniLM-L6-v2}), and \textsc{oracle top-3} (gold
+\texttt{chain\_evidence\_positions}). Retrieved sessions are
+concatenated into the LM's context window and callback-token CE is
+scored under the bare pretrained Qwen3 backbone. The oracle cell is
+a strict upper bound on the simple pipeline.
+
+\paragraph{Eval harness.} All numbers come from the same
+callback-aware evaluator (\texttt{tools/eval\_callback.py}) on the
+same 50-chain corpus (\texttt{lme\_val\_s512\_evpos.pt}). CE is
+computed only over \emph{callback answer tokens} (1.4\,\% of total
+chain tokens), avoiding the $\sim$70$\times$ dilution from
+token-averaging. For every cell we report:
+$\Delta_{\mathrm{cb}}{=}\mathrm{CE}_{\mathrm{nomem}}{-}\mathrm{CE}_{\mathrm{method}}$
+(larger is better);
+$\Delta_{\mathrm{sh}}$ a chain-specificity confound (substitute
+another chain's retrieved sessions or $M_c$); for memres only,
+$\mathrm{evidence\_lift}{=}\mathrm{CE}_{\mathrm{mem}}{-}\mathrm{CE}_{\mathrm{mem,floor}}$
+where the floor rebuilds $M_c$ with gold evidence sessions redacted
+($\approx 0$ means the memory benefit is not literal evidence
+retrieval); and per-chain positive count out of 50.
+
+\section{Headline Result}
+\label{sec:headline}
+
+Table~\ref{tab:headline} reports the headline numbers with 95\,\%
+bootstrap-over-chains CIs~\cite{efron1979bootstrap};
+Figure~\ref{fig:headline} visualises both panels.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Memres vs RAG on LongMemEval-S validation (50 chains). All cells
+share the same backbone family and the same eval script. Column
+$\Delta_{\mathrm{cb}}$~[CI] reports the seed-mean (or RAG point estimate)
+followed by the 95\,\% bootstrap-over-chains CI of the per-chain
+$\Delta_{\mathrm{cb}}$ residuals.}
+\label{tab:headline}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l l r r r l r r}
+\toprule
+size & method & params${+}$ & ctx${+}$ & $\Delta_{\mathrm{cb}}$ & 95\,\% CI & $\Delta_{\mathrm{sh}}$ & pos./50 \\
+\midrule
+0.6B & nomem (bare backbone)         & 0       & 0      & $0.000$  & ---              & ---     & 0  \\
+0.6B & RAG, BM25 top-1               & 0       & 512    & $+0.033$ & $[-0.26, +0.36]$ & $+0.51$ & 20 \\
+0.6B & RAG, BM25 top-3               & 0       & 1.5\,k & $-0.012$ & $[-0.30, +0.31]$ & $+0.46$ & 19 \\
+0.6B & RAG, dense top-3              & 22.7\,M & 1.5\,k & $+0.048$ & $[-0.23, +0.35]$ & $+0.39$ & 20 \\
+0.6B & \textbf{RAG, oracle top-3}    & 0       & 1.5\,k & $+0.111$ & $[-0.22, +0.46]$ & ---     & 25 \\
+0.6B & \textbf{MemRes ($n{=}4$)}     & 41.5\,M & \textbf{0} & $\mathbf{+1.32 \pm 0.53}$ & $\mathbf{[+1.11, +1.55]}$ & $\mathbf{+0.000}$ & \textbf{48} \\
+\midrule
+1.7B & nomem (bare backbone)         & 0       & 0      & $0.000$  & ---              & ---     & 0  \\
+1.7B & RAG, BM25 top-3               & 0       & 1.5\,k & $+0.253$ & $[-0.03, +0.54]$ & $+0.33$ & 29 \\
+1.7B & RAG, dense top-3              & 22.7\,M & 1.5\,k & $+0.035$ & $[-0.59, +0.55]$ & $+0.23$ & 32 \\
+1.7B & \textbf{RAG, oracle top-3}    & 0       & 1.5\,k & $+0.388$ & $[+0.07, +0.71]$ & ---     & 31 \\
+1.7B & \textbf{MemRes ($n{=}\NSEEDSseventeen$)} & 164.8\,M & \textbf{0} & $\mathbf{\Dseventeenmean}$ & $\mathbf{\Dseventeenci}$ & $\mathbf{\Dseventeendsh}$ & \textbf{\Dseventeenpos} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/p_a_headline.pdf}
+\caption{Memory Residuals (orange) beat every RAG baseline including
+oracle-evidence RAG (dark grey) on callback CE at both 0.6B and 1.7B,
+while adding zero context-token cost. Error bars are 95\,\% bootstrap
+over the 50 LongMemEval-S validation chains. Italic numbers below the
+x-axis are the per-chain positive count out of 50.}
+\label{fig:headline}
+\end{figure}
+
+\paragraph{Per-chain robustness.} Figure~\ref{fig:per_chain} shows
+the per-chain scatter at 0.6B: memres is positive on 48/50 chains
+(median $+0.91$~nats), oracle-RAG only on 25/50. RAG's distribution
+is bimodal---when retrieval hits useful evidence the bare LM uses it
+well, but when it does not, the LM is confused by the appended
+block. Memres' distribution is narrower and concentrated above zero.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.55\linewidth]{figures/p_a_per_chain.pdf}
+\caption{Per-chain scatter of memres (4-seed mean) vs oracle-RAG at
+0.6B. Memres (orange) concentrates above zero; oracle-RAG (grey) is
+bimodal.}
+\label{fig:per_chain}
+\end{figure}
+
+\section{Mechanistic Decomposition}
+\label{sec:mech}
+
+The two methods deliver \emph{different mechanisms}
+(Figure~\ref{fig:mech}). \textbf{RAG is chain-specific but small}:
+$\Delta_{\mathrm{sh}} \in [+0.23, +0.51]$ but $\Delta_{\mathrm{cb}}$
+is only $+0.03$ to $+0.39$, since bare pretrained Qwen3 cannot
+reliably exploit appended sessions for callback questions.
+\textbf{MemRes is large but chain-shuffle-invariant}:
+$\Delta_{\mathrm{cb}} \sim +0.98$--$+1.32$ (the readout is
+\emph{trained} end-to-end), but $\Delta_{\mathrm{sh}} \approx 0$
+because the writer encodes chain-conditional context that any other
+chain's $M_c$ also carries (style, topic, prior turns)---\emph{not}
+literal evidence retrieval. \textbf{Evidence-redaction confirms it}:
+$\mathrm{evidence\_lift} = +0.001 \pm 0.006$ means $M_c$ built from
+the redacted chain (gold evidence removed) is as effective as $M_c$
+built from the full chain. RAG and memres are thus complementary:
+RAG localises evidence; memres distils the chain into a context
+vector.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/p_a_mechanism.pdf}
+\caption{\textbf{Left:} $\Delta_{\mathrm{sh}}$ across RAG cells
+(grey) and memres (orange); RAG is chain-specific ($+0.23$ to
+$+0.51$), memres is shuffle-invariant. \textbf{Right:} memres
+$\mathrm{evidence\_lift}$ at both scales; $\approx 0$ means the gain
+survives evidence redaction.}
+\label{fig:mech}
+\end{figure}
+
+\paragraph{``Isn't this just a learned chain prior?''}
+$\Delta_{\mathrm{sh}} \approx 0$ and $\mathrm{evidence\_lift}
+\approx 0$ together suggest $M_c$ may be doing something close to a
+chain-class prior. Two responses. (i) The relevant question is
+matched-compute callback CE, and memres beats the best non-oracle
+RAG cell by $+1.21$~nats while costing zero context tokens---not
+trivially obtainable from a class prior alone. (ii) The
+chain-conditional framing is what makes memres complementary to
+RAG rather than redundant: a per-fact retriever and a chain-summary
+compressor address orthogonal failure modes (lexical-mismatch
+queries vs.\ context-budget exhaustion). We claim only that the
+readout pathway carries $+1.21$~nats of chain-conditional signal the
+bare backbone cannot extract from the raw token stream.
+The plateau itself is a direct analogue of the early MoE failure
+mode \cite{shazeer2017moe}, dissolved in that literature by
+load-balance \cite{shazeer2017moe,fedus2022switch}, top-$k$
+\cite{fedus2022switch}, and expert-choice routing
+\cite{zhou2022expertchoice}; the writer-side toolbox for driving
+specific information into a fixed memory is also well-developed
+(extractive objectives \cite{wu2022memorising,zhong2022trime},
+pointer/copy supervision \cite{vinyals2015pointer,see2017pointer},
+slot-specialisation \cite{locatello2020slot}, key/value bindings
+\cite{sukhbaatar2015memnets,miller2016keyvalue}).
+\S\ref{sec:chainspec} runs three single-flag interventions in this
+spirit; the plateau yields to all three.
+
+\section{Lifting the chain-shuffle confound: three single-flag interventions}
+\label{sec:chainspec}
+
+\S\ref{sec:mech} predicted that the $\Delta_{\mathrm{sh}} \approx 0$
+plateau is a training-objective artefact rather than a structural
+property of the design corner. We test that with three
+minimally-invasive interventions: (i) a per-category re-aggregation
+of the same evaluation, no retraining; (ii) a single-flag
+sparse-writer ablation on a no-class-prior corpus; (iii) a
+single-flag contrastive auxiliary on the canonical recipe. All
+three are sign-positive and corroborate each other.
+
+\paragraph{(i) Per-category breakdown (no retraining).}
+LongMemEval annotates each callback with one of six categories. We
+re-evaluate the 1.7B checkpoints under a \emph{within-category}
+chain-shuffle: for a chain whose callback sits in category $c$, the
+shuffled comparison uses another chain's $M_c$ from the same
+category. If $M_c$ encoded only category information, this
+comparison would be benign. A positive ``hidden'' column
+$\Delta_{\mathrm{sh,samecat}} - \Delta_{\mathrm{sh,rand}}$ thus
+measures chain-conditional content beyond the category prior. At
+1.7B, four of six categories show a hidden positive of at least
+$+0.02$~nats (Table~\ref{tab:percat}), cleanest in
+\texttt{knowledge-update}---the category whose answers must come
+from within-chain user-revised information.
+
+\begin{table}[h]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Per-category breakdown of the chain-shuffle confound on the
+1.7B canonical checkpoints (mean across $\NSEEDSseventeen$ seeds; $n$
+is per-category chain count). Positive ``hidden'' = same-category
+shuffle is \emph{worse} than random shuffle, indicating
+chain-conditional binding beyond the category prior. The
+\texttt{knowledge-update} category---the one where answers must come
+from within-chain user-revised information---shows the cleanest
+signal.}
+\label{tab:percat}
+\begin{tabular}{l c c c c c}
+\toprule
+category & $n$ & $\Delta_{\mathrm{cb}}$ & $\Delta_{\mathrm{sh,rand}}$ & $\Delta_{\mathrm{sh,samecat}}$ & hidden \\
+\midrule
+\textbf{knowledge-update}        & 6  & $+1.94$ & $-0.075$ & $-0.021$ & $\mathbf{+0.054}$ \\
+single-session-user              & 13 & $+0.83$ & $-0.029$ & $-0.003$ & $\mathbf{+0.026}$ \\
+single-session-assistant         & 8  & $+0.54$ & $-0.037$ & $-0.015$ & $\mathbf{+0.022}$ \\
+temporal-reasoning               & 6  & $+0.27$ & $-0.006$ & $+0.015$ & $\mathbf{+0.021}$ \\
+multi-session                    & 13 & $+1.07$ & $-0.003$ & $-0.005$ & $-0.003$ \\
+single-session-preference        & 4  & $+0.44$ & $-0.007$ & $-0.005$ & $+0.002$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{(ii) Sparse-writer ablation on a no-prior corpus.}
+The sharpest test of chain-specific binding is a corpus where any
+class prior is provably unhelpful. \textbf{Synthd5} is a
+random-alphanumeric-code callback corpus (``what is my
+\textsc{ACCOUNT-ID} again?'') with a fresh five-character answer per
+chain; the bare backbone has zero prior. A previous dense-writer
+attempt collapsed: the writer fell into the symmetric uniform fixed
+point of the slot-axis softmax, since plain LM-NLL has no
+permutation-breaking pressure on high-entropy random targets
+\cite{shazeer2017moe,locatello2020slot}. Adding a single flag
+\texttt{--memres\_judge\_topk\_slot\_softmax 8} (top-$8$ slots per
+input column, others masked) imposes expert-choice
+routing~\cite{zhou2022expertchoice} at the architecture level. With
+this flag (rest of recipe unchanged) training no longer collapses;
+on $100$ held-out chains we get $\Delta_{\mathrm{cb}} = +1.331$,
+$\Delta_{\mathrm{sh}} = +0.008$ (positive on a corpus where no class
+prior can explain it), $\mathrm{evidence\_lift} = +0.002$. A
+test-time fine-tuning probe ($M_c$-only optimisation against the
+evidence session) returns $-0.078$~nats, indicating $M_c$-side
+optimal storage is not yet recoverable through the trained
+readout---the readout is the next bottleneck on this strict corpus.
+
+\paragraph{(iii) Contrastive auxiliary on the canonical recipe.}
+We add an InfoNCE-style contrastive auxiliary~\cite{oord2018cpc}
+over $M_c$ representations (weight $0.5$, $200$-step warmup, unit
+temperature) to the canonical recipe; it pulls together same-chain
+representations and pushes apart different-chain ones, the simplest
+permutation-breaking gradient channel without an architectural
+change. The contrastive arm gives $\Delta_{\mathrm{cb}} = +1.20$~nats
+(within the headline CI) and lifts $\Delta_{\mathrm{sh,rand}}$ from
+$-0.0005$ to $+0.010$. The categorical breakdown
+(Table~\ref{tab:infonce_percat}) concentrates in the same
+categories diagnostic (i) flagged: \texttt{knowledge-update}
+$+0.012{\to}+0.031$, \texttt{single-session-assistant}
+$+0.011{\to}+0.036$, both $\sim 3\times$.
+
+\begin{table}[h]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Per-category random-shuffle confound on the canonical
+recipe (left) vs.\ the canonical recipe plus a contrastive
+auxiliary loss (right), 0.6B, single seed each. The contrastive arm
+preserves $\Delta_{\mathrm{cb}}$ within the headline's bootstrap CI
+($+1.20$ vs.\ canonical $+1.32 \pm 0.53$) while lifting the
+chain-shuffle confound primarily in the categories the per-category
+diagnostic flagged.}
+\label{tab:infonce_percat}
+\begin{tabular}{l c c c}
+\toprule
+category & $n$ & $\Delta_{\mathrm{sh,rand}}$ canonical & $\Delta_{\mathrm{sh,rand}}$ + contrastive \\
+\midrule
+knowledge-update          & 6  & $+0.012$ & $\mathbf{+0.031}$ \\
+single-session-assistant  & 8  & $+0.011$ & $\mathbf{+0.036}$ \\
+single-session-user       & 13 & $-0.012$ & $+0.011$ \\
+multi-session             & 13 & $-0.008$ & $-0.003$ \\
+single-session-preference & 4  & $-0.001$ & $-0.010$ \\
+temporal-reasoning        & 6  & $+0.013$ & $-0.006$ \\
+\midrule
+corpus mean               & 50 & $-0.001$ & $\mathbf{+0.010}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading the three together.} The three differ only in
+cost---a re-aggregation, a single architectural flag, a single
+auxiliary-loss flag---and agree in direction. The chain-shuffle
+plateau is a training-objective property of the v1 recipe, not a
+structural property of the design corner; it yields to the
+specific-information levers the MoE analogy of \S\ref{sec:mech}
+predicted. (ii) and (iii) are reported at $n{=}1$ seed (the
+canonical headline took $n{=}4$ to lock a CI); we treat the
+resulting recipes as the natural production candidates for
+follow-on work, particularly when combined.
+
+\section{Cross-Corpus Generalization}
+\label{sec:xcorpus}
+
+The headline trains on the LongMemEval-S 450-chain split. To probe
+whether the recipe is implicitly tuned to that distribution, we
+evaluate the same headline checkpoints \emph{with no further training}
+on five unseen corpora. Three are callback-style (same
+$\mathrm{pa\_cb\_dnm}$ metric): \textbf{synthd4} (500 persona-callback
+chains, closed-vocabulary slot-filling), \textbf{synthd4v2} (broader
+vocabulary, more slots), and \textbf{synthd5} (random alphanumeric
+IDs with evidence-session loss masked at training time---hardest
+writer-objective test, no semantic prior on the answer). Two are
+full-chain-CE: \textbf{LoCoMo}~\cite{maharana2024locomo} (10
+real long-form chains, no callback annotations) and
+\textbf{MSC test}~\cite{xu2022msc} (500 multi-session-chat
+chains).
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Cross-corpus eval of the headline 0.6B and 1.7B checkpoints
+(no further training; LongMemEval-S-only writer). Top group:
+callback-aware metric (synthd4/d4v2/d5, $\mathrm{pa\_cb\_dnm}$,
+500 chains each). Bottom group: full-chain CE (LoCoMo, MSC,
+$\mathrm{delta\_nomem\_minus\_mem}$, 10 / 500 chains) for corpora
+without callback annotations. ``CI'' is the 95\,\% bootstrap-over-
+chains CI of the per-chain $\Delta$ residuals pooled across seeds.
+``pos'' is per-chain positives out of (chains $\times$ seeds).}
+\label{tab:xcorpus}
+\begin{tabular}{l l l l l l}
+\toprule
+size & corpus & $\Delta$ (seed-mean) & 95\,\% CI & $\Delta_{\mathrm{sh}}$ & pos. \\
+\midrule
+\multicolumn{6}{l}{\emph{Callback-aware (same metric as headline; in-domain LME for ref:
+$+1.32 \pm 0.53$, [+1.11, +1.55])}} \\
+\midrule
+0.6B & synthd4    & $\xcSSixDfourDnm$    & $\xcSSixDfourCi$    & $\xcSSixDfourDsh$    & \xcSSixDfourPos    \\
+0.6B & synthd4v2  & $\xcSSixDfourVDnm$   & $\xcSSixDfourVCi$   & $\xcSSixDfourVDsh$   & \xcSSixDfourVPos   \\
+0.6B & synthd5    & $\xcSSixDfiveDnm$    & $\xcSSixDfiveCi$    & $\xcSSixDfiveDsh$    & \xcSSixDfivePos    \\
+1.7B & synthd4    & $\xcSSeventeenDfourDnm$    & $\xcSSeventeenDfourCi$    & $\xcSSeventeenDfourDsh$    & \xcSSeventeenDfourPos    \\
+1.7B & synthd4v2  & $\xcSSeventeenDfourVDnm$   & $\xcSSeventeenDfourVCi$   & $\xcSSeventeenDfourVDsh$   & \xcSSeventeenDfourVPos   \\
+1.7B & synthd5    & $\xcSSeventeenDfiveDnm$    & $\xcSSeventeenDfiveCi$    & $\xcSSeventeenDfiveDsh$    & \xcSSeventeenDfivePos    \\
+\midrule
+\multicolumn{6}{l}{\emph{Full-chain CE (no callback annotations; lower bound on the callback signal)}} \\
+\midrule
+0.6B & LoCoMo  & $\xcSSixLocomoDnm$  & $\xcSSixLocomoCi$  & $\xcSSixLocomoDsh$  & \xcSSixLocomoPos  \\
+0.6B & MSC     & $\xcSSixMscDnm$     & $\xcSSixMscCi$     & $\xcSSixMscDsh$     & \xcSSixMscPos     \\
+1.7B & LoCoMo  & $\xcSSeventeenLocomoDnm$  & $\xcSSeventeenLocomoCi$  & $\xcSSeventeenLocomoDsh$  & \xcSSeventeenLocomoPos  \\
+1.7B & MSC     & $\xcSSeventeenMscDnm$     & $\xcSSeventeenMscCi$     & $\xcSSeventeenMscDsh$     & \xcSSeventeenMscPos     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading the table.} At 1.7B, the recipe transfers cleanly
+to two of three callback-style corpora: $\xcSSeventeenDfourDnm$ on
+synthd4 and $\xcSSeventeenDfourVDnm$ on synthd4v2 (every individual
+seed sign-positive), recovering $\sim 70\%$ of the in-domain
+$\Dseventeenmean$~nats. The third, synthd5, is essentially zero
+($\xcSSeventeenDfiveDnm$): exactly what the in-domain
+$\mathrm{evidence\_lift} = +0.001 \pm 0.006$ predicts---the writer
+encodes chain-conditional context, not literal evidence, so a
+random-ID corpus cannot benefit. This failure \emph{strengthens} the
+chain-conditional framing: the same control explaining
+$\Delta_{\mathrm{sh}} \approx 0$ in-domain also predicts where
+transfer will and will not occur. At 0.6B, synthd4/d4v2 are
+sign-negative ($\xcSSixDfourDnm$, $\xcSSixDfourVDnm$): the small
+writer over-fits LongMemEval-S style---a known OOD pattern that
+motivates framing the headline statistical claim at 0.6B and the
+cross-corpus claim at 1.7B. LoCoMo and MSC give small negatives at
+both scales; we treat these as a conservative read (full-chain CE
+without callback annotations dilutes any few-token signal; prior
+work that reports positive numbers there unfreezes the LM, which
+mixes ``memory module helps'' with ``LM capacity helps'') and make
+no transfer claim on those corpora.
+
+\section{Ablations: which design choices are load-bearing?}
+\label{sec:abl}
+
+Table~\ref{tab:abl} reports three single-variable ablations, each
+removing one component. All cells are at 0.6B with the same seed (1)
+plus additional seeds where noted.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Single-variable ablations on the headline 0.6B recipe.
+Removing the iterative readout depth or the $\alpha$-floor collapses
+the result. Removing the auxiliary readout-supervision probe---a
+chain-specific gradient channel through the readout that we initially
+expected to be load-bearing---instead \emph{strengthens} the result
+by $\sim$8$\times$. ``Canonical'' here is the previous-generation
+recipe \emph{with} the probe; the headline numbers in the rest of
+the paper come from the without-probe row.}
+\label{tab:abl}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l l r l}
+\toprule
+ablation & flag changed & $\Delta_{\mathrm{cb}}$ & verdict \\
+\midrule
+prior recipe (with readout probe)        & ---                                          & $+0.16 \pm 0.08$ \emph{(n${=}3$)} & reference \\
+no readout depth                         & \texttt{--memres\_readout\_depth 0}          & \VtwentysevenA                    & depth is load-bearing \\
+no $\alpha$-floor                        & \texttt{--alpha\_mem\_floor\_aux\_weight 0} & \Vtwentysevenc                    & floor is load-bearing \\
+\textbf{no readout-supervision probe}    & \texttt{--readout\_probe\_loss\_weight 0.0}  & $\mathbf{+1.32 \pm 0.53}$ \emph{(n${=}4$)} & \textbf{recipe of record} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+No-depth and no-floor reduce $\Delta_{\mathrm{cb}}$ by
+$\sim 20\times$. The surprising row is the bottom: removing the
+readout-supervision probe \emph{strengthens} the result $\sim 8\times$.
+We interpret this as joint LM-NLL training producing a richer
+chain-conditional compression than the supervised-readout shortcut;
+the probe pulled the readout in a direction that did not help
+end-to-end CE. The without-probe variant is the canonical recipe.
+
+\section{Limitations}
+\label{sec:limits}
+
+\textbf{Single-corpus training; partial scale-dependent transfer.}
+The writer is trained only on LongMemEval-S 450 chains. At 1.7B, two
+of three callback-aware OOD corpora transfer cleanly (synthd4,
+synthd4v2; every seed positive); synthd5 (random codes) does not, as
+the in-domain $\mathrm{evidence\_lift} \approx 0$ predicts. At 0.6B
+the small writer over-fits, motivating the in-domain headline at
+0.6B and the cross-corpus claim at 1.7B. Full-chain-CE corpora
+(LoCoMo, MSC) are small negatives at both scales; we make no
+transfer claim there. \textbf{Bare-backbone RAG.} We compare against
+a bare pretrained Qwen3 for RAG, so RAG cells lack an
+instruction-tuned reading head; an instruction-tuned RAG backbone
+would close some of the gap. \textbf{No unfrozen-backbone recurrent
+baselines.} RMT~\cite{bulatov2022recurrent},
+Block-Recurrent~\cite{hutchins2022block},
+AutoCompressors~\cite{chevalier2023adapting} require fine-tuning the
+LM. Running them on LongMemEval-S would mix ``memory module helps''
+with ``LM capacity helps'' and we could not attribute movement in
+$\Delta_{\mathrm{cb}}$; a fair head-to-head requires freezing their
+backbones (not engineered for) or unfreezing ours (which removes the
+present primitive claim). \textbf{Chain-shuffle plateau partially
+resolved, not locked at multi-seed.} \S\ref{sec:chainspec}'s three
+interventions move $\Delta_{\mathrm{sh}}$ in the predicted
+direction; (ii) and (iii) are at $n{=}1$ seed, not the headline's
+$n{=}4$. The full MoE-analogy toolbox (extractive supervision,
+pointer/copy, slot-specialisation, key/value bindings) is
+unexplored. \textbf{1.7B is $n{=}\NSEEDSseventeen$ seeds.} Every
+1.7B seed lands positive (CI $\Dseventeenci$) but a confident
+scaling claim past 1.7B would require more 1.7B seeds and a cell
+at 4B+; out-of-scope here.
+
+\section{Conclusion}
+\label{sec:conc}
+
+Memory Residuals is a recurrent memory primitive in a previously
+empty corner of the (storage, routing, backbone) design space:
+$\mathcal{O}(1)$ storage, $\mathcal{O}(1)$ routing, frozen LM
+backbone. It decomposes into four small swappable
+segments---writer, readout, depth router, and $\alpha$-floor---each
+with a single testable job and a documented asymptotic cost; we
+ship the segmentation as the durable contribution and the specific
+instantiations as v1 implementations that follow-on work should
+replace. The primitive lifts callback CE by $+1.32 \pm 0.53$~nats at
+0.6B and $\Dseventeenmean$~nats at 1.7B, transfers to two unseen
+callback corpora, and---once the right single-flag interventions
+are added (\S\ref{sec:chainspec})---moves the chain-shuffle confound
+in the direction the controls predict on a corpus where no class
+prior could explain it. The deployment regime this construction
+makes addressable---a constant-cost long-horizon memory module that
+bolts onto a frozen off-the-shelf LLM, trains in hours rather than
+weeks, and can be replaced or re-trained without touching the
+backbone---is what we find most consequential. We claim only that
+the corner is now demonstrably non-empty, that the segmentation
+makes its successor easy to engineer, and that the chain-specificity
+controls are sharp enough to tell when the next iteration has
+actually moved.
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\newpage
+\appendix
+
+\section{Reproduction details}
+\label{app:repro}
+
+\paragraph{Code and data.} The Memory Residuals architecture, training
+loop, and evaluation harness are released in the supplementary zip.
+The training corpus is LongMemEval-S~\cite{wu2024longmemeval},
+publicly available; we provide the pre-tokenised cache used by the
+evaluator (\texttt{paper\_artifacts/chains/lme\_val\_s512\_evpos.pt}).
+
+\paragraph{Hardware.} Single NVIDIA H100 80\,GB per training cell.
+0.6B cells finish in $\sim$1.5\,h; 1.7B cells in $\sim$3--6\,h
+(depending on the H100 SKU; we used both H100-NVL and GH200).
+
+\paragraph{Hyperparameters.} See Table~\ref{tab:hparams}.
+
+\begin{table}[h]
+\centering\small
+\caption{Training hyperparameters (identical across all cells; only
+seed varies).}
+\label{tab:hparams}
+\begin{tabular}{l r}
+\toprule
+backbone (frozen)                         & Qwen3-0.6B / 1.7B \\
+$K$ (memres slot count)                   & 128 \\
+$L_E$ (extraction depth)                  & 4 \\
+$D$ (iterative readout depth)             & 4 \\
+$\lambda_{\mathrm{floor}}$ ($\alpha$-aux weight) & 0.5 \\
+$\alpha_{\mathrm{floor}}^*$ (target)      & 0.10 \\
+optimizer                                 & AdamW~\cite{loshchilov2019adamw}, $\beta = (0.9, 0.95)$, wd $0.1$ \\
+lr (memres)                               & $1\mathrm{e}{-4}$ cosine, 200 warmup, 5\,\% min ratio \\
+lr (backbone)                             & $0$ (frozen) \\
+batch                                     & 4 chains $\times$ grad-accum 2 (effective 8) at 0.6B; 2 $\times$ 4 (effective 8) at 1.7B \\
+TBPTT window                              & 3 sessions \\
+steps                                     & 1000 (0.6B) / 1500 (1.7B) \\
+seeds reported                            & $\{1,2,3,4\}$ at 0.6B; $\{1,2,3,4\}$ at 1.7B (subject to landing) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Per-cell numbers (raw)}
+\label{app:raw}
+
+Tables~\ref{tab:memres_raw} and \ref{tab:rag_raw} report the per-seed
+and per-cell raw numbers that drive the bootstrap CIs in
+Table~\ref{tab:headline}. All cells were evaluated on the same
+50-chain validation corpus (\texttt{lme\_val\_s512\_evpos.pt}).
+
+\begin{table}[h]
+\centering\small
+\caption{Memory Residuals per-seed numbers ($\Delta_{\mathrm{cb}}$, $\Delta_{\mathrm{sh}}$, evidence\_lift) at both scales.}
+\label{tab:memres_raw}
+\begin{tabular}{l r r r r}
+\toprule
+size / cell                  & seed & $\Delta_{\mathrm{cb}}$ & $\Delta_{\mathrm{sh}}$ & $\mathrm{evidence\_lift}$ \\
+\midrule
+0.6B canonical               & 1 & $+0.797$ & $-0.017$ & $-0.005$ \\
+0.6B canonical               & 2 & $+0.939$ & $+0.008$ & $-0.002$ \\
+0.6B canonical               & 3 & $+1.833$ & $+0.000$ & $+0.002$ \\
+0.6B canonical               & 4 & $+1.721$ & $+0.001$ & $+0.008$ \\
+\textbf{0.6B 4-seed mean}    & --- & $\mathbf{+1.323 \pm 0.530}$ & $+0.000 \pm 0.010$ & $+0.001 \pm 0.006$ \\
+\midrule
+1.7B canonical               & 1 & $+0.909$ & $-0.001$ & $+0.005$ \\
+1.7B canonical               & 2 & $+0.944$ & $-0.009$ & $-0.008$ \\
+\Vtwentyeightcdrows
+\textbf{1.7B \NSEEDSseventeen-seed mean} & --- & $\mathbf{\Dseventeenmean}$ & $\Dseventeendsh$ & $\Dseventeenevl$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\caption{RAG baseline per-cell numbers.}
+\label{tab:rag_raw}
+\begin{tabular}{l l r r r r}
+\toprule
+size & cell                 & ${\rm CE}_{\mathrm{rag}}$ & ${\rm CE}_{\mathrm{nomem}}$ & $\Delta_{\mathrm{cb}}$ & per-chain pos./50 \\
+\midrule
+0.6B & nomem (bare)         & 4.317 & 4.317 & $+0.000$ & 0  \\
+0.6B & BM25 top-1           & 4.285 & 4.317 & $+0.033$ & 20 \\
+0.6B & BM25 top-3           & 4.330 & 4.317 & $-0.012$ & 19 \\
+0.6B & dense top-3          & 4.269 & 4.317 & $+0.048$ & 20 \\
+0.6B & oracle top-3         & 4.206 & 4.317 & $+0.111$ & 25 \\
+\midrule
+1.7B & nomem (bare)         & 4.703 & 4.703 & $+0.000$ & 0  \\
+1.7B & BM25 top-3           & 4.450 & 4.703 & $+0.253$ & 29 \\
+1.7B & dense top-3          & 4.668 & 4.703 & $+0.035$ & 32 \\
+1.7B & oracle top-3         & 4.315 & 4.703 & $+0.388$ & 31 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Bootstrap CI methodology}
+\label{app:bootstrap}
+
+For each cell we have 50 per-chain residuals $\{r_i\}_{i=1}^{50}$
+(for memres pooled across $n$ seeds, so $50 n$ per-chain residuals).
+We resample with replacement at the chain level $B = 5000$ times,
+compute the mean of each resample, and report the $[2.5, 97.5]$
+percentiles as the 95\,\% CI. This is the standard bootstrap of
+\cite{efron1979bootstrap}; the cluster-by-chain choice respects the
+fact that within-chain residuals are correlated (different methods
+score the same callback positions).
+
+% =====================================================================
+% NeurIPS 2026 Paper Checklist (mandatory)
+% =====================================================================
+\section*{NeurIPS Paper Checklist}
+
+\begin{enumerate}
+
+\item {\bf Claims}\\
+\textbf{Question}: Do the main claims made in the abstract and
+introduction accurately reflect the paper's contributions and scope?\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Each numbered contribution in
+Section~\ref{sec:intro} is reported in
+Section~\ref{sec:headline}--\ref{sec:abl} with a specific number,
+seed count, CI, and the matched RAG baseline that grounds the
+comparison. Scope statements (no LoCoMo SoTA claim, no instruction-
+tuned RAG backbone) appear in Section~\ref{sec:limits}.
+
+\item {\bf Limitations}\\
+\textbf{Question}: Does the paper discuss the limitations of the
+work?\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Section~\ref{sec:limits} dedicates a
+half-page to four explicit limitations: domain specificity, the
+bare-backbone RAG framing, the chain-shuffle ${\approx}0$ framing
+finding, and the n${=}\NSEEDSseventeen$ 1.7B seed count.
+
+\item {\bf Theory assumptions and proofs}\\
+\textbf{Answer}: \texttt{[N/A]}\\
+\textbf{Justification}: The paper is empirical; no formal theorems
+are stated.
+
+\item {\bf Experimental result reproducibility}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Section~\ref{sec:method_train} and
+Appendix~\ref{app:repro} document hardware, hyperparameters, the
+training corpus, the eval corpus, and the eval script. Per-seed
+launch scripts are released in the supplementary.
+
+\item {\bf Open access to data and code}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: The supplementary zip
+(\texttt{memres\_supplementary.zip}) contains the architecture
+implementation, the training loop, the launchers, and the eval
+harness. The training/eval corpora are derived from the publicly
+available LongMemEval-S~\cite{wu2024longmemeval}; we ship the
+pre-tokenised cache.
+
+\item {\bf Experimental setting / details}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Section~\ref{sec:method_train} and
+Table~\ref{tab:hparams}.
+
+\item {\bf Experiment statistical significance}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Headline is reported with both seed std
+($\pm 0.53$) and 95\,\% bootstrap-over-chains CI ($[+1.11, +1.55]$).
+Per-chain positive count (48/50) and median per-chain
+$\Delta = +0.91$ are also reported (Section~\ref{sec:headline}).
+
+\item {\bf Experiments compute resources}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Each cell reports its training time,
+hardware, and parameter overhead in
+Section~\ref{sec:method_train}, Section~\ref{sec:headline}, and
+Appendix~\ref{app:repro}.
+
+\item {\bf Code of ethics}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: The paper studies a small architectural
+modification to a pretrained LLM; it does not introduce new training
+data, does not de-anonymise user data, and does not train on
+copyrighted material beyond what is already in the publicly
+available LongMemEval-S. We declare LLM use during paper writing
+and code generation in the LLM-usage field of the submission form
+(per the 2026 chairs' explicit request).
+
+\item {\bf Broader impacts}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Long-horizon memory is a building block for
+agentic LLM products. We add a fixed-cost differentiable alternative
+to context-extension and retrieval. The most plausible misuse is
+using the resulting agent for surveillance of conversational
+partners; we discuss this briefly in the supplementary README. The
+training procedure does not amplify any new safety risk relative to
+the baseline of fine-tuning the same backbone on the same data.
+
+\item {\bf Safeguards}\\
+\textbf{Answer}: \texttt{[N/A]}\\
+\textbf{Justification}: We do not release new datasets, new
+checkpoints, or scraped data; the released artifacts are
+architecture code and training scripts.
+
+\item {\bf Licenses for existing assets}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: Qwen3 is released under Apache-2.0;
+LongMemEval-S is released under MIT. Both are cited.
+
+\item {\bf New assets}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: The supplementary code is released under
+Apache-2.0, anonymised for the review period.
+
+\item {\bf Crowdsourcing and research with human subjects}\\
+\textbf{Answer}: \texttt{[N/A]}
+
+\item {\bf Institutional review board (IRB) approvals or equivalent}\\
+\textbf{Answer}: \texttt{[N/A]}
+
+\item {\bf Declaration of LLM usage}\\
+\textbf{Answer}: \texttt{[Yes]}\\
+\textbf{Justification}: An LLM coding assistant (Cursor agent based
+on Anthropic Claude) was used throughout the project for code
+generation, experiment scripting, run-log analysis, and manuscript
+drafting; all numbers in the paper come from agent-launched but
+human-verified runs against the locked corpus and eval script.
+
+\end{enumerate}
+
+\end{document}

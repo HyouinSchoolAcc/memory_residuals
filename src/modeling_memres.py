@@ -324,6 +324,23 @@ class Qwen3MemResConfig(Qwen3Config):
         # entropy collapse in extraction; keeping the intervention
         # targeted reduces the risk surface of the v14 campaign.
         memres_judge_qk_layernorm: bool = False,
+        # v32 sparse-writer (Tier-3 (6) — friend's plan, May 2026):
+        # If > 0, the slot-axis softmax in the judge's SlotAttentionWriter
+        # is restricted to the top-k highest-scoring slots per input
+        # column (others masked to -inf). Forces each candidate to bind
+        # to <= k slots, breaking the smooth-mixing path that a
+        # chain-class prior plausibly exploits. 0 = disabled (canonical
+        # dense softmax over all K slots). Only applies when
+        # memres_writer_kind in {slot_attention, slot_attention_full}.
+        memres_judge_topk_slot_softmax: int = 0,
+        # v33 sparse-readout (friend's option 3 / "Hard slot-routing in
+        # the readout"): if > 0, restrict the per-token MemoryReadout
+        # cross-attention softmax to the top-k highest-scoring slots
+        # per query position.  Forces the readout to SELECT slots
+        # rather than dense-mix them; chain-specific facts then live in
+        # identifiable slots.  Applies to base + every refinement
+        # layer.  0 = disabled (canonical dense softmax over K slots).
+        memres_readout_topk_slot_softmax: int = 0,
         # v14 (2026-05-02 audit, "context-summariser blow-up"):
         # RMSNorm the extraction input C BEFORE it enters
         # MemoryBlock.extract.  When memres_extract_source =
@@ -481,6 +498,24 @@ class Qwen3MemResConfig(Qwen3Config):
         self.memres_slot_positional = bool(memres_slot_positional)
         # v14 judge stabiliser (see __init__ docstring above).
         self.memres_judge_qk_layernorm = bool(memres_judge_qk_layernorm)
+        # v32 sparse-writer top-k slot softmax (see __init__ docstring).
+        if int(memres_judge_topk_slot_softmax) < 0:
+            raise ValueError(
+                f"memres_judge_topk_slot_softmax must be >= 0; got "
+                f"{memres_judge_topk_slot_softmax!r}"
+            )
+        self.memres_judge_topk_slot_softmax = int(
+            memres_judge_topk_slot_softmax
+        )
+        # v33 sparse-readout top-k (see __init__ docstring above).
+        if int(memres_readout_topk_slot_softmax) < 0:
+            raise ValueError(
+                f"memres_readout_topk_slot_softmax must be >= 0; got "
+                f"{memres_readout_topk_slot_softmax!r}"
+            )
+        self.memres_readout_topk_slot_softmax = int(
+            memres_readout_topk_slot_softmax
+        )
         # v14 extraction-input normaliser (see __init__ docstring above).
         self.memres_extract_input_norm = bool(memres_extract_input_norm)
         # v17 / F2 writer-probe head (see __init__ docstring above).
@@ -818,6 +853,7 @@ class SlotAttentionWriter(nn.Module):
         num_iters: int = 3,
         eps: float = 1e-6,
         qk_layernorm: bool = False,
+        topk_slot_softmax: int = 0,
     ):
         super().__init__()
         if num_iters < 1:
@@ -828,6 +864,14 @@ class SlotAttentionWriter(nn.Module):
         self.num_iters = int(num_iters)
         self.scale = hidden_size**-0.5
         self.eps = eps
+        # v32 sparse-writer (Tier-3 (6) of the May-2026 friend's plan):
+        # top-k along the SLOTS axis BEFORE the slot-axis softmax. Each
+        # input column j keeps only the highest-scoring k slots; the
+        # remaining K-k slots see -inf and contribute zero softmax mass.
+        # This breaks the "smooth dense mixing" path that a chain-class
+        # prior can exploit and forces each candidate to bind to <= k
+        # slots. 0 disables (canonical dense softmax).
+        self.topk_slot_softmax = int(topk_slot_softmax)
         # Same Q/K/V projection budget as a CrossAttention judge.
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
@@ -875,6 +919,18 @@ class SlotAttentionWriter(nn.Module):
              D2 keep-vs-write diagnostic).
         """
         scores = (slots @ k.transpose(-2, -1)) * self.scale  # (B, K, M)
+        # v32 sparse-writer: top-k along the slot axis. Each input column
+        # j keeps only the highest-scoring k slots; -inf elsewhere so the
+        # softmax mass goes to top-k. K_slots = scores.size(-2).
+        if self.topk_slot_softmax > 0:
+            K_slots = scores.size(-2)
+            k_top = min(self.topk_slot_softmax, K_slots)
+            if k_top < K_slots:
+                # topk along slot axis (dim=-2): find k-th largest per (B, M)
+                topk_vals, _ = scores.topk(k_top, dim=-2)              # (B, k, M)
+                threshold = topk_vals[..., -1:, :]                     # (B, 1, M)
+                mask = scores < threshold                              # (B, K, M)
+                scores = scores.masked_fill(mask, float("-inf"))
         # Softmax over SLOTS axis (this is the architectural pivot).
         attn = F.softmax(scores, dim=-2)
         # Per-slot weighted-mean renormalisation.
@@ -1004,6 +1060,7 @@ class MemoryBlock(nn.Module):
         slot_positional: bool = False,
         judge_qk_layernorm: bool = False,
         extract_input_norm: bool = False,
+        judge_topk_slot_softmax: int = 0,
     ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -1096,6 +1153,7 @@ class MemoryBlock(nn.Module):
                 num_iters=self.slot_attention_iters,
                 eps=eps,
                 qk_layernorm=bool(judge_qk_layernorm),
+                topk_slot_softmax=int(judge_topk_slot_softmax),
             )
         else:
             self.judging = CrossAttention(
@@ -1353,10 +1411,20 @@ class MemoryReadout(nn.Module):
         out_norm_init: float = 1.0,
         depth: int = 0,
         refine_zero_init: bool = False,
+        topk_slot_softmax: int = 0,
     ):
         super().__init__()
         self.scale = hidden_size**-0.5
         self._refine_zero_init = bool(refine_zero_init)
+        # v33 sparse-readout (Tier-3 (6) "Hard slot-routing in the
+        # readout" — friend's plan, May 2026): if > 0, restrict the
+        # readout's per-token cross-attention softmax to the top-k
+        # highest-scoring slots per query token.  Forces the readout to
+        # SELECT slots rather than mix them, so chain-specific facts
+        # then live in identifiable slots.  Applies to both the base
+        # cross-attention layer and (if depth > 0) every iterative
+        # refinement layer.  0 = disabled (canonical dense softmax).
+        self.topk_slot_softmax = int(topk_slot_softmax)
         self.W_Q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_K = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_V = nn.Linear(hidden_size, hidden_size, bias=False)
@@ -1416,19 +1484,33 @@ class MemoryReadout(nn.Module):
                  for _ in range(self.depth)]
             )
 
+    def _topk_softmax(self, scores: torch.Tensor) -> torch.Tensor:
+        """Softmax along slot axis (dim=-1) with optional top-k masking."""
+        if self.topk_slot_softmax > 0:
+            K_slots = scores.size(-1)
+            k_top = min(self.topk_slot_softmax, K_slots)
+            if k_top < K_slots:
+                topk_vals, _ = scores.topk(k_top, dim=-1)              # (..., k)
+                threshold = topk_vals[..., -1:]                        # (..., 1)
+                mask = scores < threshold
+                scores = scores.masked_fill(mask, float("-inf"))
+        return F.softmax(scores, dim=-1)
+
     def forward(self, X: torch.Tensor, M_c: torch.Tensor) -> torch.Tensor:
         """X: (B, S, d) queries;  M_c: (B, K, d) memory slots  ->  (B, S, d)"""
         Q = self.W_Q(X)
         K = self.W_K(M_c)
         V = self.W_V(M_c)
-        attn = F.softmax(Q @ K.transpose(-2, -1) * self.scale, dim=-1)
+        attn = self._topk_softmax(Q @ K.transpose(-2, -1) * self.scale)
         m_t = self.out_norm(attn @ V)
         for i in range(self.depth):
             q_in = X + m_t
             Qi = self.refine_W_Q[i](q_in)
             Ki = self.refine_W_K[i](M_c)
             Vi = self.refine_W_V[i](M_c)
-            attn_i = F.softmax(Qi @ Ki.transpose(-2, -1) * self.scale, dim=-1)
+            attn_i = self._topk_softmax(
+                Qi @ Ki.transpose(-2, -1) * self.scale
+            )
             m_t = m_t + self.refine_out_norm[i](attn_i @ Vi)
         return m_t
 
@@ -1844,6 +1926,9 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             extract_input_norm=getattr(
                 config, "memres_extract_input_norm", False
             ),
+            judge_topk_slot_softmax=getattr(
+                config, "memres_judge_topk_slot_softmax", 0
+            ),
         )
         self.memory_readout = MemoryReadout(
             config.hidden_size,
@@ -1852,6 +1937,9 @@ class Qwen3MemResModel(Qwen3PreTrainedModel):
             depth=getattr(config, "memres_readout_depth", 0),
             refine_zero_init=getattr(
                 config, "memres_readout_refine_zero_init", False
+            ),
+            topk_slot_softmax=getattr(
+                config, "memres_readout_topk_slot_softmax", 0
             ),
         )
         assert self.memory_block.hidden_size == config.hidden_size
