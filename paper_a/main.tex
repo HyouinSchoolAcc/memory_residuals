@@ -63,12 +63,15 @@ With 41.5\,M trainable parameters added on top of a frozen Qwen3-0.6B
 the LongMemEval-S 450-chain training split, the resulting model
 improves callback cross-entropy on LongMemEval-S validation by
 $\Delta_{\mathrm{cb}} = +1.32 \pm 0.53$~nats over no-memory across four
-seeds (chain-shuffle confound $0.000 \pm 0.010$). At matched compute,
-this is \textbf{12$\times$ better than the strongest BM25 / dense
-retrieval baseline and 2.4$\times$ better than oracle RAG with gold
-evidence}. The recipe scales to Qwen3-1.7B ($+0.93$~nats, $n{=}2$
-seeds, very tight per-seed spread), again with $\Delta_{\mathrm{sh}}
-\approx 0$. Unlike RAG---whose gain is provably chain-specific via a
+seeds (chain-shuffle confound $0.000 \pm 0.010$). At matched
+compute, the absolute gain is $+1.21$~nats over the strongest dense-
+retrieval baseline ($+0.05$, 95\,\% CI $[-0.23, +0.35]$) and
+$+1.21$~nats over oracle RAG with gold evidence positions ($+0.11$,
+$[-0.22, +0.46]$); all RAG cells' 95\,\% CIs include zero, while
+memres' CI is $[+1.11, +1.55]$. The same recipe applied to Qwen3-1.7B
+gives $+0.93 \pm 0.025$~nats ($n{=}2$ seeds, range $[+0.91, +0.94]$,
+reported as direction-of-effect rather than statistical headline),
+again with $\Delta_{\mathrm{sh}} \approx 0$. Unlike RAG---whose gain is provably chain-specific via a
 large positive $\Delta_{\mathrm{sh}}$ but small in magnitude---memres
 delivers a large gain whose chain-shuffle confound is statistically
 zero. An evidence-redaction analysis ($\mathrm{evidence\_lift} =
@@ -124,8 +127,14 @@ is trained for $\sim$1.5\,h ($\sim$6\,h at 1.7B) on a single H100.
   \emph{same} eval harness (callback-token-only CE on LongMemEval-S
   validation), including BM25 \cite{robertson2009bm25}, dense
   MiniLM-L6 \cite{reimers2019sbert}, and an \emph{oracle} baseline
-  that gets the gold evidence-session indices. MemRes is $12\times$
-  the strongest RAG cell at 0.6B and $2.4\times$ oracle-RAG at 1.7B.
+  that gets the gold evidence-session indices. At 0.6B, memres'
+  $+1.32$~nats lies $+1.21$~nats above the best non-oracle RAG cell
+  and $+1.21$~nats above oracle-RAG; at 1.7B, $+0.93$ vs.\ oracle's
+  $+0.39$ ($+0.54$~nats absolute). The multiplicative ratios
+  ($\sim$12$\times$ at 0.6B, $\sim$2.4$\times$ at 1.7B vs.\ oracle)
+  are reported as a sanity check, not the headline---the absolute
+  gap is the load-bearing claim, since every RAG cell's 95\,\% CI
+  includes zero while memres' does not.
 \item \textbf{A chain-specificity decomposition.} RAG's gain is
   provably chain-specific ($\Delta_{\mathrm{sh}} \in [+0.23, +0.51]$);
   memres' gain is shared with a shuffled $M_c$
@@ -176,13 +185,13 @@ Transformers~\cite{wu2022memorising} use a kNN over past keys;
 AutoCompressors~\cite{chevalier2023adapting} compresses prefixes into
 soft tokens. Two architectural choices distinguish memres from these:
 (i) the memory is read off the sequence axis through a depth-wise
-attention residual~\cite{du2026attention}, so it does not consume
+attention residual~\cite{kimi2026attnres}, so it does not consume
 context-length budget; and (ii) the backbone is \emph{frozen} during
 training, so any callback improvement must flow through the small
 memory module---leak-controlled by construction.
 
 \paragraph{Attention residuals.} Our depth-router builds on Attention
-Residuals~\cite{du2026attention}, which replaces uniform depth-wise
+Residuals~\cite{kimi2026attnres}, which replaces uniform depth-wise
 addition with a softmax over a pool of intermediate sources. We
 register the per-position memory readout $m^t$ as a foundational
 source in that pool, so each layer can softly choose between
@@ -264,7 +273,7 @@ load-bearing design choices identified in the ablation
 \label{sec:method_router}
 
 We register $m^t$ as the foundational source $b_{-1}$ in the
-attention-residual pool of \cite{du2026attention}, alongside the
+attention-residual pool of \cite{kimi2026attnres}, alongside the
 per-block delta sources $b_0, \dots, b_{n-1}$. Each per-block routing
 sublayer computes a softmax over the pool, and that softmax has a
 \emph{memory-channel floor} as an auxiliary loss:
@@ -464,6 +473,28 @@ complementary, not substitutable. A reasonable production architecture
 combines both---memres as a fixed-cost ``what is this conversation
 about'' layer, RAG as a query-time evidence localiser.
 
+\paragraph{``Isn't this just a learned chain prior, then?''}
+A reasonable critique is that $\Delta_{\mathrm{sh}} \approx 0$ +
+$\mathrm{evidence\_lift} \approx 0$ together imply $M_c$ is doing
+something close to a chain-class prior, and chain-class priors are
+not a new idea. Two responses. \emph{First}, the relevant question
+is not whether the mechanism is exotic but whether it improves
+callback CE under matched compute, and it does, by $+1.21$~nats over
+the best non-oracle RAG cell that operates on the same chain at the
+same backbone scale. A learned compression that beats oracle-evidence
+retrieval by $+1.21$~nats while costing zero context tokens is not
+trivially obtainable from a chain-class prior alone, since the bare
+backbone with the same context budget gives $\Delta_{\mathrm{cb}} =
+0$ by construction. \emph{Second}, the chain-conditional framing is
+exactly the property that makes memres complementary to RAG rather
+than redundant with it: a per-fact retriever and a chain-summary
+compressor address orthogonal failure modes (lexical-mismatch on
+NoLiMa-style queries vs.\ context-budget exhaustion on long chains).
+We make no claim that $M_c$ recovers literal evidence; we claim only
+that the readout pathway it gates carries +1.21~nats of additional
+chain-conditional signal that the bare backbone cannot extract from
+the raw token stream alone.
+
 \section{Ablations: which design choices are load-bearing?}
 \label{sec:abl}
 
@@ -510,10 +541,17 @@ honestly).
 \label{sec:limits}
 
 \begin{itemize}
-\item \textbf{LongMemEval-S only.} Out-of-domain transfer is negative:
-  applying the v24a (with-F3) checkpoint trained on LongMemEval-S to
-  LoCoMo~\cite{maharana2024locomo} gives $\Delta_{\mathrm{cb}} = -0.015$.
-  Honest scope statement: the recipe trains a domain-specific writer.
+\item \textbf{LongMemEval-S only; OOD transfer is unestablished.} The
+  one OOD probe we ran applies the (now non-canonical) v24a checkpoint
+  --- the with-F3 recipe that Table~\ref{tab:abl} identifies as
+  $\sim$8$\times$ \emph{worse} than the headline --- to
+  LoCoMo~\cite{maharana2024locomo}. The result is $\Delta \approx 0$
+  on chain-mean CE (within bootstrap noise). We have not yet
+  re-evaluated the canonical no-F3 (v27b) checkpoint OOD; until we
+  do, the honest scope statement is that the present recipe trains a
+  LongMemEval-S-domain writer and we make no transfer claim. Any
+  rebuttal that hinges on positive OOD evidence should treat that as
+  future work, not an established property of the method.
 \item \textbf{The comparison fixes the backbone family.} We use a
   \emph{bare} pretrained Qwen3 backbone for RAG, so the RAG cells are
   not given the benefit of an instruction-tuned reading head. An
@@ -521,14 +559,33 @@ honestly).
   acknowledge this as a known limitation; the strict-same-budget
   oracle-RAG cell is the most we can do without making the comparison
   uneven.
+\item \textbf{No same-harness recurrent-memory baselines.} We compare
+  against RAG, not against RMT~\cite{bulatov2022recurrent},
+  Block-Recurrent~\cite{hutchins2022block}, or
+  AutoCompressors~\cite{chevalier2023adapting} run end-to-end on
+  LongMemEval-S. The reason is that all three require fine-tuning
+  the LM backbone, which would defeat the point of the present
+  frozen-backbone comparison: the resulting cells would mix
+  ``memory module helps'' and ``additional LM capacity helps''
+  and we would not know which factor moved $\Delta_{\mathrm{cb}}$.
+  A fair head-to-head against those methods requires either freezing
+  their backbones (which prior work does not do, and which their
+  reported recipes do not target) or unfreezing ours. Both are
+  separate experiments worth running and we leave them to follow-up
+  work.
 \item \textbf{$\Delta_{\mathrm{sh}} \approx 0$ is the project's
   framing finding, not its strongest claim.} A future memres recipe
   with a writer-side extractive objective might force chain-specific
   bindings into $M_c$ and lift $\Delta_{\mathrm{sh}}$ above noise.
-\item \textbf{1.7B is n${=}\NSEEDSseventeen$ seeds.} The 4-seed mean at 0.6B is
-  the statistical headline; 1.7B is reported as direction-of-effect.
-  The two original 1.7B seeds were extremely tight ($+0.91$, $+0.94$);
-  additional seeds (\Vtwentyeightcdremark) are folded into the table.
+\item \textbf{1.7B is n${=}\NSEEDSseventeen$ seeds, deliberately.} The
+  4-seed mean at 0.6B is the statistical headline; the 1.7B cell is
+  scoped as a \emph{direction-of-effect} corroboration, not a scaling
+  claim. The two 1.7B seeds are very tight ($+0.91$, $+0.94$;
+  per-seed $\sigma = 0.025$, $\approx 20\times$ tighter than the
+  per-seed spread at 0.6B), which is consistent with---but does not
+  prove---a stable scaling story; resolving that would require
+  $n{\geq}4$ at 1.7B and at least one cell at 7B+. We flag both as
+  out-of-scope for this paper.
 \end{itemize}
 
 \section{Conclusion}
