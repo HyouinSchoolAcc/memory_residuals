@@ -397,7 +397,7 @@ Part VI; v15–v28 active state in the per-cell ledger below.
 # Active run ledger (newest at the top)
 
 
-## v29 → v34 — New moe-i framework: synthd5 architectural ceiling, sparse writer breaks it, InfoNCE on LME lifts Δ_sh (2026-05-05 ~02:30 EDT, IN PROGRESS)
+## v29 → v34 — New moe-i framework: synthd5 architectural ceiling, sparse writer breaks it, InfoNCE on LME lifts Δ_sh (2026-05-05 ~03:25 EDT, GH200 wave finished, local v34a still running)
 
 ### TL;DR
 
@@ -409,11 +409,12 @@ A May-2026 New moe-i plan attacked the v27b/v28 finding that the chain-shuffle c
 | 4 (10) per-category Δ_cb breakdown | same sweep | LME val | knowledge-update is the cleanest signal in every recipe (v24a +0.41, v27b +2.61, v28a +1.94 dnm at the per-category level) |
 | 2 (4) train-on-synthd5, dense writer | v29a/v30a | synthd5 0.6B + 1.7B | **all seeds COLLAPSE** (`pair/self → 0.008`, killed by `kill_on_memory_collapse`). Reproduces v23 finding under v27b recipe. Dense writer cannot bind random IDs even with the F3-off / depth=4 / strong-α-floor stack. |
 | 3 (6) sparse writer top-k=8 | v32a | synthd5 0.6B | **ARCHITECTURAL CEILING BROKEN.** No collapse (`pair/self ≥ 0.34` sustained); end-to-end **`Δ_cb = +1.33 nats` on synthd5_val (100 chains) with `Δ_sh = +0.008` positive and in-training `evidence_lift = +0.027` at step 1500** — the **first-ever positive evidence_lift at this magnitude on synthd5** in the entire memres campaign. |
-| 3 (6) sparse writer 1.7B | v32d | synthd5 1.7B | step 900 reading: **`Δ_sh = +0.119`** and **`evidence_lift = +0.130`** (largest both-of-two by an order of magnitude), but multiple bf16 NaN events; CB `Δ_cb` drifts negative late. Recipe needs LR/grad-clip stabilisation at 1.7B; numbers prove the writer *can* encode the chain-specific ID at scale. |
+| 3 (6) sparse writer 1.7B | v32d | synthd5 1.7B | **COMPLETED 1500/1500** (May 5 ~03:19 EDT). Step-900 PA-EVAL peak (`CB Δsh-m = +0.119`, `evidence_lift = +0.130`) was the high-water mark; corpus-mean `Δsh ≈ 0` throughout (n=192 EVAL never exceeds ±0.07) and CB `Δ_cb` collapses from +0.43 → −0.99 by step 1500 as `mem CE` blows out from 9.1 → 15.7 vs `nomem CE` at 5.4. Best ckpt saved at step 1300 (EVID-EVAL `evidence_lift=+0.231`). 4+ bf16 NaN events sprinkled throughout. Same v32a-style late-drift but ~10× harsher at 1.7B. **Verdict refined:** writer fix scales architecturally (judge stays sparse, eff_rank ≈ 30–40), but the v32a/v33a readout regression is the dominant failure mode at 1.7B and now the load-bearing thing to fix. |
+| (LME headline followup) | v28d | LME 1.7B seed 4 | **DIED ~step 800** before reaching `step-1000/`/`final/`. The fourth seed of the v28 1.7B ensemble (queued via `queue_paper_a_v28cd_gh200.sh`) trained cleanly through step 700 (`PA-EVAL WS Δnm-m = +0.25`, `D2-JUDGE eff_rank ≈ 2.1`, no NaNs), then lost the python process between step 800 and step 900 — log truncates mid-stride, only `best/` and `step-500/` survive. Cause is **not** `kill_on_memory_collapse` (`pair/self` was healthy and `keep_var > 0.06` throughout) — most likely a remote tmux/OOM hiccup. The headline ensemble stays at **n=3 at 1.7B (v28a/b/c)** until v28d is re-launched. |
 | 4 (9) TTT-on-M_c on v32a | `tools/eval_ttt_mc.py` | synthd5 val | **NEGATIVE (`-0.078`)**. Even with M_c TTT-optimised against the evidence session, the readout cannot extract chain-specific recall. Diagnoses the *next* bottleneck on synthd5 as the readout pathway, not the writer. |
 | 3 (6) sparse readout (top-k=8) | v33a | synthd5 0.6B | step 200 peak: `Δ_cb = +0.079`, **`Δ_sh = +0.014`** (largest mid-training Δ_sh on synthd5), `evidence_lift = +0.006`. Drifts to −0.82 by step 1400 like v32a does. Same recipe-stability issue, slightly larger early peak Δ_sh. |
 | 1 (1) uniform InfoNCE on LME | v31a | LME 0.6B | **`Δ_cb = +1.20 nats` on lme_val_evpos (50 chains, n=1 seed) — within v27b's `+1.32 ± 0.53` bootstrap CI — AND `Δ_sh-random = +0.010` (lifted from v27b's `−0.0005`)**. Per-category knowledge-update jumps `+0.012 → +0.031`. moe-i doesn't risk the +1.32 nats because LM-NLL stays primary" prediction is met. |
-| 1 (1) + 3 (6) combined | v34a | LME 0.6B | **STILL RUNNING.** At step 300/1500 already: `WS Δnm-m = +0.92`, `CB Δnm-m = +0.76` — converging to the v27b magnitude **3× faster than v27b** (v27b hit similar by ~step 700). Final read pending; this is the production-candidate recipe. |
+| 1 (1) + 3 (6) combined | v34a | LME 0.6B | **STILL RUNNING (step ~1300/1500 as of 03:25 EDT).** Early step-300 reading was a head-fake (`WS Δnm-m = +0.92`, `CB Δnm-m = +0.76`); by step 1200 the CB channel has gone *negative* (`CB Δnm-m = −0.44`) while WS holds at +0.59. Same v32a/v33a/v32d late-drift pattern shows up on LME too. Judge is sparse and stable (`eff_rank ≈ 10`, `pair/self ≈ 0.39`); whether `final/` recovers a positive `pa_cb_dnm` is the open question, expected within 30 min. |
 
 moe-i's branch logic ("if (4) succeeds: Tier 1; if (4) fails: Tier 3") was satisfied in spirit: dense (4) failed → architectural Tier 3 (6) succeeded → top of tree both confirmed Tier 1 (1) helps on LME and produced a v34 combined recipe that looks set to lift `Δ_sh` on the LME headline.
 
@@ -467,7 +468,7 @@ Recipe: v27b verbatim, only `--train_chains` flipped from LME to synthd5_random_
 | v29a | local H100 1 | 1 | **KILLED step 700** (`pair/self = 0.009`, two consecutive collapse evals) |
 | v29a | local H100 0 | 2 | manually killed step ~700 (`pair/self = 0.012`, plateauing into kill threshold) |
 | v29a | local | 3 | killed early (data redundant after seed 1+2 collapse) |
-| v30a | GH200 | 1 | three bf16 NaN events by step 380; pair/self trajectory 0.068 → 0.046 → 0.026 (heading to collapse). Manually killed at step ~340 to free GH200 for v32d. |
+| v30a | GH200 | 1 | five bf16 NaN events by step 340 (steps 60, 160, 180, 200, 300, 340); `pair/self` trajectory 0.068 → 0.046 → 0.026 → 0.014 (stable inside the kill_on_collapse zone). Manually killed at step ~410 to free GH200 for v32d. Only `best/` ckpt survives (saved step 100, when `pair/self = 0.068` and `CB Δnm-m = +0.47`); no `step-500/` or `final/`. Confirms the dense-writer ceiling carries to 1.7B. |
 
 Reproduces v23's finding under the (more aggressive) v27b recipe: **dense slot-attention writer cannot bind random alphanumeric IDs**, regardless of depth=4 readout, strong α-floor, and F3-off. Architecture ceiling — not an objective ceiling, not a corpus ceiling.
 
@@ -506,27 +507,44 @@ Cross-corpus eval (lme_val transfer, 50 chains): `pa_cb_dnm = −0.734`, `pa_cb_
 
 D2-JUDGE row_entropy at step 1500: 1.600 (norm 0.289) vs v11/dense uniform fixed point's 0.999. Effective rank 50.45. **The judge softmax is no longer uniform — slots have specialised.**
 
-#### v32d — Tier-3 (6) at scale: sparse-writer top-k=8 on synthd5 (1.7B GH200)
+#### v32d — Tier-3 (6) at scale: sparse-writer top-k=8 on synthd5 (1.7B GH200) **[COMPLETED 1500/1500 — May 5 ~03:19 EDT]**
 
 Recipe: v32a verbatim, `--preset qwen3-1.7b-large`, `batch_size 2 grad_accum 4`. Started after killing v30a-seed1 in the same tmux session.
 
-In-training trajectory (n=32 sample):
+Full in-training trajectory through 1500/1500 (PA-EVAL CB on n=32 phase-aligned chains; corpus EVAL on n=192):
 
-| step | CB Δnm-m | Δ_sh | evidence_lift | pair/self |
-|---|---|---|---|---|
-| 100 | +0.430 | −0.010 | +0.010 | 0.773 |
-| 200 | +0.490 | −0.013 | −0.013 | 0.576 |
-| 300 | +0.363 | 0.000 | −0.007 | 0.567 |
-| 400 | +0.409 | −0.016 | −0.020 | 0.388 |
-| 500 | +0.329 | +0.010 | −0.008 | 0.254 |
-| 700 | +0.091 | −0.012 | +0.006 | 0.224 |
-| 800 | −0.764 | −0.072 | −0.100 | 0.169 |
-| 900 | −0.416 | **+0.119** | **+0.130** | 0.219 |
-| 960 | (NaN) | — | — | — |
+| step | CB Δnm-m | CB Δsh-m | EVID-EVAL evidence_lift | EVAL mem CE | EVAL nomem CE | D2 eff_rank |
+|---|---|---|---|---|---|---|
+| 100 | +0.430 | (n/a) | +0.010 | (n/a) | (n/a) | (n/a) |
+| 200 | +0.490 | (n/a) | −0.013 | (n/a) | (n/a) | (n/a) |
+| 300 | +0.363 | (n/a) | −0.007 | (n/a) | (n/a) | 66.4 |
+| 400 | +0.409 | −0.016 | −0.020 | 7.18 | 6.49 | 55.5 |
+| 500 | +0.329 | +0.010 | −0.008 | 7.07 | 6.44 | 36.8 |
+| 600 | +0.134 | −0.016 | −0.024 | 9.09 | 5.99 | 40.0 |
+| 700 | +0.091 | −0.012 | +0.006 | 11.91 | 5.32 | 31.8 |
+| 800 | −0.764 | −0.072 | −0.100 | 13.69 | 4.89 | 29.0 |
+| 900 | −0.416 | **+0.119** | **+0.130** | 14.67 | 4.99 | 30.0 |
+| 1000 | −1.085 | −0.227 | −0.109 | 15.52 | 5.27 | 37.3 |
+| 1100 | −0.864 | −0.026 | −0.034 | 15.92 | 5.31 | 39.5 |
+| 1200 | −1.111 | −0.057 | −0.007 | 15.59 | 5.37 | 38.7 |
+| 1300 | −0.679 | +0.168 | **+0.231** | 15.67 | 5.35 | 37.4 |
+| 1400 | −1.426 | −0.010 | +0.133 | 15.63 | 5.38 | 39.6 |
+| 1500 (final) | −0.988 | −0.150 | −0.029 | 15.70 | 5.41 | 39.3 |
 
-**The step-900 reading is unprecedented**: `Δ_sh = +0.119`, `evidence_lift = +0.130`. These are 10× larger than any number in the entire memres campaign. The writer at 1.7B *has* the chain-specific evidence in M_c — but the LM head fights it (CB Δnm-m goes negative because the readout is decoding badly).
+Best ckpt was saved at step 1300 (driven by `evidence_lift = +0.231`, the run high). Final ckpt is at step 1500 with `mem CE = 15.70` vs `nomem CE = 5.41` — the LM head emits 10+ nats more loss with M_c than without.
 
-The cell has had 4+ bf16 NaN events. Recipe is unstable at 1.7B; needs lower LR / longer warmup / tighter grad clip before the publishable scaling claim. Per the v32a TTT-on-M_c verdict, the *readout* is the bottleneck on synthd5 at any scale; v33+ is the right place to look.
+**Two readings of this run:**
+
+1. **The architectural fix scales.** `D2-JUDGE eff_rank` stays at 30–66 throughout (vs the v11/dense uniform fixed point of 1–2 that v30a immediately fell into); `row_entropy ≈ 1.6–1.8` (norm 0.30) ≪ uniform's 5.55. The sparse top-k=8 writer at 1.7B does what it does at 0.6B: the judge actually picks slots, the writer does not collapse.
+2. **The readout regression is now the dominant failure mode at scale.** Same drift pattern as v32a/v33a (CB Δnm-m positive early, negative late) but ~10× more severe — the corpus mem-CE blows out to 15.7 nats while nomem CE stays at ~5.4. The PA-EVAL CB Δsh-m and EVID-EVAL evidence_lift oscillate wildly (`+0.119 / +0.231 / −0.227`) as the readout flails — the writer *has* chain-specific information in M_c (this is what the +0.231 evidence_lift at step 1300 demonstrates) but the readout decoder cannot consistently surface it through the LM head.
+
+4+ bf16 NaN losses logged, including back-to-back at steps 1200, 1220, 1240, 1280, 1320, 1380, 1440, 1500 — the run is steady-state-NaN at the end, but training never killed (LR cosine pulled grads small enough that NaN losses didn't propagate).
+
+**Recipe stability fixes for v32e (1.7B re-launch candidate):**
+- `--lr 5e-5` (down from 1e-4) and `--max_norm 0.5` (down from 1.0) to address the NaN cluster.
+- `--warmup 600` (up from 300) to give the sparse-judge softmax a longer warmup.
+- Stop training at step 800 (where CB Δ_cb is still positive and evidence_lift is in the +0.0 region) — the late-training drift is not recoverable on synthd5 with this readout.
+- The deeper fix (a sparse / less over-projecting readout) lives in v33+ and is the right path for the publishable 1.7B sparse-writer claim.
 
 #### v33a — sparse-writer + sparse-readout on synthd5 (0.6B)
 
@@ -573,14 +591,36 @@ Per-category Δ_sh-random (vs v27b in `[ ]`):
 
 Caveat: D3-MC `pair/self = 0.037` at step 1500 (the writer is collapsed in chain-similarity sense), but the InfoNCE evidently preserves enough chain-specific structure in the readout-extractable subspace that the eval-time chain-shuffle confound stays positive. Replication needs n≥3 seeds to lock the +0.010 number; in-training InfoNCE `gap` hovered around 0 throughout, so the contrastive loss isn't *separating* chains during training, but the residual chain-specific structure is enough to surface at eval.
 
-#### v32d (1.7B GH200) — STILL RUNNING
+#### v28d — failed seed-4 of the v28 LME 1.7B ensemble (GH200) **[DIED ~step 800 — May 5 ~03:30 EDT]**
 
-See ledger above. As of step 960 has had several NaN events; pair/self degrading; will likely either collapse or limp through to step 1500. Not blocking the headline since v32a 0.6B already established the architectural-fix verdict.
+Recipe: v28a/b/c verbatim (LME, 1.7B, F3-off, frozen, no `--memres_judge_topk_slot_softmax`), `seed=4`. Queued via `scripts/queue_paper_a_v28cd_gh200.sh` after v28c finished at 02:30. The intent was to lift the headline 1.7B ensemble from n=3 (v28a/b/c) to n=4.
 
-#### v33a / v34a — STILL RUNNING
+In-training trajectory (PA-EVAL CB on n=32 phase-aligned chains; corpus EVAL on n=192) before the run died:
 
-- **v33a** (sparse-W + sparse-R on synthd5, 0.6B): completing step ~1500 imminently; trajectory above.
-- **v34a** (sparse-W + InfoNCE on LME, 0.6B): launched 02:00 EDT. **At step 300/1500 already**: `WS Δnm-m = +0.92`, **`CB Δnm-m = +0.76`** (vs v27b at step 300 typically +0.10–0.20). Converging ~3× faster than the no-NCE recipe. Final eval pending. This is the production-candidate recipe — combined architectural fix + objective fix on the corpus that drives the headline.
+| step | CB Δnm-m | CB Δsh-m | EVAL Δnm-m | EVAL Δsh-m | D2 eff_rank |
+|---|---|---|---|---|---|
+| 100 | +0.234 | +0.034 | −0.268 | +0.001 | 2.77 |
+| 200 | +0.237 | −0.010 | +0.013 | +0.001 | 2.73 |
+| 300 | +0.292 | +0.005 | +0.129 | 0.000 | 2.25 |
+| 400 | −0.041 | −0.020 | +0.001 | +0.029 | 2.60 |
+| 500 | −0.611 | −0.013 | −0.077 | +0.004 | 2.75 |
+| 600 | −0.657 | +0.016 | −0.103 | −0.002 | 2.56 |
+| 700 | −0.708 | −0.001 | −0.090 | +0.000 | 2.08 |
+| 800 | (last logged step; no eval) | | | | |
+
+Then the log truncates mid-stride; `step-1000/`/`final/` never appear, only `best/` (pre-collapse) and `step-500/` (mid-collapse).
+
+**Diagnosis:** *not* a `kill_on_memory_collapse` event. `D2-JUDGE eff_rank` stayed at ~2.0–2.8 throughout (typical for the dense v28 recipe; the kill threshold is well below this), `keep_var ≥ 0.07`, no NaN losses, `grad_norm` healthy. The python process simply went away between step 800 and step 900 — most likely a remote tmux session disconnect, an OOM after some allocator fragmentation, or a kernel-level OOM-killer event. GH200 has 480 GB but the v28 1.7B cell at `batch_size 2 grad_accum 4` does run within ~1× of the high-water mark.
+
+**The CB-channel divergence is real and worth noting.** From step 300 (`CB Δnm-m = +0.29`) to step 700 (`CB Δnm-m = −0.71`), the callback channel goes **strongly negative** even though the WS channel stays positive at +0.25 and corpus EVAL Δnm-m is roughly flat near zero. This is unlike v28a/b/c, which all monotonically improved CB Δnm-m through training. Possible reasons: (a) a bad seed-specific writer init that the dense judge can't escape; (b) the LME callback distribution at seed=4 being unusually sensitive to the write-noise schedule. **Best ckpt** was probably saved early (around step 100–300 when CB was positive) — worth eval-ing it standalone to see if v28d-best is salvageable as a fourth seed even though `final/` never landed.
+
+**Action item:** re-launch `chain_v28d_no_probe_seed4_1p7b_frozen_gh200` with `nohup` + watchdog so a tmux disconnect can't kill it; or accept n=3 at 1.7B in the headline and document v28d as the seed that didn't reproduce.
+
+#### Currently still running (as of 2026-05-05 ~03:25 EDT)
+
+- **v34a** (sparse-W + InfoNCE on LME, 0.6B local GPU 0): at step ~1300/1500, ~3 min from final eval. Trajectory through step 1200: `WS Δnm-m = +0.59`, `CB Δnm-m = −0.44` (post-warmup CB is still negative — the InfoNCE+sparse-writer combo on LME is *not* lifting CB Δnm-m the way the prediction at step 300 suggested; see below). `D2-JUDGE eff_rank ≈ 10–11` (sparse like v32a/v33a, not collapsed like v28d), `D3-MC pair/self ≈ 0.34–0.39`. Final eval imminent.
+  - **Important caveat to the earlier extrapolation**: the ledger entry above quoted v34a's step-300 reading as "`CB Δnm-m = +0.76`, ~3× faster than v27b". By step 700+ that lead has evaporated and CB Δnm-m has gone negative; the system is now tracking *behind* v27b's CB trajectory, not ahead of it. Whether the `final/` ckpt's full-chain `tools/eval_callback.py` `pa_cb_dnm` lands above or below v27b's +1.32 nats is the open question. Expected within 30 min.
+- **GH200**: idle (`nvidia-smi` 0% util, 4.5 GiB resident; no python training procs). The queue (v28c/v28d → v30a → v32d) has drained. v33a / v32a / v31a all already completed cleanly on the local H100s; their entries above are final.
 
 ### Tooling additions this wave
 
@@ -599,9 +639,10 @@ See ledger above. As of step 960 has had several NaN events; pair/self degrading
 - `results/eval_per_category/v32a_seed1_0p6b_lme_val.json` — synthd5-trained sparse writer evaluated OOD on LME.
 
 **Pending** (cells still running or seeds 2+ not started):
-- v33a final / per-category eval — step ~1500 imminently.
-- v34a final / per-category eval — ETA ~25 min.
-- v32d final / per-category eval — ETA ~3 h, recipe-stability dependent.
+- v33a `final/` ckpt completed step 1500 at 02:29 EDT; per-category eval pending. (Headline numbers above are from in-training PA-EVAL; the locked numbers will need a `tools/eval_callback.py` post-hoc eval against `paper_artifacts/chains/synthd5_random_codes_val_s512.pt`.)
+- v34a `final/` ckpt + per-category eval — ETA ~30 min (in-training trajectory has gone CB-negative late, so the `final/` PA-EVAL might disappoint vs the early-step extrapolation).
+- v32d `final/` ckpt eval — `final/` is on disk on the GH200; needs to be rsync'd down and eval'd. Given the corpus EVAL `mem CE = 15.7` vs `nomem CE = 5.4` at step 1500, this is almost certainly a deeply negative `pa_cb_dnm` reading and the `best/` ckpt (step 1300, where `evidence_lift = +0.231`) is the more interesting one to eval.
+- v28d re-launch — pending decision (re-run with watchdog, or accept n=3 at 1.7B for the headline ensemble).
 - Multi-seed repeats: **all of v31a/v32a/v33a/v34a are n=1 seed**. v27b's `+1.32 ± 0.53` headline took n=4 to claim a CI; same is needed here before declaring a publishable Δ_sh lift.
 
 ### Implications for the paper
