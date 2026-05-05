@@ -1,0 +1,4624 @@
+{
+  "locomo": {
+    "n_chains_scored": 10,
+    "n_score_positions": 40,
+    "ce_mem": 2.788830518722534,
+    "ce_nomem": 2.728085923194885,
+    "ce_shuffle": 2.782058294614156,
+    "ce_oracle_concat": 2.5481345474720003,
+    "ce_rag": null,
+    "delta_nomem_minus_mem": -0.0607445955276491,
+    "delta_shuffle_minus_mem": -0.0067722241083783,
+    "delta_oracle_minus_mem": -0.24069597125053388,
+    "delta_rag_minus_mem": null,
+    "memory_capture_ratio": -0.337561162195239,
+    "per_chain": [
+      {
+        "chain_id": "conv-26",
+        "length": 19,
+        "ce_mem": 2.791517674922943,
+        "ce_nomem": 2.718021512031555,
+        "ce_shuffle": 2.79276442527771,
+        "ce_oracle": 2.584913194179535,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-30",
+        "length": 19,
+        "ce_mem": 2.737795650959015,
+        "ce_nomem": 2.6973313093185425,
+        "ce_shuffle": 2.740531623363495,
+        "ce_oracle": 2.3860985040664673,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-41",
+        "length": 32,
+        "ce_mem": 2.704985558986664,
+        "ce_nomem": 2.6356365084648132,
+        "ce_shuffle": 2.720183849334717,
+        "ce_oracle": 2.4789790511131287,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-42",
+        "length": 29,
+        "ce_mem": 2.893428862094879,
+        "ce_nomem": 2.8452205061912537,
+        "ce_shuffle": 2.8928184509277344,
+        "ce_oracle": 2.6829649209976196,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-43",
+        "length": 29,
+        "ce_mem": 2.6499696373939514,
+        "ce_nomem": 2.608094573020935,
+        "ce_shuffle": 2.65328049659729,
+        "ce_oracle": 2.4241902232170105,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-44",
+        "length": 28,
+        "ce_mem": 2.853604793548584,
+        "ce_nomem": 2.7660645842552185,
+        "ce_shuffle": 2.8535308837890625,
+        "ce_oracle": 2.6158076524734497,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-47",
+        "length": 31,
+        "ce_mem": 2.789461135864258,
+        "ce_nomem": 2.7445600032806396,
+        "ce_shuffle": 2.7892513275146484,
+        "ce_oracle": 2.496431887149811,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-48",
+        "length": 30,
+        "ce_mem": 2.823124349117279,
+        "ce_nomem": 2.7710471153259277,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.6151687502861023,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-49",
+        "length": 25,
+        "ce_mem": 2.784784972667694,
+        "ce_nomem": 2.6980666518211365,
+        "ce_shuffle": 2.783168077468872,
+        "ce_oracle": 2.5909048914909363,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "conv-50",
+        "length": 30,
+        "ce_mem": 2.8596325516700745,
+        "ce_nomem": 2.7968164682388306,
+        "ce_shuffle": NaN,
+        "ce_oracle": 2.605886399745941,
+        "ce_rag": null
+      }
+    ]
+  },
+  "msc_test": {
+    "n_chains_scored": 500,
+    "n_score_positions": 2000,
+    "ce_mem": 2.6686394253373145,
+    "ce_nomem": 2.5951960223317148,
+    "ce_shuffle": 2.668901249706745,
+    "ce_oracle_concat": 2.3875533704161644,
+    "ce_rag": null,
+    "delta_nomem_minus_mem": -0.0734434030055997,
+    "delta_shuffle_minus_mem": 0.0002618243694305633,
+    "delta_oracle_minus_mem": -0.28108605492115,
+    "delta_rag_minus_mem": null,
+    "memory_capture_ratio": -0.35370094885645,
+    "per_chain": [
+      {
+        "chain_id": "msc_0000000",
+        "length": 5,
+        "ce_mem": 2.607804000377655,
+        "ce_nomem": 2.5203000903129578,
+        "ce_shuffle": 2.6007259488105774,
+        "ce_oracle": 2.319761335849762,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000001",
+        "length": 5,
+        "ce_mem": 2.4028133749961853,
+        "ce_nomem": 2.3078681230545044,
+        "ce_shuffle": 2.4139530062675476,
+        "ce_oracle": 2.0193945467472076,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000002",
+        "length": 5,
+        "ce_mem": 2.689740777015686,
+        "ce_nomem": 2.605222523212433,
+        "ce_shuffle": 2.6808654069900513,
+        "ce_oracle": 2.3254793882369995,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000003",
+        "length": 5,
+        "ce_mem": 2.897137701511383,
+        "ce_nomem": 2.872015357017517,
+        "ce_shuffle": 2.895329773426056,
+        "ce_oracle": 2.686887741088867,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000004",
+        "length": 5,
+        "ce_mem": 2.6634664237499237,
+        "ce_nomem": 2.610445559024811,
+        "ce_shuffle": 2.66365846991539,
+        "ce_oracle": 2.410779297351837,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000005",
+        "length": 5,
+        "ce_mem": 2.8075443506240845,
+        "ce_nomem": 2.750062882900238,
+        "ce_shuffle": 2.8080661296844482,
+        "ce_oracle": 2.5500991344451904,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000006",
+        "length": 5,
+        "ce_mem": 2.599950432777405,
+        "ce_nomem": 2.5267392992973328,
+        "ce_shuffle": 2.5943973660469055,
+        "ce_oracle": 2.261963725090027,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000007",
+        "length": 5,
+        "ce_mem": 2.4917335510253906,
+        "ce_nomem": 2.4039904475212097,
+        "ce_shuffle": 2.483340084552765,
+        "ce_oracle": 2.1607602536678314,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000008",
+        "length": 5,
+        "ce_mem": 2.451828569173813,
+        "ce_nomem": 2.2928777635097504,
+        "ce_shuffle": 2.4544373154640198,
+        "ce_oracle": 2.076341897249222,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000009",
+        "length": 5,
+        "ce_mem": 2.6195690631866455,
+        "ce_nomem": 2.5297069251537323,
+        "ce_shuffle": 2.6219019889831543,
+        "ce_oracle": 2.3530960083007812,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000010",
+        "length": 5,
+        "ce_mem": 3.0234485268592834,
+        "ce_nomem": 2.9802271723747253,
+        "ce_shuffle": 3.021912634372711,
+        "ce_oracle": 2.811428666114807,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000011",
+        "length": 5,
+        "ce_mem": 2.6542108058929443,
+        "ce_nomem": 2.5738216638565063,
+        "ce_shuffle": 2.6595417857170105,
+        "ce_oracle": 2.306310921907425,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000012",
+        "length": 5,
+        "ce_mem": 2.8627325892448425,
+        "ce_nomem": 2.844146728515625,
+        "ce_shuffle": 2.8619059920310974,
+        "ce_oracle": 2.726752519607544,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000013",
+        "length": 5,
+        "ce_mem": 3.083289682865143,
+        "ce_nomem": 3.0691369771957397,
+        "ce_shuffle": 3.083331525325775,
+        "ce_oracle": 2.9460843205451965,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000014",
+        "length": 5,
+        "ce_mem": 2.6051446199417114,
+        "ce_nomem": 2.523295760154724,
+        "ce_shuffle": 2.6044055223464966,
+        "ce_oracle": 2.337627351284027,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000015",
+        "length": 5,
+        "ce_mem": 2.559508830308914,
+        "ce_nomem": 2.520751178264618,
+        "ce_shuffle": 2.5531452000141144,
+        "ce_oracle": 2.3341785669326782,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000016",
+        "length": 5,
+        "ce_mem": 2.9161691069602966,
+        "ce_nomem": 2.8160021603107452,
+        "ce_shuffle": 2.912303864955902,
+        "ce_oracle": 2.6648127138614655,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000017",
+        "length": 5,
+        "ce_mem": 2.739799439907074,
+        "ce_nomem": 2.636528968811035,
+        "ce_shuffle": 2.7361119985580444,
+        "ce_oracle": 2.440968334674835,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000018",
+        "length": 5,
+        "ce_mem": 2.9844022393226624,
+        "ce_nomem": 2.9476025104522705,
+        "ce_shuffle": 2.9793564081192017,
+        "ce_oracle": 2.7651731967926025,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000019",
+        "length": 5,
+        "ce_mem": 2.553985893726349,
+        "ce_nomem": 2.503162771463394,
+        "ce_shuffle": 2.5541250109672546,
+        "ce_oracle": 2.3213857114315033,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000020",
+        "length": 5,
+        "ce_mem": 2.5170693695545197,
+        "ce_nomem": 2.408388912677765,
+        "ce_shuffle": 2.5094875395298004,
+        "ce_oracle": 2.221648931503296,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000021",
+        "length": 5,
+        "ce_mem": 2.4628806710243225,
+        "ce_nomem": 2.371674597263336,
+        "ce_shuffle": 2.468392491340637,
+        "ce_oracle": 2.1390637159347534,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000022",
+        "length": 5,
+        "ce_mem": 2.9374096393585205,
+        "ce_nomem": 2.8798674941062927,
+        "ce_shuffle": 2.9334717392921448,
+        "ce_oracle": 2.689768671989441,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000023",
+        "length": 5,
+        "ce_mem": 2.6110453605651855,
+        "ce_nomem": 2.512177586555481,
+        "ce_shuffle": 2.6165988743305206,
+        "ce_oracle": 2.321113258600235,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000024",
+        "length": 5,
+        "ce_mem": 2.7237749099731445,
+        "ce_nomem": 2.7112048864364624,
+        "ce_shuffle": 2.7255613803863525,
+        "ce_oracle": 2.4700636863708496,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000025",
+        "length": 5,
+        "ce_mem": 2.391585350036621,
+        "ce_nomem": 2.283240258693695,
+        "ce_shuffle": 2.3897294402122498,
+        "ce_oracle": 2.030197888612747,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000026",
+        "length": 5,
+        "ce_mem": 2.772854745388031,
+        "ce_nomem": 2.766704022884369,
+        "ce_shuffle": 2.7805713415145874,
+        "ce_oracle": 2.5547511279582977,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000027",
+        "length": 5,
+        "ce_mem": 2.6443238258361816,
+        "ce_nomem": 2.6094640493392944,
+        "ce_shuffle": 2.637871742248535,
+        "ce_oracle": 2.4015292525291443,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000028",
+        "length": 5,
+        "ce_mem": 2.604015350341797,
+        "ce_nomem": 2.5234395265579224,
+        "ce_shuffle": 2.595723509788513,
+        "ce_oracle": 2.3232050240039825,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000029",
+        "length": 5,
+        "ce_mem": 2.580775499343872,
+        "ce_nomem": 2.4790164828300476,
+        "ce_shuffle": 2.5838747024536133,
+        "ce_oracle": 2.2631591260433197,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000030",
+        "length": 5,
+        "ce_mem": 2.7142746448516846,
+        "ce_nomem": 2.6494429111480713,
+        "ce_shuffle": 2.7158339619636536,
+        "ce_oracle": 2.4484376907348633,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000031",
+        "length": 5,
+        "ce_mem": 2.5204073786735535,
+        "ce_nomem": 2.44949471950531,
+        "ce_shuffle": 2.5153799653053284,
+        "ce_oracle": 2.2153937816619873,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000032",
+        "length": 5,
+        "ce_mem": 3.2323986291885376,
+        "ce_nomem": 3.1541475653648376,
+        "ce_shuffle": 3.232564091682434,
+        "ce_oracle": 2.958875894546509,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000033",
+        "length": 5,
+        "ce_mem": 2.888213098049164,
+        "ce_nomem": 2.860709309577942,
+        "ce_shuffle": 2.885788381099701,
+        "ce_oracle": 2.6804598569869995,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000034",
+        "length": 5,
+        "ce_mem": 2.729079306125641,
+        "ce_nomem": 2.7080267667770386,
+        "ce_shuffle": 2.723225474357605,
+        "ce_oracle": 2.4918234944343567,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000035",
+        "length": 5,
+        "ce_mem": 2.810351312160492,
+        "ce_nomem": 2.7313681840896606,
+        "ce_shuffle": 2.8114801049232483,
+        "ce_oracle": 2.578263431787491,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000036",
+        "length": 5,
+        "ce_mem": 2.7080236673355103,
+        "ce_nomem": 2.598381906747818,
+        "ce_shuffle": 2.703170359134674,
+        "ce_oracle": 2.4517728686332703,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000037",
+        "length": 5,
+        "ce_mem": 2.5298832058906555,
+        "ce_nomem": 2.4341305792331696,
+        "ce_shuffle": 2.53844752907753,
+        "ce_oracle": 2.193790763616562,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000038",
+        "length": 5,
+        "ce_mem": 3.1310815811157227,
+        "ce_nomem": 3.0401437878608704,
+        "ce_shuffle": 3.131512403488159,
+        "ce_oracle": 2.910716712474823,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000039",
+        "length": 5,
+        "ce_mem": 2.4197102785110474,
+        "ce_nomem": 2.3430671989917755,
+        "ce_shuffle": 2.423293113708496,
+        "ce_oracle": 2.168478935956955,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000040",
+        "length": 5,
+        "ce_mem": 2.7442363500595093,
+        "ce_nomem": 2.686464488506317,
+        "ce_shuffle": 2.7447543144226074,
+        "ce_oracle": 2.4306538701057434,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000041",
+        "length": 5,
+        "ce_mem": 2.7135977745056152,
+        "ce_nomem": 2.675093650817871,
+        "ce_shuffle": 2.718235194683075,
+        "ce_oracle": 2.454210937023163,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000042",
+        "length": 5,
+        "ce_mem": 2.828494429588318,
+        "ce_nomem": 2.7559059262275696,
+        "ce_shuffle": 2.8303871750831604,
+        "ce_oracle": 2.655552387237549,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000043",
+        "length": 5,
+        "ce_mem": 2.793888568878174,
+        "ce_nomem": 2.767939865589142,
+        "ce_shuffle": 2.796187162399292,
+        "ce_oracle": 2.5569020807743073,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000044",
+        "length": 5,
+        "ce_mem": 2.7500211596488953,
+        "ce_nomem": 2.657581388950348,
+        "ce_shuffle": 2.7559913396835327,
+        "ce_oracle": 2.4041956663131714,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000045",
+        "length": 5,
+        "ce_mem": 2.7386392951011658,
+        "ce_nomem": 2.675418257713318,
+        "ce_shuffle": 2.7385842204093933,
+        "ce_oracle": 2.483301430940628,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000046",
+        "length": 5,
+        "ce_mem": 2.716925323009491,
+        "ce_nomem": 2.653794050216675,
+        "ce_shuffle": 2.7144176363945007,
+        "ce_oracle": 2.4340652525424957,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000047",
+        "length": 5,
+        "ce_mem": 2.3743927478790283,
+        "ce_nomem": 2.2342638075351715,
+        "ce_shuffle": 2.371941715478897,
+        "ce_oracle": 1.9669574201107025,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000048",
+        "length": 5,
+        "ce_mem": 2.9008105397224426,
+        "ce_nomem": 2.8398383259773254,
+        "ce_shuffle": 2.9031941294670105,
+        "ce_oracle": 2.6660895347595215,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000049",
+        "length": 5,
+        "ce_mem": 2.934190034866333,
+        "ce_nomem": 2.8851187229156494,
+        "ce_shuffle": 2.9402336478233337,
+        "ce_oracle": 2.749717116355896,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000050",
+        "length": 5,
+        "ce_mem": 2.7318167090415955,
+        "ce_nomem": 2.6651549339294434,
+        "ce_shuffle": 2.723593592643738,
+        "ce_oracle": 2.4045435786247253,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000051",
+        "length": 5,
+        "ce_mem": 2.713318943977356,
+        "ce_nomem": 2.61518794298172,
+        "ce_shuffle": 2.71089369058609,
+        "ce_oracle": 2.4282225370407104,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000052",
+        "length": 5,
+        "ce_mem": 2.727933168411255,
+        "ce_nomem": 2.6769555509090424,
+        "ce_shuffle": 2.732145309448242,
+        "ce_oracle": 2.4169693291187286,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000053",
+        "length": 5,
+        "ce_mem": 2.7352115511894226,
+        "ce_nomem": 2.6495925784111023,
+        "ce_shuffle": 2.7293933629989624,
+        "ce_oracle": 2.434710443019867,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000054",
+        "length": 5,
+        "ce_mem": 2.787428379058838,
+        "ce_nomem": 2.7306433618068695,
+        "ce_shuffle": 2.7850265502929688,
+        "ce_oracle": 2.520193427801132,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000055",
+        "length": 5,
+        "ce_mem": 2.712521195411682,
+        "ce_nomem": 2.6977157592773438,
+        "ce_shuffle": 2.71281898021698,
+        "ce_oracle": 2.5133623480796814,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000056",
+        "length": 5,
+        "ce_mem": 2.739922881126404,
+        "ce_nomem": 2.7044814825057983,
+        "ce_shuffle": 2.74313622713089,
+        "ce_oracle": 2.46161288022995,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000057",
+        "length": 5,
+        "ce_mem": 2.4954296946525574,
+        "ce_nomem": 2.378497004508972,
+        "ce_shuffle": 2.4911001324653625,
+        "ce_oracle": 2.1387620866298676,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000058",
+        "length": 5,
+        "ce_mem": 2.6992492079734802,
+        "ce_nomem": 2.617991179227829,
+        "ce_shuffle": 2.6896690130233765,
+        "ce_oracle": 2.418231040239334,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000059",
+        "length": 5,
+        "ce_mem": 2.6050687432289124,
+        "ce_nomem": 2.5607218742370605,
+        "ce_shuffle": 2.6043344736099243,
+        "ce_oracle": 2.432465046644211,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000060",
+        "length": 5,
+        "ce_mem": 2.655979573726654,
+        "ce_nomem": 2.601002871990204,
+        "ce_shuffle": 2.65036278963089,
+        "ce_oracle": 2.38112935423851,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000061",
+        "length": 5,
+        "ce_mem": 2.5977250933647156,
+        "ce_nomem": 2.514253795146942,
+        "ce_shuffle": 2.595618724822998,
+        "ce_oracle": 2.2665037512779236,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000062",
+        "length": 5,
+        "ce_mem": 2.6401824355125427,
+        "ce_nomem": 2.584911584854126,
+        "ce_shuffle": 2.6419991850852966,
+        "ce_oracle": 2.3218467831611633,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000063",
+        "length": 5,
+        "ce_mem": 3.0292038321495056,
+        "ce_nomem": 3.0222657322883606,
+        "ce_shuffle": 3.03023898601532,
+        "ce_oracle": 2.9587106704711914,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000064",
+        "length": 5,
+        "ce_mem": 2.5105820298194885,
+        "ce_nomem": 2.391655594110489,
+        "ce_shuffle": 2.5076776146888733,
+        "ce_oracle": 2.217815726995468,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000065",
+        "length": 5,
+        "ce_mem": 2.9561243653297424,
+        "ce_nomem": 2.928148865699768,
+        "ce_shuffle": 2.9581528902053833,
+        "ce_oracle": 2.690952956676483,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000066",
+        "length": 5,
+        "ce_mem": 2.753127694129944,
+        "ce_nomem": 2.702143669128418,
+        "ce_shuffle": 2.7606756687164307,
+        "ce_oracle": 2.49517023563385,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000067",
+        "length": 5,
+        "ce_mem": 2.478423297405243,
+        "ce_nomem": 2.390886425971985,
+        "ce_shuffle": 2.4770894646644592,
+        "ce_oracle": 2.2304815649986267,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000068",
+        "length": 5,
+        "ce_mem": 2.8584956526756287,
+        "ce_nomem": 2.78226500749588,
+        "ce_shuffle": 2.8627811074256897,
+        "ce_oracle": 2.577343165874481,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000069",
+        "length": 5,
+        "ce_mem": 2.6817009449005127,
+        "ce_nomem": 2.5794485211372375,
+        "ce_shuffle": 2.6869760751724243,
+        "ce_oracle": 2.4760060012340546,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000070",
+        "length": 5,
+        "ce_mem": 2.3877931237220764,
+        "ce_nomem": 2.288889557123184,
+        "ce_shuffle": 2.3892857432365417,
+        "ce_oracle": 2.0633709877729416,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000071",
+        "length": 5,
+        "ce_mem": 2.6982080042362213,
+        "ce_nomem": 2.6381057500839233,
+        "ce_shuffle": 2.701059252023697,
+        "ce_oracle": 2.4449706375598907,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000072",
+        "length": 5,
+        "ce_mem": 2.629689574241638,
+        "ce_nomem": 2.5678308606147766,
+        "ce_shuffle": 2.6382375359535217,
+        "ce_oracle": 2.367639571428299,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000073",
+        "length": 5,
+        "ce_mem": 2.5900232791900635,
+        "ce_nomem": 2.50408399105072,
+        "ce_shuffle": 2.594062387943268,
+        "ce_oracle": 2.2197559773921967,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000074",
+        "length": 5,
+        "ce_mem": 2.7035728096961975,
+        "ce_nomem": 2.599061071872711,
+        "ce_shuffle": 2.7034435868263245,
+        "ce_oracle": 2.414849668741226,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000075",
+        "length": 5,
+        "ce_mem": 2.866765558719635,
+        "ce_nomem": 2.8090333938598633,
+        "ce_shuffle": 2.8731947541236877,
+        "ce_oracle": 2.578027129173279,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000076",
+        "length": 5,
+        "ce_mem": 2.8039316534996033,
+        "ce_nomem": 2.7368558645248413,
+        "ce_shuffle": 2.814304292201996,
+        "ce_oracle": 2.479618936777115,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000077",
+        "length": 5,
+        "ce_mem": 2.8158594369888306,
+        "ce_nomem": 2.7119083404541016,
+        "ce_shuffle": 2.8003451228141785,
+        "ce_oracle": 2.494323432445526,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000078",
+        "length": 5,
+        "ce_mem": 2.5428627133369446,
+        "ce_nomem": 2.471498668193817,
+        "ce_shuffle": 2.547153949737549,
+        "ce_oracle": 2.26487734913826,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000079",
+        "length": 5,
+        "ce_mem": 2.648296058177948,
+        "ce_nomem": 2.573559284210205,
+        "ce_shuffle": 2.645698368549347,
+        "ce_oracle": 2.3351760804653168,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000080",
+        "length": 5,
+        "ce_mem": 2.657127320766449,
+        "ce_nomem": 2.5580703020095825,
+        "ce_shuffle": 2.6561546325683594,
+        "ce_oracle": 2.341250777244568,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000081",
+        "length": 5,
+        "ce_mem": 2.665266990661621,
+        "ce_nomem": 2.5846898555755615,
+        "ce_shuffle": 2.6659404039382935,
+        "ce_oracle": 2.328808069229126,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000082",
+        "length": 5,
+        "ce_mem": 2.5662750601768494,
+        "ce_nomem": 2.487257421016693,
+        "ce_shuffle": 2.565982699394226,
+        "ce_oracle": 2.2687589526176453,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000083",
+        "length": 5,
+        "ce_mem": 2.1891881227493286,
+        "ce_nomem": 2.0033280551433563,
+        "ce_shuffle": 2.1896535754203796,
+        "ce_oracle": 1.8195598721504211,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000084",
+        "length": 5,
+        "ce_mem": 3.112696349620819,
+        "ce_nomem": 3.102271258831024,
+        "ce_shuffle": 3.1095348596572876,
+        "ce_oracle": 2.926289737224579,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000085",
+        "length": 5,
+        "ce_mem": 2.171902745962143,
+        "ce_nomem": 2.0368911027908325,
+        "ce_shuffle": 2.1721034348011017,
+        "ce_oracle": 1.8115784227848053,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000086",
+        "length": 5,
+        "ce_mem": 2.637100636959076,
+        "ce_nomem": 2.553213596343994,
+        "ce_shuffle": 2.6409007906913757,
+        "ce_oracle": 2.3759477138519287,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000087",
+        "length": 5,
+        "ce_mem": 2.936640202999115,
+        "ce_nomem": 2.8568666577339172,
+        "ce_shuffle": 2.930006206035614,
+        "ce_oracle": 2.692658394575119,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000088",
+        "length": 5,
+        "ce_mem": 2.9253596663475037,
+        "ce_nomem": 2.8349481225013733,
+        "ce_shuffle": 2.9275059700012207,
+        "ce_oracle": 2.6495007276535034,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000089",
+        "length": 5,
+        "ce_mem": 3.0467668175697327,
+        "ce_nomem": 2.9956464767456055,
+        "ce_shuffle": 3.047922432422638,
+        "ce_oracle": 2.8502453565597534,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000090",
+        "length": 5,
+        "ce_mem": 2.238441914319992,
+        "ce_nomem": 2.1099128127098083,
+        "ce_shuffle": 2.232822984457016,
+        "ce_oracle": 1.8643426895141602,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000091",
+        "length": 5,
+        "ce_mem": 2.8328750133514404,
+        "ce_nomem": 2.771011769771576,
+        "ce_shuffle": 2.8364930748939514,
+        "ce_oracle": 2.6088787317276,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000092",
+        "length": 5,
+        "ce_mem": 2.52379709482193,
+        "ce_nomem": 2.3756953179836273,
+        "ce_shuffle": 2.531942903995514,
+        "ce_oracle": 2.1900088787078857,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000093",
+        "length": 5,
+        "ce_mem": 2.5724183320999146,
+        "ce_nomem": 2.5293388962745667,
+        "ce_shuffle": 2.5731789469718933,
+        "ce_oracle": 2.2593825459480286,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000094",
+        "length": 5,
+        "ce_mem": 2.804343104362488,
+        "ce_nomem": 2.7211917638778687,
+        "ce_shuffle": 2.8075161576271057,
+        "ce_oracle": 2.53818416595459,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000095",
+        "length": 5,
+        "ce_mem": 2.479522705078125,
+        "ce_nomem": 2.393155515193939,
+        "ce_shuffle": 2.478018134832382,
+        "ce_oracle": 2.212633341550827,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000096",
+        "length": 5,
+        "ce_mem": 3.0132898688316345,
+        "ce_nomem": 2.957191288471222,
+        "ce_shuffle": 3.015011489391327,
+        "ce_oracle": 2.853985905647278,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000097",
+        "length": 5,
+        "ce_mem": 2.909196674823761,
+        "ce_nomem": 2.877622365951538,
+        "ce_shuffle": 2.90783828496933,
+        "ce_oracle": 2.6921130418777466,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000098",
+        "length": 5,
+        "ce_mem": 2.546909272670746,
+        "ce_nomem": 2.4234040081501007,
+        "ce_shuffle": 2.547881007194519,
+        "ce_oracle": 2.1815772652626038,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000099",
+        "length": 5,
+        "ce_mem": 2.7433175444602966,
+        "ce_nomem": 2.7061601877212524,
+        "ce_shuffle": 2.744719684123993,
+        "ce_oracle": 2.474422514438629,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000100",
+        "length": 5,
+        "ce_mem": 2.4728477001190186,
+        "ce_nomem": 2.3747855722904205,
+        "ce_shuffle": 2.4792918860912323,
+        "ce_oracle": 2.167150169610977,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000101",
+        "length": 5,
+        "ce_mem": 2.586879551410675,
+        "ce_nomem": 2.4981965720653534,
+        "ce_shuffle": 2.597837269306183,
+        "ce_oracle": 2.3361218571662903,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000102",
+        "length": 5,
+        "ce_mem": 2.786494195461273,
+        "ce_nomem": 2.7504239082336426,
+        "ce_shuffle": 2.780036151409149,
+        "ce_oracle": 2.548131227493286,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000103",
+        "length": 5,
+        "ce_mem": 2.8292025327682495,
+        "ce_nomem": 2.7333200573921204,
+        "ce_shuffle": 2.8264216780662537,
+        "ce_oracle": 2.5808423161506653,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000104",
+        "length": 5,
+        "ce_mem": 3.055066406726837,
+        "ce_nomem": 2.9639431834220886,
+        "ce_shuffle": 3.0544499158859253,
+        "ce_oracle": 2.7598429322242737,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000105",
+        "length": 5,
+        "ce_mem": 2.6775367856025696,
+        "ce_nomem": 2.613652288913727,
+        "ce_shuffle": 2.6847662925720215,
+        "ce_oracle": 2.361987680196762,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000106",
+        "length": 5,
+        "ce_mem": 2.953536570072174,
+        "ce_nomem": 2.898565411567688,
+        "ce_shuffle": 2.953285038471222,
+        "ce_oracle": 2.736656665802002,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000107",
+        "length": 5,
+        "ce_mem": 2.710391104221344,
+        "ce_nomem": 2.5843932032585144,
+        "ce_shuffle": 2.70849871635437,
+        "ce_oracle": 2.417096644639969,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000108",
+        "length": 5,
+        "ce_mem": 2.647407293319702,
+        "ce_nomem": 2.530460298061371,
+        "ce_shuffle": 2.6499200463294983,
+        "ce_oracle": 2.268565744161606,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000109",
+        "length": 5,
+        "ce_mem": 2.3898451924324036,
+        "ce_nomem": 2.2856735289096832,
+        "ce_shuffle": 2.390064835548401,
+        "ce_oracle": 2.0936068296432495,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000110",
+        "length": 5,
+        "ce_mem": 2.6456015706062317,
+        "ce_nomem": 2.6142430305480957,
+        "ce_shuffle": 2.648518204689026,
+        "ce_oracle": 2.379436880350113,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000111",
+        "length": 5,
+        "ce_mem": 2.54394194483757,
+        "ce_nomem": 2.439697027206421,
+        "ce_shuffle": 2.5543526113033295,
+        "ce_oracle": 2.1939057409763336,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000112",
+        "length": 5,
+        "ce_mem": 2.9724833369255066,
+        "ce_nomem": 2.9624077677726746,
+        "ce_shuffle": 2.974062442779541,
+        "ce_oracle": 2.8119019269943237,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000113",
+        "length": 5,
+        "ce_mem": 2.839855968952179,
+        "ce_nomem": 2.811341941356659,
+        "ce_shuffle": 2.8463881611824036,
+        "ce_oracle": 2.6947100162506104,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000114",
+        "length": 5,
+        "ce_mem": 2.4807101488113403,
+        "ce_nomem": 2.4252859354019165,
+        "ce_shuffle": 2.486871749162674,
+        "ce_oracle": 2.2816817462444305,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000115",
+        "length": 5,
+        "ce_mem": 2.721827447414398,
+        "ce_nomem": 2.673290967941284,
+        "ce_shuffle": 2.7294554710388184,
+        "ce_oracle": 2.462233066558838,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000116",
+        "length": 5,
+        "ce_mem": 2.6030457615852356,
+        "ce_nomem": 2.5095659494400024,
+        "ce_shuffle": 2.604267120361328,
+        "ce_oracle": 2.2990781366825104,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000117",
+        "length": 5,
+        "ce_mem": 2.784797787666321,
+        "ce_nomem": 2.722609281539917,
+        "ce_shuffle": 2.7764565348625183,
+        "ce_oracle": 2.51743346452713,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000118",
+        "length": 5,
+        "ce_mem": 2.38553050160408,
+        "ce_nomem": 2.2563558518886566,
+        "ce_shuffle": 2.386738270521164,
+        "ce_oracle": 2.1094829738140106,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000119",
+        "length": 5,
+        "ce_mem": 2.4034534692764282,
+        "ce_nomem": 2.28855898976326,
+        "ce_shuffle": 2.4057998061180115,
+        "ce_oracle": 2.111720860004425,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000120",
+        "length": 5,
+        "ce_mem": 2.82142972946167,
+        "ce_nomem": 2.770420789718628,
+        "ce_shuffle": 2.821642220020294,
+        "ce_oracle": 2.546197474002838,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000121",
+        "length": 5,
+        "ce_mem": 2.979335606098175,
+        "ce_nomem": 2.8943116068840027,
+        "ce_shuffle": 2.97446870803833,
+        "ce_oracle": 2.6964977979660034,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000122",
+        "length": 5,
+        "ce_mem": 2.8276795744895935,
+        "ce_nomem": 2.800723075866699,
+        "ce_shuffle": 2.8345510959625244,
+        "ce_oracle": 2.6331814527511597,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000123",
+        "length": 5,
+        "ce_mem": 2.509159803390503,
+        "ce_nomem": 2.4621229767799377,
+        "ce_shuffle": 2.4942033290863037,
+        "ce_oracle": 2.14593306183815,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000124",
+        "length": 5,
+        "ce_mem": 2.7260791063308716,
+        "ce_nomem": 2.6573938727378845,
+        "ce_shuffle": 2.727010190486908,
+        "ce_oracle": 2.4088593125343323,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000125",
+        "length": 5,
+        "ce_mem": 2.810603618621826,
+        "ce_nomem": 2.7487902641296387,
+        "ce_shuffle": 2.812078595161438,
+        "ce_oracle": 2.5155490040779114,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000126",
+        "length": 5,
+        "ce_mem": 2.7648489475250244,
+        "ce_nomem": 2.6868170499801636,
+        "ce_shuffle": 2.7655575275421143,
+        "ce_oracle": 2.504961371421814,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000127",
+        "length": 5,
+        "ce_mem": 2.819216728210449,
+        "ce_nomem": 2.73043692111969,
+        "ce_shuffle": 2.8183863759040833,
+        "ce_oracle": 2.4572989344596863,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000128",
+        "length": 5,
+        "ce_mem": 2.8312649726867676,
+        "ce_nomem": 2.7300840616226196,
+        "ce_shuffle": 2.83662086725235,
+        "ce_oracle": 2.4006994366645813,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000129",
+        "length": 5,
+        "ce_mem": 2.406363368034363,
+        "ce_nomem": 2.2949956953525543,
+        "ce_shuffle": 2.4004735946655273,
+        "ce_oracle": 2.011955201625824,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000130",
+        "length": 5,
+        "ce_mem": 2.5523093044757843,
+        "ce_nomem": 2.4834969639778137,
+        "ce_shuffle": 2.558913230895996,
+        "ce_oracle": 2.244941383600235,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000131",
+        "length": 5,
+        "ce_mem": 2.6695523262023926,
+        "ce_nomem": 2.569369286298752,
+        "ce_shuffle": 2.6736151576042175,
+        "ce_oracle": 2.3528242707252502,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000132",
+        "length": 5,
+        "ce_mem": 2.9221829771995544,
+        "ce_nomem": 2.8334258794784546,
+        "ce_shuffle": 2.92438143491745,
+        "ce_oracle": 2.6573169827461243,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000133",
+        "length": 5,
+        "ce_mem": 2.648515999317169,
+        "ce_nomem": 2.547058403491974,
+        "ce_shuffle": 2.650384485721588,
+        "ce_oracle": 2.3571788370609283,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000134",
+        "length": 5,
+        "ce_mem": 2.7383280396461487,
+        "ce_nomem": 2.660862684249878,
+        "ce_shuffle": 2.741986572742462,
+        "ce_oracle": 2.44611519575119,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000135",
+        "length": 5,
+        "ce_mem": 2.451932966709137,
+        "ce_nomem": 2.36636483669281,
+        "ce_shuffle": 2.4484296441078186,
+        "ce_oracle": 2.072817414999008,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000136",
+        "length": 5,
+        "ce_mem": 2.518407106399536,
+        "ce_nomem": 2.41590279340744,
+        "ce_shuffle": 2.518296539783478,
+        "ce_oracle": 2.127417892217636,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000137",
+        "length": 5,
+        "ce_mem": 2.865723133087158,
+        "ce_nomem": 2.772821068763733,
+        "ce_shuffle": 2.8658738136291504,
+        "ce_oracle": 2.5102546215057373,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000138",
+        "length": 5,
+        "ce_mem": 2.7308850288391113,
+        "ce_nomem": 2.6509771943092346,
+        "ce_shuffle": 2.7341146767139435,
+        "ce_oracle": 2.476826101541519,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000139",
+        "length": 5,
+        "ce_mem": 2.8635682463645935,
+        "ce_nomem": 2.810260057449341,
+        "ce_shuffle": 2.8612797260284424,
+        "ce_oracle": 2.6190854907035828,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000140",
+        "length": 5,
+        "ce_mem": 2.459764242172241,
+        "ce_nomem": 2.3503093123435974,
+        "ce_shuffle": 2.459292471408844,
+        "ce_oracle": 2.0555703938007355,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000141",
+        "length": 5,
+        "ce_mem": 2.9962838888168335,
+        "ce_nomem": 2.9316460490226746,
+        "ce_shuffle": 2.9973073601722717,
+        "ce_oracle": 2.7289924025535583,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000142",
+        "length": 5,
+        "ce_mem": 3.0762287974357605,
+        "ce_nomem": 3.019418239593506,
+        "ce_shuffle": 3.076618015766144,
+        "ce_oracle": 2.841294229030609,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000143",
+        "length": 5,
+        "ce_mem": 3.056437373161316,
+        "ce_nomem": 2.988520860671997,
+        "ce_shuffle": 3.0537527203559875,
+        "ce_oracle": 2.7434818744659424,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000144",
+        "length": 5,
+        "ce_mem": 2.9372531175613403,
+        "ce_nomem": 2.851348400115967,
+        "ce_shuffle": 2.9387130737304688,
+        "ce_oracle": 2.728621006011963,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000145",
+        "length": 5,
+        "ce_mem": 2.8478625416755676,
+        "ce_nomem": 2.7642788887023926,
+        "ce_shuffle": 2.8530362844467163,
+        "ce_oracle": 2.541031390428543,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000146",
+        "length": 5,
+        "ce_mem": 2.775466203689575,
+        "ce_nomem": 2.7304850816726685,
+        "ce_shuffle": 2.772168755531311,
+        "ce_oracle": 2.518274664878845,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000147",
+        "length": 5,
+        "ce_mem": 2.6609082221984863,
+        "ce_nomem": 2.590475469827652,
+        "ce_shuffle": 2.6601800322532654,
+        "ce_oracle": 2.317669451236725,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000148",
+        "length": 5,
+        "ce_mem": 2.869112253189087,
+        "ce_nomem": 2.7627477645874023,
+        "ce_shuffle": 2.8632034063339233,
+        "ce_oracle": 2.6639834344387054,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000149",
+        "length": 5,
+        "ce_mem": 2.466593384742737,
+        "ce_nomem": 2.384715110063553,
+        "ce_shuffle": 2.4798588156700134,
+        "ce_oracle": 2.2151489853858948,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000150",
+        "length": 5,
+        "ce_mem": 2.6364057064056396,
+        "ce_nomem": 2.583000421524048,
+        "ce_shuffle": 2.6444368958473206,
+        "ce_oracle": 2.391057014465332,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000151",
+        "length": 5,
+        "ce_mem": 2.252016067504883,
+        "ce_nomem": 2.155747562646866,
+        "ce_shuffle": 2.245922267436981,
+        "ce_oracle": 1.9120425283908844,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000152",
+        "length": 5,
+        "ce_mem": 2.334704875946045,
+        "ce_nomem": 2.251292258501053,
+        "ce_shuffle": 2.3317798376083374,
+        "ce_oracle": 1.9913120865821838,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000153",
+        "length": 5,
+        "ce_mem": 2.56212317943573,
+        "ce_nomem": 2.4704695641994476,
+        "ce_shuffle": 2.565602481365204,
+        "ce_oracle": 2.233751207590103,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000154",
+        "length": 5,
+        "ce_mem": 2.53672993183136,
+        "ce_nomem": 2.447973221540451,
+        "ce_shuffle": 2.5364941358566284,
+        "ce_oracle": 2.2227344512939453,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000155",
+        "length": 5,
+        "ce_mem": 2.4868881702423096,
+        "ce_nomem": 2.4649049639701843,
+        "ce_shuffle": 2.487511992454529,
+        "ce_oracle": 2.303786039352417,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000156",
+        "length": 5,
+        "ce_mem": 2.678528606891632,
+        "ce_nomem": 2.6127727031707764,
+        "ce_shuffle": 2.684378445148468,
+        "ce_oracle": 2.3727851510047913,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000157",
+        "length": 5,
+        "ce_mem": 2.8557329773902893,
+        "ce_nomem": 2.8074743151664734,
+        "ce_shuffle": 2.8529033064842224,
+        "ce_oracle": 2.5971028208732605,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000158",
+        "length": 5,
+        "ce_mem": 2.4614822268486023,
+        "ce_nomem": 2.363275170326233,
+        "ce_shuffle": 2.4601264595985413,
+        "ce_oracle": 2.0783822536468506,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000159",
+        "length": 5,
+        "ce_mem": 2.5331870913505554,
+        "ce_nomem": 2.4308807253837585,
+        "ce_shuffle": 2.5312599539756775,
+        "ce_oracle": 2.233724355697632,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000160",
+        "length": 5,
+        "ce_mem": 2.661804676055908,
+        "ce_nomem": 2.640592575073242,
+        "ce_shuffle": 2.6648396253585815,
+        "ce_oracle": 2.4106712341308594,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000161",
+        "length": 5,
+        "ce_mem": 2.681374192237854,
+        "ce_nomem": 2.616153657436371,
+        "ce_shuffle": 2.680056393146515,
+        "ce_oracle": 2.446873962879181,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000162",
+        "length": 5,
+        "ce_mem": 2.7251676321029663,
+        "ce_nomem": 2.624830663204193,
+        "ce_shuffle": 2.722824454307556,
+        "ce_oracle": 2.3906075060367584,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000163",
+        "length": 5,
+        "ce_mem": 2.528977692127228,
+        "ce_nomem": 2.452100396156311,
+        "ce_shuffle": 2.5378050208091736,
+        "ce_oracle": 2.236990749835968,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000164",
+        "length": 5,
+        "ce_mem": 2.64335697889328,
+        "ce_nomem": 2.6024349331855774,
+        "ce_shuffle": 2.64434951543808,
+        "ce_oracle": 2.4159783720970154,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000165",
+        "length": 5,
+        "ce_mem": 2.8930325508117676,
+        "ce_nomem": 2.76153165102005,
+        "ce_shuffle": 2.89150607585907,
+        "ce_oracle": 2.657081425189972,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000166",
+        "length": 5,
+        "ce_mem": 2.2112788558006287,
+        "ce_nomem": 2.054525136947632,
+        "ce_shuffle": 2.215266227722168,
+        "ce_oracle": 1.7513532042503357,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000167",
+        "length": 5,
+        "ce_mem": 2.6782780289649963,
+        "ce_nomem": 2.639500617980957,
+        "ce_shuffle": 2.674910068511963,
+        "ce_oracle": 2.4611387848854065,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000168",
+        "length": 5,
+        "ce_mem": 2.7287092804908752,
+        "ce_nomem": 2.695369839668274,
+        "ce_shuffle": 2.7238054871559143,
+        "ce_oracle": 2.5271809697151184,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000169",
+        "length": 5,
+        "ce_mem": 2.5777688026428223,
+        "ce_nomem": 2.5216866433620453,
+        "ce_shuffle": 2.586211681365967,
+        "ce_oracle": 2.2977630496025085,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000170",
+        "length": 5,
+        "ce_mem": 2.8653964400291443,
+        "ce_nomem": 2.813144624233246,
+        "ce_shuffle": 2.8676199316978455,
+        "ce_oracle": 2.6496957540512085,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000171",
+        "length": 5,
+        "ce_mem": 2.8991957902908325,
+        "ce_nomem": 2.855936825275421,
+        "ce_shuffle": 2.90110045671463,
+        "ce_oracle": 2.652593195438385,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000172",
+        "length": 5,
+        "ce_mem": 3.0176990032196045,
+        "ce_nomem": 2.993350327014923,
+        "ce_shuffle": 3.019865572452545,
+        "ce_oracle": 2.8494263291358948,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000173",
+        "length": 5,
+        "ce_mem": 2.583719789981842,
+        "ce_nomem": 2.5364916920661926,
+        "ce_shuffle": 2.5884101390838623,
+        "ce_oracle": 2.3239865899086,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000174",
+        "length": 5,
+        "ce_mem": 2.5873680114746094,
+        "ce_nomem": 2.510746657848358,
+        "ce_shuffle": 2.593460440635681,
+        "ce_oracle": 2.273488938808441,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000175",
+        "length": 5,
+        "ce_mem": 2.796667993068695,
+        "ce_nomem": 2.78053480386734,
+        "ce_shuffle": 2.79113507270813,
+        "ce_oracle": 2.588457763195038,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000176",
+        "length": 5,
+        "ce_mem": 3.167218029499054,
+        "ce_nomem": 3.132037580013275,
+        "ce_shuffle": 3.166827380657196,
+        "ce_oracle": 2.9398518204689026,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000177",
+        "length": 5,
+        "ce_mem": 2.515273690223694,
+        "ce_nomem": 2.412560999393463,
+        "ce_shuffle": 2.5207069516181946,
+        "ce_oracle": 2.1628130674362183,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000178",
+        "length": 5,
+        "ce_mem": 2.3708183765411377,
+        "ce_nomem": 2.240101307630539,
+        "ce_shuffle": 2.3756250143051147,
+        "ce_oracle": 2.0392697751522064,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000179",
+        "length": 5,
+        "ce_mem": 2.8142653703689575,
+        "ce_nomem": 2.7666075825691223,
+        "ce_shuffle": 2.811676800251007,
+        "ce_oracle": 2.522280693054199,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000180",
+        "length": 5,
+        "ce_mem": 2.8002509474754333,
+        "ce_nomem": 2.775051534175873,
+        "ce_shuffle": 2.802176535129547,
+        "ce_oracle": 2.579024314880371,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000181",
+        "length": 5,
+        "ce_mem": 2.6823312044143677,
+        "ce_nomem": 2.6056403517723083,
+        "ce_shuffle": 2.6781139373779297,
+        "ce_oracle": 2.386992633342743,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000182",
+        "length": 5,
+        "ce_mem": 2.8688714504241943,
+        "ce_nomem": 2.8327757120132446,
+        "ce_shuffle": 2.86318439245224,
+        "ce_oracle": 2.625947654247284,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000183",
+        "length": 5,
+        "ce_mem": 2.8162795901298523,
+        "ce_nomem": 2.7671156525611877,
+        "ce_shuffle": 2.8121612071990967,
+        "ce_oracle": 2.618530571460724,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000184",
+        "length": 5,
+        "ce_mem": 2.8204946517944336,
+        "ce_nomem": 2.8147412538528442,
+        "ce_shuffle": 2.817809224128723,
+        "ce_oracle": 2.575282096862793,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000185",
+        "length": 5,
+        "ce_mem": 2.6486276388168335,
+        "ce_nomem": 2.541785776615143,
+        "ce_shuffle": 2.6488301753997803,
+        "ce_oracle": 2.3210441768169403,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000186",
+        "length": 5,
+        "ce_mem": 2.5392497181892395,
+        "ce_nomem": 2.408108174800873,
+        "ce_shuffle": 2.537633955478668,
+        "ce_oracle": 2.134704440832138,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000187",
+        "length": 5,
+        "ce_mem": 2.8779428601264954,
+        "ce_nomem": 2.821480691432953,
+        "ce_shuffle": 2.883805215358734,
+        "ce_oracle": 2.5918578505516052,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000188",
+        "length": 5,
+        "ce_mem": 2.6121838092803955,
+        "ce_nomem": 2.5566813945770264,
+        "ce_shuffle": 2.611793875694275,
+        "ce_oracle": 2.372121959924698,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000189",
+        "length": 5,
+        "ce_mem": 2.665976583957672,
+        "ce_nomem": 2.568985342979431,
+        "ce_shuffle": 2.658213436603546,
+        "ce_oracle": 2.391687273979187,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000190",
+        "length": 5,
+        "ce_mem": 2.5311875343322754,
+        "ce_nomem": 2.4128545820713043,
+        "ce_shuffle": 2.530283272266388,
+        "ce_oracle": 2.1542393267154694,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000191",
+        "length": 5,
+        "ce_mem": 2.5329235196113586,
+        "ce_nomem": 2.48602694272995,
+        "ce_shuffle": 2.5323038697242737,
+        "ce_oracle": 2.3025174140930176,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000192",
+        "length": 5,
+        "ce_mem": 2.332468181848526,
+        "ce_nomem": 2.2515948712825775,
+        "ce_shuffle": 2.3308144211769104,
+        "ce_oracle": 2.0602788627147675,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000193",
+        "length": 5,
+        "ce_mem": 2.3073985278606415,
+        "ce_nomem": 2.257607191801071,
+        "ce_shuffle": 2.3163035213947296,
+        "ce_oracle": 2.065373510122299,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000194",
+        "length": 5,
+        "ce_mem": 2.7953991293907166,
+        "ce_nomem": 2.7227171063423157,
+        "ce_shuffle": 2.793010711669922,
+        "ce_oracle": 2.4949567914009094,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000195",
+        "length": 5,
+        "ce_mem": 2.782797634601593,
+        "ce_nomem": 2.725364565849304,
+        "ce_shuffle": 2.7834392786026,
+        "ce_oracle": 2.449538290500641,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000196",
+        "length": 5,
+        "ce_mem": 2.7964833974838257,
+        "ce_nomem": 2.7419840693473816,
+        "ce_shuffle": 2.796069085597992,
+        "ce_oracle": 2.598651170730591,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000197",
+        "length": 5,
+        "ce_mem": 2.409045457839966,
+        "ce_nomem": 2.303362727165222,
+        "ce_shuffle": 2.4055009484291077,
+        "ce_oracle": 2.0931894779205322,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000198",
+        "length": 5,
+        "ce_mem": 2.671526551246643,
+        "ce_nomem": 2.5780410766601562,
+        "ce_shuffle": 2.6753416657447815,
+        "ce_oracle": 2.409562349319458,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000199",
+        "length": 5,
+        "ce_mem": 2.695200204849243,
+        "ce_nomem": 2.658760964870453,
+        "ce_shuffle": 2.6967368125915527,
+        "ce_oracle": 2.4649408757686615,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000200",
+        "length": 5,
+        "ce_mem": 2.47685307264328,
+        "ce_nomem": 2.34889018535614,
+        "ce_shuffle": 2.475402355194092,
+        "ce_oracle": 2.150627702474594,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000201",
+        "length": 5,
+        "ce_mem": 2.4139556884765625,
+        "ce_nomem": 2.2988920509815216,
+        "ce_shuffle": 2.4162681996822357,
+        "ce_oracle": 2.045604109764099,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000202",
+        "length": 5,
+        "ce_mem": 2.464650958776474,
+        "ce_nomem": 2.3635776937007904,
+        "ce_shuffle": 2.4662342071533203,
+        "ce_oracle": 2.0679454803466797,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000203",
+        "length": 5,
+        "ce_mem": 2.8878912329673767,
+        "ce_nomem": 2.836646795272827,
+        "ce_shuffle": 2.887734115123749,
+        "ce_oracle": 2.658539891242981,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000204",
+        "length": 5,
+        "ce_mem": 2.717010200023651,
+        "ce_nomem": 2.6494200825691223,
+        "ce_shuffle": 2.7138227820396423,
+        "ce_oracle": 2.468485414981842,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000205",
+        "length": 5,
+        "ce_mem": 2.5783960223197937,
+        "ce_nomem": 2.5164064168930054,
+        "ce_shuffle": 2.5707783102989197,
+        "ce_oracle": 2.2822422683238983,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000206",
+        "length": 5,
+        "ce_mem": 2.7762451171875,
+        "ce_nomem": 2.7213998436927795,
+        "ce_shuffle": 2.7784873247146606,
+        "ce_oracle": 2.5582971572875977,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000207",
+        "length": 5,
+        "ce_mem": 2.7264607548713684,
+        "ce_nomem": 2.6539426445961,
+        "ce_shuffle": 2.7141844034194946,
+        "ce_oracle": 2.4199399948120117,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000208",
+        "length": 5,
+        "ce_mem": 2.8986581563949585,
+        "ce_nomem": 2.873378574848175,
+        "ce_shuffle": 2.894284427165985,
+        "ce_oracle": 2.7377805709838867,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000209",
+        "length": 5,
+        "ce_mem": 2.407809615135193,
+        "ce_nomem": 2.3070775866508484,
+        "ce_shuffle": 2.4139915704727173,
+        "ce_oracle": 2.0304566621780396,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000210",
+        "length": 5,
+        "ce_mem": 2.9285635948181152,
+        "ce_nomem": 2.862114727497101,
+        "ce_shuffle": 2.9293195605278015,
+        "ce_oracle": 2.7592867612838745,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000211",
+        "length": 5,
+        "ce_mem": 2.3029156923294067,
+        "ce_nomem": 2.1963388919830322,
+        "ce_shuffle": 2.300428479909897,
+        "ce_oracle": 1.9260989129543304,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000212",
+        "length": 5,
+        "ce_mem": 2.8900433778762817,
+        "ce_nomem": 2.8573544025421143,
+        "ce_shuffle": 2.8905062675476074,
+        "ce_oracle": 2.628180205821991,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000213",
+        "length": 5,
+        "ce_mem": 2.9018818140029907,
+        "ce_nomem": 2.8528977036476135,
+        "ce_shuffle": 2.8999263644218445,
+        "ce_oracle": 2.663943588733673,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000214",
+        "length": 5,
+        "ce_mem": 2.510832190513611,
+        "ce_nomem": 2.4574626684188843,
+        "ce_shuffle": 2.5049771070480347,
+        "ce_oracle": 2.261865943670273,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000215",
+        "length": 5,
+        "ce_mem": 2.632176995277405,
+        "ce_nomem": 2.556240975856781,
+        "ce_shuffle": 2.629176676273346,
+        "ce_oracle": 2.350564658641815,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000216",
+        "length": 5,
+        "ce_mem": 2.6162086725234985,
+        "ce_nomem": 2.5279484391212463,
+        "ce_shuffle": 2.610666334629059,
+        "ce_oracle": 2.287335991859436,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000217",
+        "length": 5,
+        "ce_mem": 2.639912784099579,
+        "ce_nomem": 2.5701255798339844,
+        "ce_shuffle": 2.632017970085144,
+        "ce_oracle": 2.307547926902771,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000218",
+        "length": 5,
+        "ce_mem": 2.4170748591423035,
+        "ce_nomem": 2.3849544525146484,
+        "ce_shuffle": 2.4164915680885315,
+        "ce_oracle": 2.086082011461258,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000219",
+        "length": 5,
+        "ce_mem": 2.60667222738266,
+        "ce_nomem": 2.5657567977905273,
+        "ce_shuffle": 2.610124707221985,
+        "ce_oracle": 2.30465167760849,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000220",
+        "length": 5,
+        "ce_mem": 2.5510955154895782,
+        "ce_nomem": 2.4474839568138123,
+        "ce_shuffle": 2.5537525415420532,
+        "ce_oracle": 2.2312362790107727,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000221",
+        "length": 5,
+        "ce_mem": 2.7150797247886658,
+        "ce_nomem": 2.6420705318450928,
+        "ce_shuffle": 2.7051438093185425,
+        "ce_oracle": 2.443802058696747,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000222",
+        "length": 5,
+        "ce_mem": 2.7781100273132324,
+        "ce_nomem": 2.7386316061019897,
+        "ce_shuffle": 2.786567509174347,
+        "ce_oracle": 2.5410221815109253,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000223",
+        "length": 5,
+        "ce_mem": 2.2732250094413757,
+        "ce_nomem": 2.2133712768554688,
+        "ce_shuffle": 2.270040661096573,
+        "ce_oracle": 1.946465015411377,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000224",
+        "length": 5,
+        "ce_mem": 2.6717097759246826,
+        "ce_nomem": 2.5896435976028442,
+        "ce_shuffle": 2.6669735312461853,
+        "ce_oracle": 2.353276014328003,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000225",
+        "length": 5,
+        "ce_mem": 2.7564544677734375,
+        "ce_nomem": 2.7116714119911194,
+        "ce_shuffle": 2.7589439749717712,
+        "ce_oracle": 2.4794487357139587,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000226",
+        "length": 5,
+        "ce_mem": 2.4687910079956055,
+        "ce_nomem": 2.384486585855484,
+        "ce_shuffle": 2.465517282485962,
+        "ce_oracle": 2.0952662229537964,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000227",
+        "length": 5,
+        "ce_mem": 2.5813361406326294,
+        "ce_nomem": 2.4742950797080994,
+        "ce_shuffle": 2.580735683441162,
+        "ce_oracle": 2.193454295396805,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000228",
+        "length": 5,
+        "ce_mem": 2.622786819934845,
+        "ce_nomem": 2.523957669734955,
+        "ce_shuffle": 2.619886815547943,
+        "ce_oracle": 2.2765960097312927,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000229",
+        "length": 5,
+        "ce_mem": 2.688863694667816,
+        "ce_nomem": 2.5715739727020264,
+        "ce_shuffle": 2.6900179982185364,
+        "ce_oracle": 2.3897818326950073,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000230",
+        "length": 5,
+        "ce_mem": 2.6214309632778168,
+        "ce_nomem": 2.5662895143032074,
+        "ce_shuffle": 2.61527881026268,
+        "ce_oracle": 2.3532752096652985,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000231",
+        "length": 5,
+        "ce_mem": 2.7038612961769104,
+        "ce_nomem": 2.606047749519348,
+        "ce_shuffle": 2.704881966114044,
+        "ce_oracle": 2.3948519229888916,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000232",
+        "length": 5,
+        "ce_mem": 2.697639286518097,
+        "ce_nomem": 2.6507807970046997,
+        "ce_shuffle": 2.701299250125885,
+        "ce_oracle": 2.4507204592227936,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000233",
+        "length": 5,
+        "ce_mem": 2.41708642244339,
+        "ce_nomem": 2.3668007254600525,
+        "ce_shuffle": 2.414747953414917,
+        "ce_oracle": 2.158791095018387,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000234",
+        "length": 5,
+        "ce_mem": 2.809567093849182,
+        "ce_nomem": 2.8257803916931152,
+        "ce_shuffle": 2.804250657558441,
+        "ce_oracle": 2.675424247980118,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000235",
+        "length": 5,
+        "ce_mem": 2.7975735664367676,
+        "ce_nomem": 2.7546045780181885,
+        "ce_shuffle": 2.7998275756835938,
+        "ce_oracle": 2.586211860179901,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000236",
+        "length": 5,
+        "ce_mem": 2.780748963356018,
+        "ce_nomem": 2.6861515641212463,
+        "ce_shuffle": 2.7777385115623474,
+        "ce_oracle": 2.4645064771175385,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000237",
+        "length": 5,
+        "ce_mem": 2.489013820886612,
+        "ce_nomem": 2.449375867843628,
+        "ce_shuffle": 2.4885295033454895,
+        "ce_oracle": 2.266817629337311,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000238",
+        "length": 5,
+        "ce_mem": 2.6655908823013306,
+        "ce_nomem": 2.589051365852356,
+        "ce_shuffle": 2.6627268195152283,
+        "ce_oracle": 2.37978059053421,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000239",
+        "length": 5,
+        "ce_mem": 2.5824931263923645,
+        "ce_nomem": 2.4748757779598236,
+        "ce_shuffle": 2.5855520963668823,
+        "ce_oracle": 2.2596416771411896,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000240",
+        "length": 5,
+        "ce_mem": 2.4180328249931335,
+        "ce_nomem": 2.2901082932949066,
+        "ce_shuffle": 2.42346453666687,
+        "ce_oracle": 2.0117060244083405,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000241",
+        "length": 5,
+        "ce_mem": 2.534234046936035,
+        "ce_nomem": 2.418129950761795,
+        "ce_shuffle": 2.533197343349457,
+        "ce_oracle": 2.1760970652103424,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000242",
+        "length": 5,
+        "ce_mem": 2.863215923309326,
+        "ce_nomem": 2.7680875062942505,
+        "ce_shuffle": 2.861228883266449,
+        "ce_oracle": 2.583413064479828,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000243",
+        "length": 5,
+        "ce_mem": 2.5069271326065063,
+        "ce_nomem": 2.4652235209941864,
+        "ce_shuffle": 2.517493814229965,
+        "ce_oracle": 2.2186498045921326,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000244",
+        "length": 5,
+        "ce_mem": 2.688889801502228,
+        "ce_nomem": 2.6260138154029846,
+        "ce_shuffle": 2.68348228931427,
+        "ce_oracle": 2.436083287000656,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000245",
+        "length": 5,
+        "ce_mem": 2.670516163110733,
+        "ce_nomem": 2.56543692946434,
+        "ce_shuffle": 2.6610703468322754,
+        "ce_oracle": 2.3661137521266937,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000246",
+        "length": 5,
+        "ce_mem": 2.636709451675415,
+        "ce_nomem": 2.555484175682068,
+        "ce_shuffle": 2.6376144886016846,
+        "ce_oracle": 2.3881397247314453,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000247",
+        "length": 5,
+        "ce_mem": 2.856301963329315,
+        "ce_nomem": 2.768851399421692,
+        "ce_shuffle": 2.8606908917427063,
+        "ce_oracle": 2.5576467514038086,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000248",
+        "length": 5,
+        "ce_mem": 2.1396879255771637,
+        "ce_nomem": 2.022894471883774,
+        "ce_shuffle": 2.1304382383823395,
+        "ce_oracle": 1.7622445821762085,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000249",
+        "length": 5,
+        "ce_mem": 2.444597363471985,
+        "ce_nomem": 2.3463029861450195,
+        "ce_shuffle": 2.4440128803253174,
+        "ce_oracle": 2.1591165363788605,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000250",
+        "length": 5,
+        "ce_mem": 2.352829337120056,
+        "ce_nomem": 2.2268910109996796,
+        "ce_shuffle": 2.3589556515216827,
+        "ce_oracle": 2.033257931470871,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000251",
+        "length": 5,
+        "ce_mem": 2.5875462889671326,
+        "ce_nomem": 2.4956692457199097,
+        "ce_shuffle": 2.5852119624614716,
+        "ce_oracle": 2.323090046644211,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000252",
+        "length": 5,
+        "ce_mem": 2.4618560075759888,
+        "ce_nomem": 2.352812349796295,
+        "ce_shuffle": 2.4611127376556396,
+        "ce_oracle": 2.1486843526363373,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000253",
+        "length": 5,
+        "ce_mem": 2.5956532955169678,
+        "ce_nomem": 2.5441845655441284,
+        "ce_shuffle": 2.598051905632019,
+        "ce_oracle": 2.271651715040207,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000254",
+        "length": 5,
+        "ce_mem": 2.624306619167328,
+        "ce_nomem": 2.5316649079322815,
+        "ce_shuffle": 2.628247916698456,
+        "ce_oracle": 2.2757797837257385,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000255",
+        "length": 5,
+        "ce_mem": 2.2963019013404846,
+        "ce_nomem": 2.1464554369449615,
+        "ce_shuffle": 2.292662799358368,
+        "ce_oracle": 1.9079737663269043,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000256",
+        "length": 5,
+        "ce_mem": 2.7973799109458923,
+        "ce_nomem": 2.713872969150543,
+        "ce_shuffle": 2.800908327102661,
+        "ce_oracle": 2.5097764134407043,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000257",
+        "length": 5,
+        "ce_mem": 2.4678372144699097,
+        "ce_nomem": 2.355879455804825,
+        "ce_shuffle": 2.4654118418693542,
+        "ce_oracle": 2.083904355764389,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000258",
+        "length": 5,
+        "ce_mem": 2.8850932121276855,
+        "ce_nomem": 2.8069166243076324,
+        "ce_shuffle": 2.8834083676338196,
+        "ce_oracle": 2.627088338136673,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000259",
+        "length": 5,
+        "ce_mem": 2.216775208711624,
+        "ce_nomem": 2.0638926327228546,
+        "ce_shuffle": 2.220913976430893,
+        "ce_oracle": 1.7760124504566193,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000260",
+        "length": 5,
+        "ce_mem": 2.600095510482788,
+        "ce_nomem": 2.5752071738243103,
+        "ce_shuffle": 2.59674996137619,
+        "ce_oracle": 2.3536093533039093,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000261",
+        "length": 5,
+        "ce_mem": 2.887583553791046,
+        "ce_nomem": 2.851323127746582,
+        "ce_shuffle": 2.8844128847122192,
+        "ce_oracle": 2.647607386112213,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000262",
+        "length": 5,
+        "ce_mem": 2.7028991878032684,
+        "ce_nomem": 2.5887776017189026,
+        "ce_shuffle": 2.7098026871681213,
+        "ce_oracle": 2.308411478996277,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000263",
+        "length": 5,
+        "ce_mem": 2.9151240587234497,
+        "ce_nomem": 2.8525867462158203,
+        "ce_shuffle": 2.915538728237152,
+        "ce_oracle": 2.651668071746826,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000264",
+        "length": 5,
+        "ce_mem": 2.315040647983551,
+        "ce_nomem": 2.1861052215099335,
+        "ce_shuffle": 2.307891309261322,
+        "ce_oracle": 1.9644111692905426,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000265",
+        "length": 5,
+        "ce_mem": 2.3783286809921265,
+        "ce_nomem": 2.274596929550171,
+        "ce_shuffle": 2.3776767253875732,
+        "ce_oracle": 1.9953625202178955,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000266",
+        "length": 5,
+        "ce_mem": 2.6668484807014465,
+        "ce_nomem": 2.583531379699707,
+        "ce_shuffle": 2.663537621498108,
+        "ce_oracle": 2.367712140083313,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000267",
+        "length": 5,
+        "ce_mem": 2.6291515827178955,
+        "ce_nomem": 2.5471238493919373,
+        "ce_shuffle": 2.633407950401306,
+        "ce_oracle": 2.3078631460666656,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000268",
+        "length": 5,
+        "ce_mem": 2.83072566986084,
+        "ce_nomem": 2.699119508266449,
+        "ce_shuffle": 2.82567036151886,
+        "ce_oracle": 2.542199969291687,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000269",
+        "length": 5,
+        "ce_mem": 2.686358869075775,
+        "ce_nomem": 2.6246472001075745,
+        "ce_shuffle": 2.6863721013069153,
+        "ce_oracle": 2.4263485074043274,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000270",
+        "length": 5,
+        "ce_mem": 2.837128758430481,
+        "ce_nomem": 2.817485749721527,
+        "ce_shuffle": 2.837646186351776,
+        "ce_oracle": 2.7413864135742188,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000271",
+        "length": 5,
+        "ce_mem": 2.9226889610290527,
+        "ce_nomem": 2.9303064346313477,
+        "ce_shuffle": 2.921729266643524,
+        "ce_oracle": 2.737690031528473,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000272",
+        "length": 5,
+        "ce_mem": 2.381097137928009,
+        "ce_nomem": 2.2624565958976746,
+        "ce_shuffle": 2.3847299218177795,
+        "ce_oracle": 2.0286929607391357,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000273",
+        "length": 5,
+        "ce_mem": 2.4880439043045044,
+        "ce_nomem": 2.4306495785713196,
+        "ce_shuffle": 2.4902586936950684,
+        "ce_oracle": 2.186059296131134,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000274",
+        "length": 5,
+        "ce_mem": 2.6460699439048767,
+        "ce_nomem": 2.593717575073242,
+        "ce_shuffle": 2.645246386528015,
+        "ce_oracle": 2.3346797823905945,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000275",
+        "length": 5,
+        "ce_mem": 2.7615467309951782,
+        "ce_nomem": 2.7118173241615295,
+        "ce_shuffle": 2.761076271533966,
+        "ce_oracle": 2.57435005903244,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000276",
+        "length": 5,
+        "ce_mem": 3.013437032699585,
+        "ce_nomem": 2.9596120715141296,
+        "ce_shuffle": 3.0200657844543457,
+        "ce_oracle": 2.761872351169586,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000277",
+        "length": 5,
+        "ce_mem": 2.732780933380127,
+        "ce_nomem": 2.6763177514076233,
+        "ce_shuffle": 2.73066645860672,
+        "ce_oracle": 2.5451745986938477,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000278",
+        "length": 5,
+        "ce_mem": 2.456500768661499,
+        "ce_nomem": 2.3683062195777893,
+        "ce_shuffle": 2.462493598461151,
+        "ce_oracle": 2.1338217556476593,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000279",
+        "length": 5,
+        "ce_mem": 2.345889687538147,
+        "ce_nomem": 2.2510001957416534,
+        "ce_shuffle": 2.347885489463806,
+        "ce_oracle": 2.051726818084717,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000280",
+        "length": 5,
+        "ce_mem": 2.7121358513832092,
+        "ce_nomem": 2.666001319885254,
+        "ce_shuffle": 2.707507014274597,
+        "ce_oracle": 2.506656587123871,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000281",
+        "length": 5,
+        "ce_mem": 2.594743251800537,
+        "ce_nomem": 2.499697268009186,
+        "ce_shuffle": 2.5991589426994324,
+        "ce_oracle": 2.219138503074646,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000282",
+        "length": 5,
+        "ce_mem": 3.019198477268219,
+        "ce_nomem": 2.95622718334198,
+        "ce_shuffle": 3.017937481403351,
+        "ce_oracle": 2.795944333076477,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000283",
+        "length": 5,
+        "ce_mem": 3.1224700212478638,
+        "ce_nomem": 3.0597108006477356,
+        "ce_shuffle": 3.123367667198181,
+        "ce_oracle": 2.8590295910835266,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000284",
+        "length": 5,
+        "ce_mem": 2.751872181892395,
+        "ce_nomem": 2.689821183681488,
+        "ce_shuffle": 2.754843294620514,
+        "ce_oracle": 2.509123772382736,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000285",
+        "length": 5,
+        "ce_mem": 2.592261493206024,
+        "ce_nomem": 2.4895994663238525,
+        "ce_shuffle": 2.5949591994285583,
+        "ce_oracle": 2.3188788890838623,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000286",
+        "length": 5,
+        "ce_mem": 2.6399565935134888,
+        "ce_nomem": 2.579270303249359,
+        "ce_shuffle": 2.642545163631439,
+        "ce_oracle": 2.342652976512909,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000287",
+        "length": 5,
+        "ce_mem": 2.459041476249695,
+        "ce_nomem": 2.447998881340027,
+        "ce_shuffle": 2.4547868967056274,
+        "ce_oracle": 2.2256058752536774,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000288",
+        "length": 5,
+        "ce_mem": 2.4426880478858948,
+        "ce_nomem": 2.38255113363266,
+        "ce_shuffle": 2.448445647954941,
+        "ce_oracle": 2.2037019431591034,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000289",
+        "length": 5,
+        "ce_mem": 2.802836060523987,
+        "ce_nomem": 2.7754350900650024,
+        "ce_shuffle": 2.807545840740204,
+        "ce_oracle": 2.5560795068740845,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000290",
+        "length": 5,
+        "ce_mem": 2.9319827556610107,
+        "ce_nomem": 2.898475408554077,
+        "ce_shuffle": 2.9308201670646667,
+        "ce_oracle": 2.718427002429962,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000291",
+        "length": 5,
+        "ce_mem": 2.702318549156189,
+        "ce_nomem": 2.6755331158638,
+        "ce_shuffle": 2.707358419895172,
+        "ce_oracle": 2.422432631254196,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000292",
+        "length": 5,
+        "ce_mem": 2.519752949476242,
+        "ce_nomem": 2.396256536245346,
+        "ce_shuffle": 2.513947993516922,
+        "ce_oracle": 2.13013231754303,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000293",
+        "length": 5,
+        "ce_mem": 2.382125973701477,
+        "ce_nomem": 2.2561183273792267,
+        "ce_shuffle": 2.383779227733612,
+        "ce_oracle": 1.9981237351894379,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000294",
+        "length": 5,
+        "ce_mem": 2.6847003698349,
+        "ce_nomem": 2.5881994366645813,
+        "ce_shuffle": 2.686997175216675,
+        "ce_oracle": 2.423070192337036,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000295",
+        "length": 5,
+        "ce_mem": 2.6012028455734253,
+        "ce_nomem": 2.517087459564209,
+        "ce_shuffle": 2.6021159291267395,
+        "ce_oracle": 2.2834974229335785,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000296",
+        "length": 5,
+        "ce_mem": 2.617828845977783,
+        "ce_nomem": 2.542262852191925,
+        "ce_shuffle": 2.6185999512672424,
+        "ce_oracle": 2.3558579087257385,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000297",
+        "length": 5,
+        "ce_mem": 2.7003321051597595,
+        "ce_nomem": 2.606524884700775,
+        "ce_shuffle": 2.7035765647888184,
+        "ce_oracle": 2.3468386828899384,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000298",
+        "length": 5,
+        "ce_mem": 3.060054123401642,
+        "ce_nomem": 3.0304617881774902,
+        "ce_shuffle": 3.059046983718872,
+        "ce_oracle": 2.850447118282318,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000299",
+        "length": 5,
+        "ce_mem": 2.627288341522217,
+        "ce_nomem": 2.5475916862487793,
+        "ce_shuffle": 2.629922091960907,
+        "ce_oracle": 2.36853688955307,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000300",
+        "length": 5,
+        "ce_mem": 2.629848003387451,
+        "ce_nomem": 2.5406112670898438,
+        "ce_shuffle": 2.6348748803138733,
+        "ce_oracle": 2.4208725690841675,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000301",
+        "length": 5,
+        "ce_mem": 2.490891695022583,
+        "ce_nomem": 2.3446501791477203,
+        "ce_shuffle": 2.4909815788269043,
+        "ce_oracle": 2.2745401859283447,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000302",
+        "length": 5,
+        "ce_mem": 2.7823830246925354,
+        "ce_nomem": 2.7306350469589233,
+        "ce_shuffle": 2.7806591987609863,
+        "ce_oracle": 2.4922203421592712,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000303",
+        "length": 5,
+        "ce_mem": 2.569128632545471,
+        "ce_nomem": 2.4582665860652924,
+        "ce_shuffle": 2.565273702144623,
+        "ce_oracle": 2.186937153339386,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000304",
+        "length": 5,
+        "ce_mem": 2.895227015018463,
+        "ce_nomem": 2.872649312019348,
+        "ce_shuffle": 2.8992819786071777,
+        "ce_oracle": 2.6914117336273193,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000305",
+        "length": 5,
+        "ce_mem": 2.569840669631958,
+        "ce_nomem": 2.4462990760803223,
+        "ce_shuffle": 2.5679566264152527,
+        "ce_oracle": 2.1727386116981506,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000306",
+        "length": 5,
+        "ce_mem": 2.4893484711647034,
+        "ce_nomem": 2.3809615671634674,
+        "ce_shuffle": 2.48871573805809,
+        "ce_oracle": 2.1226435601711273,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000307",
+        "length": 5,
+        "ce_mem": 2.685682713985443,
+        "ce_nomem": 2.5791727006435394,
+        "ce_shuffle": 2.6890271306037903,
+        "ce_oracle": 2.3791224360466003,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000308",
+        "length": 5,
+        "ce_mem": 3.1222144961357117,
+        "ce_nomem": 3.0731842517852783,
+        "ce_shuffle": 3.1238213777542114,
+        "ce_oracle": 2.974650800228119,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000309",
+        "length": 5,
+        "ce_mem": 2.518633246421814,
+        "ce_nomem": 2.453546404838562,
+        "ce_shuffle": 2.5201451778411865,
+        "ce_oracle": 2.1657437086105347,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000310",
+        "length": 5,
+        "ce_mem": 2.4964413046836853,
+        "ce_nomem": 2.394390046596527,
+        "ce_shuffle": 2.4932493567466736,
+        "ce_oracle": 2.1737695038318634,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000311",
+        "length": 5,
+        "ce_mem": 2.2427955269813538,
+        "ce_nomem": 2.158803164958954,
+        "ce_shuffle": 2.246590554714203,
+        "ce_oracle": 1.904970645904541,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000312",
+        "length": 5,
+        "ce_mem": 2.658442437648773,
+        "ce_nomem": 2.605027735233307,
+        "ce_shuffle": 2.657309055328369,
+        "ce_oracle": 2.317492514848709,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000313",
+        "length": 5,
+        "ce_mem": 2.65494966506958,
+        "ce_nomem": 2.5713713467121124,
+        "ce_shuffle": 2.659061074256897,
+        "ce_oracle": 2.38301882147789,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000314",
+        "length": 5,
+        "ce_mem": 2.607773780822754,
+        "ce_nomem": 2.51565819978714,
+        "ce_shuffle": 2.6189332008361816,
+        "ce_oracle": 2.2579126954078674,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000315",
+        "length": 5,
+        "ce_mem": 2.7934983372688293,
+        "ce_nomem": 2.758762836456299,
+        "ce_shuffle": 2.7846460342407227,
+        "ce_oracle": 2.5551984310150146,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000316",
+        "length": 5,
+        "ce_mem": 2.9689080715179443,
+        "ce_nomem": 2.8808862566947937,
+        "ce_shuffle": 2.9657392501831055,
+        "ce_oracle": 2.73622864484787,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000317",
+        "length": 5,
+        "ce_mem": 2.4466549158096313,
+        "ce_nomem": 2.3532065749168396,
+        "ce_shuffle": 2.4411738514900208,
+        "ce_oracle": 2.1781107783317566,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000318",
+        "length": 5,
+        "ce_mem": 2.7223318219184875,
+        "ce_nomem": 2.645974040031433,
+        "ce_shuffle": 2.7243672609329224,
+        "ce_oracle": 2.405365824699402,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000319",
+        "length": 5,
+        "ce_mem": 3.0967801213264465,
+        "ce_nomem": 3.058702230453491,
+        "ce_shuffle": 3.101739764213562,
+        "ce_oracle": 2.9126659631729126,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000320",
+        "length": 5,
+        "ce_mem": 2.8520041704177856,
+        "ce_nomem": 2.7745054960250854,
+        "ce_shuffle": 2.8450218439102173,
+        "ce_oracle": 2.6217982470989227,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000321",
+        "length": 5,
+        "ce_mem": 2.7516465187072754,
+        "ce_nomem": 2.675986170768738,
+        "ce_shuffle": 2.7491058707237244,
+        "ce_oracle": 2.470072329044342,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000322",
+        "length": 5,
+        "ce_mem": 2.6043301224708557,
+        "ce_nomem": 2.532680869102478,
+        "ce_shuffle": 2.6045992970466614,
+        "ce_oracle": 2.2701247334480286,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000323",
+        "length": 5,
+        "ce_mem": 2.6851894855499268,
+        "ce_nomem": 2.63629150390625,
+        "ce_shuffle": 2.6918912529945374,
+        "ce_oracle": 2.4789833426475525,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000324",
+        "length": 5,
+        "ce_mem": 2.8341294527053833,
+        "ce_nomem": 2.7377896308898926,
+        "ce_shuffle": 2.8327298760414124,
+        "ce_oracle": 2.572362631559372,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000325",
+        "length": 5,
+        "ce_mem": 3.0785276889801025,
+        "ce_nomem": 3.0504972338676453,
+        "ce_shuffle": 3.0743107199668884,
+        "ce_oracle": 2.9269330501556396,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000326",
+        "length": 5,
+        "ce_mem": 2.6522088050842285,
+        "ce_nomem": 2.5790290236473083,
+        "ce_shuffle": 2.650967597961426,
+        "ce_oracle": 2.3230212330818176,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000327",
+        "length": 5,
+        "ce_mem": 2.2576845288276672,
+        "ce_nomem": 2.1987023651599884,
+        "ce_shuffle": 2.2576045393943787,
+        "ce_oracle": 1.9589405059814453,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000328",
+        "length": 5,
+        "ce_mem": 2.7761837244033813,
+        "ce_nomem": 2.704468250274658,
+        "ce_shuffle": 2.7793760299682617,
+        "ce_oracle": 2.489924430847168,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000329",
+        "length": 5,
+        "ce_mem": 2.620357632637024,
+        "ce_nomem": 2.565215229988098,
+        "ce_shuffle": 2.622392773628235,
+        "ce_oracle": 2.3282222747802734,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000330",
+        "length": 5,
+        "ce_mem": 2.74227237701416,
+        "ce_nomem": 2.6753877997398376,
+        "ce_shuffle": 2.739198923110962,
+        "ce_oracle": 2.431072413921356,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000331",
+        "length": 5,
+        "ce_mem": 2.8186190128326416,
+        "ce_nomem": 2.734742969274521,
+        "ce_shuffle": 2.8165409862995148,
+        "ce_oracle": 2.5416595339775085,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000332",
+        "length": 5,
+        "ce_mem": 2.7602487802505493,
+        "ce_nomem": 2.6732159852981567,
+        "ce_shuffle": 2.763729512691498,
+        "ce_oracle": 2.4948148131370544,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000333",
+        "length": 5,
+        "ce_mem": 2.2632932662963867,
+        "ce_nomem": 2.1293128728866577,
+        "ce_shuffle": 2.2640524804592133,
+        "ce_oracle": 1.895858883857727,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000334",
+        "length": 5,
+        "ce_mem": 2.712174952030182,
+        "ce_nomem": 2.648461103439331,
+        "ce_shuffle": 2.7065423727035522,
+        "ce_oracle": 2.4323590099811554,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000335",
+        "length": 5,
+        "ce_mem": 2.4921172857284546,
+        "ce_nomem": 2.4532191157341003,
+        "ce_shuffle": 2.4904549717903137,
+        "ce_oracle": 2.2492432296276093,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000336",
+        "length": 5,
+        "ce_mem": 2.2378082871437073,
+        "ce_nomem": 2.0669166445732117,
+        "ce_shuffle": 2.2398275434970856,
+        "ce_oracle": 1.881872907280922,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000337",
+        "length": 5,
+        "ce_mem": 2.659527897834778,
+        "ce_nomem": 2.6036986112594604,
+        "ce_shuffle": 2.6683847904205322,
+        "ce_oracle": 2.3829599618911743,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000338",
+        "length": 5,
+        "ce_mem": 2.5117247104644775,
+        "ce_nomem": 2.4487165212631226,
+        "ce_shuffle": 2.5109925866127014,
+        "ce_oracle": 2.274108499288559,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000339",
+        "length": 5,
+        "ce_mem": 2.414393424987793,
+        "ce_nomem": 2.3420029282569885,
+        "ce_shuffle": 2.4221572279930115,
+        "ce_oracle": 2.050314426422119,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000340",
+        "length": 5,
+        "ce_mem": 2.6918755173683167,
+        "ce_nomem": 2.6608656644821167,
+        "ce_shuffle": 2.697302222251892,
+        "ce_oracle": 2.4328961968421936,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000341",
+        "length": 5,
+        "ce_mem": 2.637737452983856,
+        "ce_nomem": 2.5439301133155823,
+        "ce_shuffle": 2.6383692622184753,
+        "ce_oracle": 2.380179703235626,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000342",
+        "length": 5,
+        "ce_mem": 2.643302023410797,
+        "ce_nomem": 2.5752833783626556,
+        "ce_shuffle": 2.645695209503174,
+        "ce_oracle": 2.362930953502655,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000343",
+        "length": 5,
+        "ce_mem": 2.363593578338623,
+        "ce_nomem": 2.2866846323013306,
+        "ce_shuffle": 2.3623905777931213,
+        "ce_oracle": 2.033048003911972,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000344",
+        "length": 5,
+        "ce_mem": 2.784716546535492,
+        "ce_nomem": 2.756732761859894,
+        "ce_shuffle": 2.7872090935707092,
+        "ce_oracle": 2.545759439468384,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000345",
+        "length": 5,
+        "ce_mem": 2.823246121406555,
+        "ce_nomem": 2.7668654918670654,
+        "ce_shuffle": 2.8251729607582092,
+        "ce_oracle": 2.645408809185028,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000346",
+        "length": 5,
+        "ce_mem": 2.6245665550231934,
+        "ce_nomem": 2.526458740234375,
+        "ce_shuffle": 2.628730207681656,
+        "ce_oracle": 2.2953997254371643,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000347",
+        "length": 5,
+        "ce_mem": 2.4824060201644897,
+        "ce_nomem": 2.415259540081024,
+        "ce_shuffle": 2.489138424396515,
+        "ce_oracle": 2.2076666355133057,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000348",
+        "length": 5,
+        "ce_mem": 2.4188328087329865,
+        "ce_nomem": 2.3071011304855347,
+        "ce_shuffle": 2.4124238193035126,
+        "ce_oracle": 2.0860102474689484,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000349",
+        "length": 5,
+        "ce_mem": 2.2207655906677246,
+        "ce_nomem": 2.059930920600891,
+        "ce_shuffle": 2.227593958377838,
+        "ce_oracle": 1.7814371883869171,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000350",
+        "length": 5,
+        "ce_mem": 2.3222364485263824,
+        "ce_nomem": 2.2571872770786285,
+        "ce_shuffle": 2.3166607320308685,
+        "ce_oracle": 2.0704939663410187,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000351",
+        "length": 5,
+        "ce_mem": 2.621818423271179,
+        "ce_nomem": 2.5555198788642883,
+        "ce_shuffle": 2.6270103454589844,
+        "ce_oracle": 2.3867719769477844,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000352",
+        "length": 5,
+        "ce_mem": 2.7371551990509033,
+        "ce_nomem": 2.710137188434601,
+        "ce_shuffle": 2.7385101318359375,
+        "ce_oracle": 2.5192666053771973,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000353",
+        "length": 5,
+        "ce_mem": 2.424899697303772,
+        "ce_nomem": 2.2970998883247375,
+        "ce_shuffle": 2.420002520084381,
+        "ce_oracle": 2.06598499417305,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000354",
+        "length": 5,
+        "ce_mem": 2.6781181693077087,
+        "ce_nomem": 2.580197036266327,
+        "ce_shuffle": 2.6839383244514465,
+        "ce_oracle": 2.385473310947418,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000355",
+        "length": 5,
+        "ce_mem": 2.954273045063019,
+        "ce_nomem": 2.9395952820777893,
+        "ce_shuffle": 2.9570354223251343,
+        "ce_oracle": 2.8380783796310425,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000356",
+        "length": 5,
+        "ce_mem": 2.475328028202057,
+        "ce_nomem": 2.3541365563869476,
+        "ce_shuffle": 2.4668773412704468,
+        "ce_oracle": 2.082777291536331,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000357",
+        "length": 5,
+        "ce_mem": 2.687669515609741,
+        "ce_nomem": 2.6115633845329285,
+        "ce_shuffle": 2.6871888041496277,
+        "ce_oracle": 2.3510103821754456,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000358",
+        "length": 5,
+        "ce_mem": 2.471222758293152,
+        "ce_nomem": 2.3942605555057526,
+        "ce_shuffle": 2.4689658284187317,
+        "ce_oracle": 2.1410867869853973,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000359",
+        "length": 5,
+        "ce_mem": 2.4542743265628815,
+        "ce_nomem": 2.3141661286354065,
+        "ce_shuffle": 2.448828339576721,
+        "ce_oracle": 2.088451236486435,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000360",
+        "length": 5,
+        "ce_mem": 2.724770188331604,
+        "ce_nomem": 2.690321624279022,
+        "ce_shuffle": 2.7247592210769653,
+        "ce_oracle": 2.5662300288677216,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000361",
+        "length": 5,
+        "ce_mem": 2.2938793897628784,
+        "ce_nomem": 2.1568214893341064,
+        "ce_shuffle": 2.29384845495224,
+        "ce_oracle": 1.9190882742404938,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000362",
+        "length": 5,
+        "ce_mem": 2.1501218676567078,
+        "ce_nomem": 1.9980692863464355,
+        "ce_shuffle": 2.154017984867096,
+        "ce_oracle": 1.7421457171440125,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000363",
+        "length": 5,
+        "ce_mem": 2.2997171878814697,
+        "ce_nomem": 2.2433632016181946,
+        "ce_shuffle": 2.296969950199127,
+        "ce_oracle": 2.0100134909152985,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000364",
+        "length": 5,
+        "ce_mem": 2.247209310531616,
+        "ce_nomem": 2.1545058488845825,
+        "ce_shuffle": 2.255824387073517,
+        "ce_oracle": 1.9349502623081207,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000365",
+        "length": 5,
+        "ce_mem": 2.6908109188079834,
+        "ce_nomem": 2.6153453588485718,
+        "ce_shuffle": 2.6884979009628296,
+        "ce_oracle": 2.4245375096797943,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000366",
+        "length": 5,
+        "ce_mem": 3.0073761343955994,
+        "ce_nomem": 2.9769638180732727,
+        "ce_shuffle": 3.003692150115967,
+        "ce_oracle": 2.722982108592987,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000367",
+        "length": 5,
+        "ce_mem": 2.6943228244781494,
+        "ce_nomem": 2.6006804704666138,
+        "ce_shuffle": 2.699515163898468,
+        "ce_oracle": 2.4262608885765076,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000368",
+        "length": 5,
+        "ce_mem": 2.466629981994629,
+        "ce_nomem": 2.3908717036247253,
+        "ce_shuffle": 2.468627691268921,
+        "ce_oracle": 2.0992514193058014,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000369",
+        "length": 5,
+        "ce_mem": 2.931078553199768,
+        "ce_nomem": 2.874647617340088,
+        "ce_shuffle": 2.927897274494171,
+        "ce_oracle": 2.705742359161377,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000370",
+        "length": 5,
+        "ce_mem": 2.8068618178367615,
+        "ce_nomem": 2.787377178668976,
+        "ce_shuffle": 2.813271164894104,
+        "ce_oracle": 2.5887649059295654,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000371",
+        "length": 5,
+        "ce_mem": 2.8020980954170227,
+        "ce_nomem": 2.7317941784858704,
+        "ce_shuffle": 2.805503249168396,
+        "ce_oracle": 2.4423623085021973,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000372",
+        "length": 5,
+        "ce_mem": 2.572052538394928,
+        "ce_nomem": 2.518754243850708,
+        "ce_shuffle": 2.5715883374214172,
+        "ce_oracle": 2.2981762886047363,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000373",
+        "length": 5,
+        "ce_mem": 2.9233635663986206,
+        "ce_nomem": 2.9192676544189453,
+        "ce_shuffle": 2.9265886545181274,
+        "ce_oracle": 2.739626705646515,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000374",
+        "length": 5,
+        "ce_mem": 2.437050223350525,
+        "ce_nomem": 2.3475977778434753,
+        "ce_shuffle": 2.4362317621707916,
+        "ce_oracle": 2.143219828605652,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000375",
+        "length": 5,
+        "ce_mem": 2.352979302406311,
+        "ce_nomem": 2.2505942285060883,
+        "ce_shuffle": 2.3490795493125916,
+        "ce_oracle": 2.026098668575287,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000376",
+        "length": 5,
+        "ce_mem": 3.0436221957206726,
+        "ce_nomem": 2.976642072200775,
+        "ce_shuffle": 3.046214997768402,
+        "ce_oracle": 2.795962154865265,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000377",
+        "length": 5,
+        "ce_mem": 2.4888736605644226,
+        "ce_nomem": 2.4400384426116943,
+        "ce_shuffle": 2.494869649410248,
+        "ce_oracle": 2.192827582359314,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000378",
+        "length": 5,
+        "ce_mem": 2.831376075744629,
+        "ce_nomem": 2.787594735622406,
+        "ce_shuffle": 2.833929181098938,
+        "ce_oracle": 2.6447349786758423,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000379",
+        "length": 5,
+        "ce_mem": 2.7676673531532288,
+        "ce_nomem": 2.7183127403259277,
+        "ce_shuffle": 2.7669772505760193,
+        "ce_oracle": 2.44994580745697,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000380",
+        "length": 5,
+        "ce_mem": 2.8147998452186584,
+        "ce_nomem": 2.786038041114807,
+        "ce_shuffle": 2.812161445617676,
+        "ce_oracle": 2.6452112793922424,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000381",
+        "length": 5,
+        "ce_mem": 2.676205813884735,
+        "ce_nomem": 2.617008328437805,
+        "ce_shuffle": 2.6783969402313232,
+        "ce_oracle": 2.398861825466156,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000382",
+        "length": 5,
+        "ce_mem": 3.01370769739151,
+        "ce_nomem": 2.9950443506240845,
+        "ce_shuffle": 3.0164729356765747,
+        "ce_oracle": 2.8692434430122375,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000383",
+        "length": 5,
+        "ce_mem": 2.308576077222824,
+        "ce_nomem": 2.167353004217148,
+        "ce_shuffle": 2.302344560623169,
+        "ce_oracle": 1.9159064590930939,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000384",
+        "length": 5,
+        "ce_mem": 2.4475458562374115,
+        "ce_nomem": 2.3386672139167786,
+        "ce_shuffle": 2.449823796749115,
+        "ce_oracle": 2.0939524173736572,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000385",
+        "length": 5,
+        "ce_mem": 2.4302624464035034,
+        "ce_nomem": 2.278001308441162,
+        "ce_shuffle": 2.4324921369552612,
+        "ce_oracle": 2.0224384367465973,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000386",
+        "length": 5,
+        "ce_mem": 2.1695629358291626,
+        "ce_nomem": 2.0737253427505493,
+        "ce_shuffle": 2.1743513345718384,
+        "ce_oracle": 1.8389182090759277,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000387",
+        "length": 5,
+        "ce_mem": 2.35272753238678,
+        "ce_nomem": 2.262850522994995,
+        "ce_shuffle": 2.347800552845001,
+        "ce_oracle": 1.989151269197464,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000388",
+        "length": 5,
+        "ce_mem": 2.554242968559265,
+        "ce_nomem": 2.4842114746570587,
+        "ce_shuffle": 2.5506449341773987,
+        "ce_oracle": 2.291032463312149,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000389",
+        "length": 5,
+        "ce_mem": 2.791861414909363,
+        "ce_nomem": 2.749834895133972,
+        "ce_shuffle": 2.7948890924453735,
+        "ce_oracle": 2.5004276037216187,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000390",
+        "length": 5,
+        "ce_mem": 2.3890876471996307,
+        "ce_nomem": 2.319140613079071,
+        "ce_shuffle": 2.3904885053634644,
+        "ce_oracle": 2.0766845643520355,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000391",
+        "length": 5,
+        "ce_mem": 2.515057384967804,
+        "ce_nomem": 2.442196547985077,
+        "ce_shuffle": 2.5114867091178894,
+        "ce_oracle": 2.195638030767441,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000392",
+        "length": 5,
+        "ce_mem": 2.27203032374382,
+        "ce_nomem": 2.0876429975032806,
+        "ce_shuffle": 2.2804311215877533,
+        "ce_oracle": 1.770469605922699,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000393",
+        "length": 5,
+        "ce_mem": 2.7528058290481567,
+        "ce_nomem": 2.727099061012268,
+        "ce_shuffle": 2.755419671535492,
+        "ce_oracle": 2.5687023401260376,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000394",
+        "length": 5,
+        "ce_mem": 2.809609830379486,
+        "ce_nomem": 2.7574387788772583,
+        "ce_shuffle": 2.805848717689514,
+        "ce_oracle": 2.5275516510009766,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000395",
+        "length": 5,
+        "ce_mem": 2.7216309309005737,
+        "ce_nomem": 2.654019355773926,
+        "ce_shuffle": 2.722217559814453,
+        "ce_oracle": 2.408220112323761,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000396",
+        "length": 5,
+        "ce_mem": 2.59496808052063,
+        "ce_nomem": 2.512608587741852,
+        "ce_shuffle": 2.601411283016205,
+        "ce_oracle": 2.329001873731613,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000397",
+        "length": 5,
+        "ce_mem": 2.8128578066825867,
+        "ce_nomem": 2.7520917654037476,
+        "ce_shuffle": 2.8106528520584106,
+        "ce_oracle": 2.450703263282776,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000398",
+        "length": 5,
+        "ce_mem": 2.5980352461338043,
+        "ce_nomem": 2.523170977830887,
+        "ce_shuffle": 2.592683047056198,
+        "ce_oracle": 2.280956268310547,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000399",
+        "length": 5,
+        "ce_mem": 3.118223011493683,
+        "ce_nomem": 3.101734459400177,
+        "ce_shuffle": 3.1190075874328613,
+        "ce_oracle": 2.895723879337311,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000400",
+        "length": 5,
+        "ce_mem": 2.5604817867279053,
+        "ce_nomem": 2.5290644764900208,
+        "ce_shuffle": 2.5547069311141968,
+        "ce_oracle": 2.3045637011528015,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000401",
+        "length": 5,
+        "ce_mem": 2.435275375843048,
+        "ce_nomem": 2.3757558465003967,
+        "ce_shuffle": 2.441086530685425,
+        "ce_oracle": 2.1225071251392365,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000402",
+        "length": 5,
+        "ce_mem": 2.5825799703598022,
+        "ce_nomem": 2.521336615085602,
+        "ce_shuffle": 2.586724042892456,
+        "ce_oracle": 2.3259037137031555,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000403",
+        "length": 5,
+        "ce_mem": 2.215854972600937,
+        "ce_nomem": 2.069976568222046,
+        "ce_shuffle": 2.2231450378894806,
+        "ce_oracle": 1.8762020766735077,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000404",
+        "length": 5,
+        "ce_mem": 3.1518463492393494,
+        "ce_nomem": 3.1207804083824158,
+        "ce_shuffle": 3.143056809902191,
+        "ce_oracle": 2.945958375930786,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000405",
+        "length": 5,
+        "ce_mem": 2.446418344974518,
+        "ce_nomem": 2.403484582901001,
+        "ce_shuffle": 2.458288013935089,
+        "ce_oracle": 2.1596932411193848,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000406",
+        "length": 5,
+        "ce_mem": 2.785494804382324,
+        "ce_nomem": 2.7452266216278076,
+        "ce_shuffle": 2.7857577800750732,
+        "ce_oracle": 2.4813160598278046,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000407",
+        "length": 5,
+        "ce_mem": 2.5731313824653625,
+        "ce_nomem": 2.47574445605278,
+        "ce_shuffle": 2.5711421370506287,
+        "ce_oracle": 2.2606975734233856,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000408",
+        "length": 5,
+        "ce_mem": 2.90472012758255,
+        "ce_nomem": 2.8921124935150146,
+        "ce_shuffle": 2.904928147792816,
+        "ce_oracle": 2.7217007279396057,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000409",
+        "length": 5,
+        "ce_mem": 2.5261802673339844,
+        "ce_nomem": 2.4585265517234802,
+        "ce_shuffle": 2.523178279399872,
+        "ce_oracle": 2.2114999890327454,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000410",
+        "length": 5,
+        "ce_mem": 2.520969569683075,
+        "ce_nomem": 2.463601589202881,
+        "ce_shuffle": 2.5191580951213837,
+        "ce_oracle": 2.310970574617386,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000411",
+        "length": 5,
+        "ce_mem": 2.6016058325767517,
+        "ce_nomem": 2.535586714744568,
+        "ce_shuffle": 2.598890244960785,
+        "ce_oracle": 2.3283392786979675,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000412",
+        "length": 5,
+        "ce_mem": 2.573646068572998,
+        "ce_nomem": 2.519256114959717,
+        "ce_shuffle": 2.5791748762130737,
+        "ce_oracle": 2.241465747356415,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000413",
+        "length": 5,
+        "ce_mem": 2.673137068748474,
+        "ce_nomem": 2.6178648471832275,
+        "ce_shuffle": 2.6712198853492737,
+        "ce_oracle": 2.393027901649475,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000414",
+        "length": 5,
+        "ce_mem": 2.7685973048210144,
+        "ce_nomem": 2.6800107955932617,
+        "ce_shuffle": 2.7813011407852173,
+        "ce_oracle": 2.473232626914978,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000415",
+        "length": 5,
+        "ce_mem": 2.6250712275505066,
+        "ce_nomem": 2.5413267016410828,
+        "ce_shuffle": 2.6197718381881714,
+        "ce_oracle": 2.2887014746665955,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000416",
+        "length": 5,
+        "ce_mem": 2.6643198132514954,
+        "ce_nomem": 2.5656594038009644,
+        "ce_shuffle": 2.66251540184021,
+        "ce_oracle": 2.307246446609497,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000417",
+        "length": 5,
+        "ce_mem": 2.555060565471649,
+        "ce_nomem": 2.4815950989723206,
+        "ce_shuffle": 2.562555193901062,
+        "ce_oracle": 2.323721170425415,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000418",
+        "length": 5,
+        "ce_mem": 2.581701636314392,
+        "ce_nomem": 2.502146601676941,
+        "ce_shuffle": 2.5810927748680115,
+        "ce_oracle": 2.2299729585647583,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000419",
+        "length": 5,
+        "ce_mem": 2.589751422405243,
+        "ce_nomem": 2.4729831218719482,
+        "ce_shuffle": 2.585382103919983,
+        "ce_oracle": 2.2769164741039276,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000420",
+        "length": 5,
+        "ce_mem": 3.0067718029022217,
+        "ce_nomem": 2.95318603515625,
+        "ce_shuffle": 3.006349503993988,
+        "ce_oracle": 2.795178771018982,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000421",
+        "length": 5,
+        "ce_mem": 2.537787675857544,
+        "ce_nomem": 2.4544712901115417,
+        "ce_shuffle": 2.534913718700409,
+        "ce_oracle": 2.245787799358368,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000422",
+        "length": 5,
+        "ce_mem": 2.7119787335395813,
+        "ce_nomem": 2.67454993724823,
+        "ce_shuffle": 2.7082709670066833,
+        "ce_oracle": 2.500190794467926,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000423",
+        "length": 5,
+        "ce_mem": 2.604126453399658,
+        "ce_nomem": 2.5528866350650787,
+        "ce_shuffle": 2.6097786128520966,
+        "ce_oracle": 2.3916735649108887,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000424",
+        "length": 5,
+        "ce_mem": 3.0021814107894897,
+        "ce_nomem": 2.902209520339966,
+        "ce_shuffle": 2.9987984895706177,
+        "ce_oracle": 2.7145296931266785,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000425",
+        "length": 5,
+        "ce_mem": 2.868655800819397,
+        "ce_nomem": 2.812079668045044,
+        "ce_shuffle": 2.8696817755699158,
+        "ce_oracle": 2.550511419773102,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000426",
+        "length": 5,
+        "ce_mem": 2.841871917247772,
+        "ce_nomem": 2.790597379207611,
+        "ce_shuffle": 2.8398364782333374,
+        "ce_oracle": 2.660860300064087,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000427",
+        "length": 5,
+        "ce_mem": 2.534247577190399,
+        "ce_nomem": 2.4778059124946594,
+        "ce_shuffle": 2.533590793609619,
+        "ce_oracle": 2.2476902902126312,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000428",
+        "length": 5,
+        "ce_mem": 2.4824236035346985,
+        "ce_nomem": 2.4155694246292114,
+        "ce_shuffle": 2.488768994808197,
+        "ce_oracle": 2.165781557559967,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000429",
+        "length": 5,
+        "ce_mem": 2.4189027547836304,
+        "ce_nomem": 2.324126720428467,
+        "ce_shuffle": 2.4192460775375366,
+        "ce_oracle": 2.1397902369499207,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000430",
+        "length": 5,
+        "ce_mem": 2.4282870292663574,
+        "ce_nomem": 2.3400705456733704,
+        "ce_shuffle": 2.430242419242859,
+        "ce_oracle": 2.1092839539051056,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000431",
+        "length": 5,
+        "ce_mem": 2.525925099849701,
+        "ce_nomem": 2.4235645532608032,
+        "ce_shuffle": 2.524584472179413,
+        "ce_oracle": 2.160570353269577,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000432",
+        "length": 5,
+        "ce_mem": 2.6552125811576843,
+        "ce_nomem": 2.481684446334839,
+        "ce_shuffle": 2.6513364911079407,
+        "ce_oracle": 2.3408747613430023,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000433",
+        "length": 5,
+        "ce_mem": 2.4801487922668457,
+        "ce_nomem": 2.335994392633438,
+        "ce_shuffle": 2.487278461456299,
+        "ce_oracle": 2.1138415336608887,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000434",
+        "length": 5,
+        "ce_mem": 2.857173204421997,
+        "ce_nomem": 2.804811418056488,
+        "ce_shuffle": 2.856646776199341,
+        "ce_oracle": 2.6978973150253296,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000435",
+        "length": 5,
+        "ce_mem": 2.3691244423389435,
+        "ce_nomem": 2.305458515882492,
+        "ce_shuffle": 2.3702676594257355,
+        "ce_oracle": 2.0514980852603912,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000436",
+        "length": 5,
+        "ce_mem": 2.8174906969070435,
+        "ce_nomem": 2.7348655462265015,
+        "ce_shuffle": 2.822308897972107,
+        "ce_oracle": 2.6254337430000305,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000437",
+        "length": 5,
+        "ce_mem": 2.463900864124298,
+        "ce_nomem": 2.3424757421016693,
+        "ce_shuffle": 2.4592161178588867,
+        "ce_oracle": 2.1011266112327576,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000438",
+        "length": 5,
+        "ce_mem": 2.7297122478485107,
+        "ce_nomem": 2.65491646528244,
+        "ce_shuffle": 2.7233023047447205,
+        "ce_oracle": 2.4437036216259003,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000439",
+        "length": 5,
+        "ce_mem": 2.966438114643097,
+        "ce_nomem": 2.9490752816200256,
+        "ce_shuffle": 2.9653045535087585,
+        "ce_oracle": 2.823868691921234,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000440",
+        "length": 5,
+        "ce_mem": 2.523038238286972,
+        "ce_nomem": 2.413390189409256,
+        "ce_shuffle": 2.522886037826538,
+        "ce_oracle": 2.188365340232849,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000441",
+        "length": 5,
+        "ce_mem": 3.0040271282196045,
+        "ce_nomem": 2.9210017323493958,
+        "ce_shuffle": 3.0009087920188904,
+        "ce_oracle": 2.812972128391266,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000442",
+        "length": 5,
+        "ce_mem": 3.0131229162216187,
+        "ce_nomem": 2.9859155416488647,
+        "ce_shuffle": 3.00978821516037,
+        "ce_oracle": 2.9448954463005066,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000443",
+        "length": 5,
+        "ce_mem": 2.9592363238334656,
+        "ce_nomem": 2.860612630844116,
+        "ce_shuffle": 2.95520681142807,
+        "ce_oracle": 2.739412307739258,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000444",
+        "length": 5,
+        "ce_mem": 2.5770026445388794,
+        "ce_nomem": 2.5198211073875427,
+        "ce_shuffle": 2.580293834209442,
+        "ce_oracle": 2.3207879662513733,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000445",
+        "length": 5,
+        "ce_mem": 2.757022440433502,
+        "ce_nomem": 2.7229164242744446,
+        "ce_shuffle": 2.7630538940429688,
+        "ce_oracle": 2.4932538270950317,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000446",
+        "length": 5,
+        "ce_mem": 2.9666974544525146,
+        "ce_nomem": 2.9114255905151367,
+        "ce_shuffle": 2.9716684818267822,
+        "ce_oracle": 2.7099640369415283,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000447",
+        "length": 5,
+        "ce_mem": 2.5117982029914856,
+        "ce_nomem": 2.3689269721508026,
+        "ce_shuffle": 2.5057270526885986,
+        "ce_oracle": 2.066914737224579,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000448",
+        "length": 5,
+        "ce_mem": 2.653079032897949,
+        "ce_nomem": 2.544140934944153,
+        "ce_shuffle": 2.643622249364853,
+        "ce_oracle": 2.339963734149933,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000449",
+        "length": 5,
+        "ce_mem": 3.0411890745162964,
+        "ce_nomem": 2.9991066455841064,
+        "ce_shuffle": 3.046966254711151,
+        "ce_oracle": 2.919465720653534,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000450",
+        "length": 5,
+        "ce_mem": 2.488489031791687,
+        "ce_nomem": 2.338091015815735,
+        "ce_shuffle": 2.4933852553367615,
+        "ce_oracle": 2.0288823544979095,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000451",
+        "length": 5,
+        "ce_mem": 2.3911867439746857,
+        "ce_nomem": 2.2984993755817413,
+        "ce_shuffle": 2.389878422021866,
+        "ce_oracle": 2.0931723713874817,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000452",
+        "length": 5,
+        "ce_mem": 2.498487949371338,
+        "ce_nomem": 2.4319273233413696,
+        "ce_shuffle": 2.4996789693832397,
+        "ce_oracle": 2.257814049720764,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000453",
+        "length": 5,
+        "ce_mem": 2.8981205821037292,
+        "ce_nomem": 2.8540462255477905,
+        "ce_shuffle": 2.8916174173355103,
+        "ce_oracle": 2.6310574412345886,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000454",
+        "length": 5,
+        "ce_mem": 2.5836381316184998,
+        "ce_nomem": 2.4873334169387817,
+        "ce_shuffle": 2.5880972146987915,
+        "ce_oracle": 2.2630283534526825,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000455",
+        "length": 5,
+        "ce_mem": 2.904519498348236,
+        "ce_nomem": 2.8678715229034424,
+        "ce_shuffle": 2.909067213535309,
+        "ce_oracle": 2.739876449108124,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000456",
+        "length": 5,
+        "ce_mem": 2.8302122354507446,
+        "ce_nomem": 2.6966159343719482,
+        "ce_shuffle": 2.8344675302505493,
+        "ce_oracle": 2.5191686153411865,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000457",
+        "length": 5,
+        "ce_mem": 2.237555503845215,
+        "ce_nomem": 2.1131250262260437,
+        "ce_shuffle": 2.242885112762451,
+        "ce_oracle": 1.8671360909938812,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000458",
+        "length": 5,
+        "ce_mem": 2.970734179019928,
+        "ce_nomem": 2.9460291266441345,
+        "ce_shuffle": 2.968877613544464,
+        "ce_oracle": 2.8628810048103333,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000459",
+        "length": 5,
+        "ce_mem": 2.6120611429214478,
+        "ce_nomem": 2.5588085651397705,
+        "ce_shuffle": 2.608332395553589,
+        "ce_oracle": 2.38611763715744,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000460",
+        "length": 5,
+        "ce_mem": 2.5429769158363342,
+        "ce_nomem": 2.486128568649292,
+        "ce_shuffle": 2.534515678882599,
+        "ce_oracle": 2.2743663787841797,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000461",
+        "length": 5,
+        "ce_mem": 2.525970607995987,
+        "ce_nomem": 2.430421322584152,
+        "ce_shuffle": 2.532678633928299,
+        "ce_oracle": 2.190825968980789,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000462",
+        "length": 5,
+        "ce_mem": 2.885167360305786,
+        "ce_nomem": 2.829329013824463,
+        "ce_shuffle": 2.8816347122192383,
+        "ce_oracle": 2.718003988265991,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000463",
+        "length": 5,
+        "ce_mem": 2.4659096896648407,
+        "ce_nomem": 2.3879287242889404,
+        "ce_shuffle": 2.4683670699596405,
+        "ce_oracle": 2.225667506456375,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000464",
+        "length": 5,
+        "ce_mem": 2.774003744125366,
+        "ce_nomem": 2.690985321998596,
+        "ce_shuffle": 2.781530201435089,
+        "ce_oracle": 2.5029414296150208,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000465",
+        "length": 5,
+        "ce_mem": 2.8217139840126038,
+        "ce_nomem": 2.7533316016197205,
+        "ce_shuffle": 2.8151805996894836,
+        "ce_oracle": 2.626374125480652,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000466",
+        "length": 5,
+        "ce_mem": 2.7303974628448486,
+        "ce_nomem": 2.691807448863983,
+        "ce_shuffle": 2.741628348827362,
+        "ce_oracle": 2.461298882961273,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000467",
+        "length": 5,
+        "ce_mem": 2.2117996215820312,
+        "ce_nomem": 2.101162701845169,
+        "ce_shuffle": 2.204932302236557,
+        "ce_oracle": 1.87302628159523,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000468",
+        "length": 5,
+        "ce_mem": 2.8895941376686096,
+        "ce_nomem": 2.8322786688804626,
+        "ce_shuffle": 2.8901665210723877,
+        "ce_oracle": 2.6902299523353577,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000469",
+        "length": 5,
+        "ce_mem": 2.638423502445221,
+        "ce_nomem": 2.5117244124412537,
+        "ce_shuffle": 2.634224057197571,
+        "ce_oracle": 2.3459442853927612,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000470",
+        "length": 5,
+        "ce_mem": 2.6678507328033447,
+        "ce_nomem": 2.655830979347229,
+        "ce_shuffle": 2.6658687591552734,
+        "ce_oracle": 2.4295263290405273,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000471",
+        "length": 5,
+        "ce_mem": 2.867627799510956,
+        "ce_nomem": 2.8185057640075684,
+        "ce_shuffle": 2.873607099056244,
+        "ce_oracle": 2.635274589061737,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000472",
+        "length": 5,
+        "ce_mem": 2.7385205030441284,
+        "ce_nomem": 2.6831899285316467,
+        "ce_shuffle": 2.7342390418052673,
+        "ce_oracle": 2.3841055929660797,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000473",
+        "length": 5,
+        "ce_mem": 2.751041054725647,
+        "ce_nomem": 2.701050817966461,
+        "ce_shuffle": 2.7496767044067383,
+        "ce_oracle": 2.5109227895736694,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000474",
+        "length": 5,
+        "ce_mem": 2.8909422755241394,
+        "ce_nomem": 2.8444324731826782,
+        "ce_shuffle": 2.8939525485038757,
+        "ce_oracle": 2.6736263632774353,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000475",
+        "length": 5,
+        "ce_mem": 2.956975519657135,
+        "ce_nomem": 2.9237350821495056,
+        "ce_shuffle": 2.9570847153663635,
+        "ce_oracle": 2.7304710745811462,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000476",
+        "length": 5,
+        "ce_mem": 2.773114800453186,
+        "ce_nomem": 2.706617057323456,
+        "ce_shuffle": 2.7726998925209045,
+        "ce_oracle": 2.483078360557556,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000477",
+        "length": 5,
+        "ce_mem": 3.1255396604537964,
+        "ce_nomem": 3.081522285938263,
+        "ce_shuffle": 3.1317238211631775,
+        "ce_oracle": 2.904242515563965,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000478",
+        "length": 5,
+        "ce_mem": 2.4688881039619446,
+        "ce_nomem": 2.38754665851593,
+        "ce_shuffle": 2.4641342759132385,
+        "ce_oracle": 2.115631639957428,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000479",
+        "length": 5,
+        "ce_mem": 2.8250315189361572,
+        "ce_nomem": 2.790708005428314,
+        "ce_shuffle": 2.830045521259308,
+        "ce_oracle": 2.604749023914337,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000480",
+        "length": 5,
+        "ce_mem": 2.7697657346725464,
+        "ce_nomem": 2.699438691139221,
+        "ce_shuffle": 2.7633244395256042,
+        "ce_oracle": 2.5288809537887573,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000481",
+        "length": 5,
+        "ce_mem": 2.662424623966217,
+        "ce_nomem": 2.5914646089076996,
+        "ce_shuffle": 2.6675466299057007,
+        "ce_oracle": 2.2696804106235504,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000482",
+        "length": 5,
+        "ce_mem": 2.9274795055389404,
+        "ce_nomem": 2.890566408634186,
+        "ce_shuffle": 2.921572208404541,
+        "ce_oracle": 2.615952789783478,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000483",
+        "length": 5,
+        "ce_mem": 3.226612150669098,
+        "ce_nomem": 3.1870447993278503,
+        "ce_shuffle": 3.231806516647339,
+        "ce_oracle": 3.1545145511627197,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000484",
+        "length": 5,
+        "ce_mem": 2.7219274044036865,
+        "ce_nomem": 2.6670006811618805,
+        "ce_shuffle": 2.723763585090637,
+        "ce_oracle": 2.3965134024620056,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000485",
+        "length": 5,
+        "ce_mem": 2.6907008290290833,
+        "ce_nomem": 2.6263626515865326,
+        "ce_shuffle": 2.6784453988075256,
+        "ce_oracle": 2.3989402651786804,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000486",
+        "length": 5,
+        "ce_mem": 2.7688474655151367,
+        "ce_nomem": 2.7413302063941956,
+        "ce_shuffle": 2.7703073024749756,
+        "ce_oracle": 2.509870946407318,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000487",
+        "length": 5,
+        "ce_mem": 2.558199882507324,
+        "ce_nomem": 2.4796836972236633,
+        "ce_shuffle": 2.5602339804172516,
+        "ce_oracle": 2.268163114786148,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000488",
+        "length": 5,
+        "ce_mem": 2.477136731147766,
+        "ce_nomem": 2.4350901544094086,
+        "ce_shuffle": 2.4814295172691345,
+        "ce_oracle": 2.215169072151184,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000489",
+        "length": 5,
+        "ce_mem": 2.7342880368232727,
+        "ce_nomem": 2.661080777645111,
+        "ce_shuffle": 2.736057698726654,
+        "ce_oracle": 2.487721711397171,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000490",
+        "length": 5,
+        "ce_mem": 2.698012411594391,
+        "ce_nomem": 2.6646931171417236,
+        "ce_shuffle": 2.7023419737815857,
+        "ce_oracle": 2.5312279760837555,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000491",
+        "length": 5,
+        "ce_mem": 2.904780864715576,
+        "ce_nomem": 2.802439272403717,
+        "ce_shuffle": 2.8974152207374573,
+        "ce_oracle": 2.7184666991233826,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000492",
+        "length": 5,
+        "ce_mem": 2.6943143010139465,
+        "ce_nomem": 2.6487181782722473,
+        "ce_shuffle": 2.70258104801178,
+        "ce_oracle": 2.3614074289798737,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000493",
+        "length": 5,
+        "ce_mem": 2.5611122250556946,
+        "ce_nomem": 2.4368648529052734,
+        "ce_shuffle": 2.56248140335083,
+        "ce_oracle": 2.1778085231781006,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000494",
+        "length": 5,
+        "ce_mem": 2.737362504005432,
+        "ce_nomem": 2.663754105567932,
+        "ce_shuffle": 2.7362958192825317,
+        "ce_oracle": 2.5137535333633423,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000495",
+        "length": 5,
+        "ce_mem": 2.8782730102539062,
+        "ce_nomem": 2.8477928042411804,
+        "ce_shuffle": 2.8802751302719116,
+        "ce_oracle": 2.67226642370224,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000496",
+        "length": 5,
+        "ce_mem": 2.8731091618537903,
+        "ce_nomem": 2.8079552054405212,
+        "ce_shuffle": 2.873202323913574,
+        "ce_oracle": 2.674908459186554,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000497",
+        "length": 5,
+        "ce_mem": 2.933419942855835,
+        "ce_nomem": 2.8409448862075806,
+        "ce_shuffle": 2.9350632429122925,
+        "ce_oracle": 2.6305410265922546,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000498",
+        "length": 5,
+        "ce_mem": 2.5745606422424316,
+        "ce_nomem": 2.506002366542816,
+        "ce_shuffle": 2.5726491808891296,
+        "ce_oracle": 2.2288575768470764,
+        "ce_rag": null
+      },
+      {
+        "chain_id": "msc_0000499",
+        "length": 5,
+        "ce_mem": 2.7099891304969788,
+        "ce_nomem": 2.6333391666412354,
+        "ce_shuffle": 2.7062577605247498,
+        "ce_oracle": 2.5062603056430817,
+        "ce_rag": null
+      }
+    ]
+  }
+}

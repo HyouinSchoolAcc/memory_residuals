@@ -34,6 +34,10 @@
 % Auto-generated macros (numbers.tex). Re-run paper_a/scripts/render_numbers_tex.py
 % after any new eval JSON lands.
 \input{numbers}
+% Cross-corpus eval macros (xcorpus_numbers.tex). Re-run
+% paper_a/scripts/compute_xcorpus_numbers.py after any new
+% results/eval_v27_v28_cross_corpus/*.json lands.
+\input{xcorpus_numbers}
 
 \title{Memory Residuals at Scale:\\
        A Frozen-Backbone Recurrent Memory that\\
@@ -69,9 +73,14 @@ retrieval baseline ($+0.05$, 95\,\% CI $[-0.23, +0.35]$) and
 $+1.21$~nats over oracle RAG with gold evidence positions ($+0.11$,
 $[-0.22, +0.46]$); all RAG cells' 95\,\% CIs include zero, while
 memres' CI is $[+1.11, +1.55]$. The same recipe applied to Qwen3-1.7B
-gives $+0.93 \pm 0.025$~nats ($n{=}2$ seeds, range $[+0.91, +0.94]$,
-reported as direction-of-effect rather than statistical headline),
-again with $\Delta_{\mathrm{sh}} \approx 0$. Unlike RAG---whose gain is provably chain-specific via a
+gives $\Dseventeenmean$~nats ($n{=}\NSEEDSseventeen$ seeds, every
+seed positive, $\Delta_{\mathrm{sh}} = \Dseventeendsh$). At 1.7B, the
+LongMemEval-S-trained writer also transfers, with no further
+training, to two callback-style OOD corpora (synthd4
+$\xcSSeventeenDfourDnm$, synthd4v2 $\xcSSeventeenDfourVDnm$ across
+\xcSSeventeenDfourNseeds\ seeds, every seed positive on both),
+recovering ${\sim}70\,\%$ of the in-domain gain on benchmarks
+the headline checkpoints have never seen. Unlike RAG---whose gain is provably chain-specific via a
 large positive $\Delta_{\mathrm{sh}}$ but small in magnitude---memres
 delivers a large gain whose chain-shuffle confound is statistically
 zero. An evidence-redaction analysis ($\mathrm{evidence\_lift} =
@@ -105,7 +114,7 @@ known trade-offs:
 
 We claim that recurrent memory and retrieval are
 \emph{complementary, not substitutable}, and that on a callback
-benchmark---LongMemEval-S \cite{yu2024longmemeval}---a small
+benchmark---LongMemEval-S \cite{wu2024longmemeval}---a small
 jointly-trained recurrent memory outperforms strong RAG baselines
 including \emph{oracle} RAG (which is given the gold evidence
 session indices), at both 0.6B and 1.7B model scale. Critically,
@@ -120,17 +129,22 @@ is trained for $\sim$1.5\,h ($\sim$6\,h at 1.7B) on a single H100.
   recurrent memory (Memory Residuals) that produces $+1.32 \pm
   0.53$~nats of callback-CE improvement on LongMemEval-S validation
   at 0.6B (n${=}4$ seeds, 95\,\% bootstrap-over-chains
-  CI~$[+1.11, +1.55]$), preserved as $+0.93$~nats at 1.7B (n${=}2$
-  seeds, range $[+0.91, +0.94]$), with chain-shuffle confound under
-  $\pm 0.02$ throughout.
+  CI~$[+1.11, +1.55]$), preserved as $\Dseventeenmean$~nats at 1.7B
+  (n${=}\NSEEDSseventeen$ seeds, 95\,\% bootstrap-over-chains
+  CI~$\Dseventeenci$; \Dseventeenpos\,/\,50 chains positive at the
+  per-seed mean), with chain-shuffle confound under $\pm 0.02$
+  throughout.   At 1.7B the recipe also transfers (no further
+  training) to two callback-style OOD corpora it has never seen
+  (synthd4 $\xcSSeventeenDfourDnm$, synthd4v2 $\xcSSeventeenDfourVDnm$
+  across \xcSSeventeenDfourNseeds\ seeds; \S\ref{sec:xcorpus}).
 \item \textbf{An apples-to-apples RAG comparison} under the
   \emph{same} eval harness (callback-token-only CE on LongMemEval-S
   validation), including BM25 \cite{robertson2009bm25}, dense
   MiniLM-L6 \cite{reimers2019sbert}, and an \emph{oracle} baseline
   that gets the gold evidence-session indices. At 0.6B, memres'
   $+1.32$~nats lies $+1.21$~nats above the best non-oracle RAG cell
-  and $+1.21$~nats above oracle-RAG; at 1.7B, $+0.93$ vs.\ oracle's
-  $+0.39$ ($+0.54$~nats absolute). The multiplicative ratios
+  and   $+1.21$~nats above oracle-RAG; at 1.7B, $\Dseventeenmean$
+  vs.\ oracle's $+0.39$. The multiplicative ratios
   ($\sim$12$\times$ at 0.6B, $\sim$2.4$\times$ at 1.7B vs.\ oracle)
   are reported as a sanity check, not the headline---the absolute
   gap is the load-bearing claim, since every RAG cell's 95\,\% CI
@@ -198,7 +212,7 @@ source in that pool, so each layer can softly choose between
 current-session computation and cross-session memory.
 
 \paragraph{The RAG-vs-recurrent-memory question.}
-LongMemEval~\cite{yu2024longmemeval} reports retrieval baselines as
+LongMemEval~\cite{wu2024longmemeval} reports retrieval baselines as
 the standard comparison for long-conversation memory. We extend that
 comparison by (i) using a \emph{frozen} backbone in both arms,
 (ii) running an \emph{oracle} RAG cell with gold evidence positions,
@@ -439,7 +453,7 @@ attacking the same callback CE metric (Figure~\ref{fig:mech}):
   callback questions---the LM is not instruction-tuned to use a
   retrieved-context block.
 \item \textbf{MemRes is large but chain-shuffle-invariant.}
-  $\Delta_{\mathrm{cb}}$ is large ($+0.93$--$+1.32$) because the
+  $\Delta_{\mathrm{cb}}$ is large ($\sim$$+0.98$--$+1.32$) because the
   readout pathway is \emph{trained} end-to-end; but
   $\Delta_{\mathrm{sh}} \approx 0$ because the writer encodes
   chain-conditional context that any other chain's $M_c$ also
@@ -495,6 +509,147 @@ that the readout pathway it gates carries +1.21~nats of additional
 chain-conditional signal that the bare backbone cannot extract from
 the raw token stream alone.
 
+\section{Cross-Corpus Generalization}
+\label{sec:xcorpus}
+
+The headline result trains the writer on the LongMemEval-S 450-chain
+training split and evaluates on the 50-chain validation split. A
+natural concern is that the recipe is implicitly tuned to that
+specific callback distribution---the 32-way category templates, the
+GPT-4-generated dialogue style, the typical evidence depth---and
+would not transfer to a different domain. To probe this, we evaluate
+\emph{the same headline checkpoints, with no further training} on
+five corpora none of them have ever seen, holding every other
+component (eval harness, redaction protocol, chain-shuffle confound)
+fixed.
+
+\paragraph{Five OOD corpora.} Three are callback-style (same metric
+as the headline, $\mathrm{pa\_cb\_dnm}$, computed only over annotated
+callback answer tokens), two are not (full-chain CE, the same
+metric as the LoCoMo number reported in prior versions of this work).
+
+\begin{itemize}
+\item \textbf{synthd4} (500 chains): persona-callback dialogues with
+  a closed-vocabulary slot-filling answer (e.g.\ ``what's my
+  favourite \textsc{COLOR}?''). Different generator than
+  LongMemEval-S, different domain (persona facts), different
+  callback templates.
+\item \textbf{synthd4v2} (500 chains): same generator, broader
+  vocabulary and more answer slots. A within-family OOD probe.
+\item \textbf{synthd5} (500 chains): random alphanumeric IDs
+  (``what's my \textsc{ACCOUNT-ID} again?'') with the evidence
+  session's LM loss masked out at training time. There is no
+  semantic prior on the answer; the only signal is the writer
+  capturing the exact ID into $M_c$ and the readout retrieving it.
+  The \emph{hardest} writer-objective test in the corpus zoo.
+\item \textbf{LoCoMo} \cite{maharana2024locomo} (10 chains, real
+  long-form conversations, no callback annotations): full-chain CE
+  via the same \texttt{eval\_chain.py} script used in earlier
+  versions of this work. Reported as a strict lower bound on the
+  callback-only signal (the corpus has no callback markers, so
+  meaningful gain on a few key tokens is diluted by averaging over
+  the rest).
+\item \textbf{MSC test} \cite{xu2022msc} (500 chains, real
+  multi-session-chat dialogues): same metric as LoCoMo,
+  $50\times$ more chains so substantially less noise.
+\end{itemize}
+
+\paragraph{Results.} Table~\ref{tab:xcorpus} reports the per-corpus
+seed-mean $\Delta_{\mathrm{cb}}$ (callback-CE for synthd4/d4v2/d5,
+chain-mean CE for LoCoMo/MSC) at both 0.6B ($n{=}\xcSnsix$ seeds) and
+1.7B ($n{=}\xcSnseventeen$ seeds), alongside chain-shuffle confound and
+per-chain positive count. \emph{Critically, none of these corpora
+were used to train any of the headline checkpoints.}
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Cross-corpus eval of the headline v27b/v28 checkpoints (no
+further training; LongMemEval-S-only writer). Top group:
+callback-aware metric (synthd4/d4v2/d5, $\mathrm{pa\_cb\_dnm}$,
+500 chains each). Bottom group: full-chain CE (LoCoMo, MSC,
+$\mathrm{delta\_nomem\_minus\_mem}$, 10 / 500 chains) for corpora
+without callback annotations. ``CI'' is the 95\,\% bootstrap-over-
+chains CI of the per-chain $\Delta$ residuals pooled across seeds.
+``pos'' is per-chain positives out of (chains $\times$ seeds).}
+\label{tab:xcorpus}
+\begin{tabular}{l l l l l l}
+\toprule
+size & corpus & $\Delta$ (seed-mean) & 95\,\% CI & $\Delta_{\mathrm{sh}}$ & pos. \\
+\midrule
+\multicolumn{6}{l}{\emph{Callback-aware (same metric as headline; in-domain LME for ref:
+$+1.32 \pm 0.53$, [+1.11, +1.55])}} \\
+\midrule
+0.6B & synthd4    & $\xcSSixDfourDnm$    & $\xcSSixDfourCi$    & $\xcSSixDfourDsh$    & \xcSSixDfourPos    \\
+0.6B & synthd4v2  & $\xcSSixDfourVDnm$   & $\xcSSixDfourVCi$   & $\xcSSixDfourVDsh$   & \xcSSixDfourVPos   \\
+0.6B & synthd5    & $\xcSSixDfiveDnm$    & $\xcSSixDfiveCi$    & $\xcSSixDfiveDsh$    & \xcSSixDfivePos    \\
+1.7B & synthd4    & $\xcSSeventeenDfourDnm$    & $\xcSSeventeenDfourCi$    & $\xcSSeventeenDfourDsh$    & \xcSSeventeenDfourPos    \\
+1.7B & synthd4v2  & $\xcSSeventeenDfourVDnm$   & $\xcSSeventeenDfourVCi$   & $\xcSSeventeenDfourVDsh$   & \xcSSeventeenDfourVPos   \\
+1.7B & synthd5    & $\xcSSeventeenDfiveDnm$    & $\xcSSeventeenDfiveCi$    & $\xcSSeventeenDfiveDsh$    & \xcSSeventeenDfivePos    \\
+\midrule
+\multicolumn{6}{l}{\emph{Full-chain CE (no callback annotations; lower bound on the callback signal)}} \\
+\midrule
+0.6B & LoCoMo  & $\xcSSixLocomoDnm$  & $\xcSSixLocomoCi$  & $\xcSSixLocomoDsh$  & \xcSSixLocomoPos  \\
+0.6B & MSC     & $\xcSSixMscDnm$     & $\xcSSixMscCi$     & $\xcSSixMscDsh$     & \xcSSixMscPos     \\
+1.7B & LoCoMo  & $\xcSSeventeenLocomoDnm$  & $\xcSSeventeenLocomoCi$  & $\xcSSeventeenLocomoDsh$  & \xcSSeventeenLocomoPos  \\
+1.7B & MSC     & $\xcSSeventeenMscDnm$     & $\xcSSeventeenMscCi$     & $\xcSSeventeenMscDsh$     & \xcSSeventeenMscPos     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading the table.} The synthd4 and synthd4v2 cells
+isolate ``does the LME-trained writer help on a \emph{different
+callback-style benchmark} with the same eval harness?'' --- the
+cleanest second-benchmark question. The synthd5 cell asks the
+strictly harder ``does it help when the answer has \emph{no
+semantic prior} the LM head could exploit?'', a setting the writer
+must carry literal information into $M_c$ to win. LoCoMo and MSC
+ask ``does the model help on \emph{real long-form conversation
+data} under token-averaged CE'', the harness most prior recurrent-
+memory work uses; we report these as a strict lower bound on the
+callback-only signal (no callback annotations to focus the metric)
+and to enable direct comparison to numbers in earlier versions of
+this work that used the older with-F3 checkpoint on the same
+corpora.
+
+\paragraph{What the cross-corpus pattern shows.} At 1.7B, the
+recipe transfers cleanly to two of three callback-style OOD corpora:
+$\xcSSeventeenDfourDnm$ on synthd4 (\xcSSeventeenDfourPos\ chains
+pooled across \xcSSeventeenDfourNseeds\ seeds positive) and
+$\xcSSeventeenDfourVDnm$ on synthd4v2 (\xcSSeventeenDfourVPos\
+positive), recovering roughly $70\,\%$ of the in-domain
+$\Dseventeenmean$~nats with every individual seed sign-positive on
+both corpora. The third corpus, synthd5, shows
+$\xcSSeventeenDfiveDnm$, essentially zero. This is exactly what the
+in-domain $\mathrm{evidence\_lift} = +0.001 \pm 0.006$ finding from
+\S\ref{sec:mech} predicts: the writer encodes chain-conditional
+context, not literal evidence, so a corpus whose answers are random
+alphanumeric IDs with no semantic prior cannot benefit. The
+cross-corpus failure on synthd5 \emph{strengthens} the chain-
+conditional framing, since the same control that explained why
+$\Delta_{\mathrm{sh}} \approx 0$ in-domain also predicts where
+transfer will and will not occur.
+
+\paragraph{0.6B vs 1.7B and the two full-CE corpora.} At 0.6B,
+synthd4/d4v2 are sign-negative on the seed mean
+($\xcSSixDfourDnm$, $\xcSSixDfourVDnm$); the small writer over-fits
+LongMemEval-S style and hurts on transfer, while curiously helping
+on synthd5 ($\xcSSixDfiveDnm$). This is consistent with the well-
+known small-model OOD-overfitting pattern, and is the load-bearing
+reason we frame the in-domain statistical headline at 0.6B (the
+high-variance scale) and the multi-seed corroboration at 1.7B
+(where the cross-corpus picture is also cleaner). On LoCoMo
+($\xcSSeventeenLocomoDnm$ at 1.7B, 10-chain corpus, full-chain CE)
+and MSC ($\xcSSeventeenMscDnm$ at 1.7B), the result is small
+negatives at both scales. We treat these as the conservative read:
+full-chain CE on un-annotated conversation diluting the contribution
+of any few-token callback signal, and prior recurrent-memory work
+that reports positive numbers on these corpora unfreezes the LM
+backbone --- which mixes ``memory module helps'' and ``additional
+LM capacity helps''. We make no claim that the present recipe
+transfers to those corpora; we report the numbers so the reader can
+calibrate scope.
+
 \section{Ablations: which design choices are load-bearing?}
 \label{sec:abl}
 
@@ -541,17 +696,25 @@ honestly).
 \label{sec:limits}
 
 \begin{itemize}
-\item \textbf{LongMemEval-S only; OOD transfer is unestablished.} The
-  one OOD probe we ran applies the (now non-canonical) v24a checkpoint
-  --- the with-F3 recipe that Table~\ref{tab:abl} identifies as
-  $\sim$8$\times$ \emph{worse} than the headline --- to
-  LoCoMo~\cite{maharana2024locomo}. The result is $\Delta \approx 0$
-  on chain-mean CE (within bootstrap noise). We have not yet
-  re-evaluated the canonical no-F3 (v27b) checkpoint OOD; until we
-  do, the honest scope statement is that the present recipe trains a
-  LongMemEval-S-domain writer and we make no transfer claim. Any
-  rebuttal that hinges on positive OOD evidence should treat that as
-  future work, not an established property of the method.
+\item \textbf{Single-corpus training; cross-corpus transfer is
+  partial and scale-dependent.} The writer is trained only on the
+  LongMemEval-S 450-chain training split.
+  Section~\ref{sec:xcorpus} reports zero-additional-training
+  evaluation of the headline checkpoints on five OOD corpora.
+  At 1.7B, two of three callback-aware corpora transfer cleanly
+  (synthd4 $\xcSSeventeenDfourDnm$, synthd4v2 $\xcSSeventeenDfourVDnm$,
+  every seed positive); synthd5 (random-code answers) does not
+  ($\xcSSeventeenDfiveDnm$ at 1.7B), as the in-domain
+  $\mathrm{evidence\_lift} \approx 0$ finding predicts. At 0.6B,
+  the small writer over-fits LongMemEval-S style and the same
+  callback-aware OOD numbers go sign-negative; this is the load-
+  bearing reason we frame the in-domain headline statistical claim
+  at 0.6B and the cross-corpus generalisation claim at 1.7B. On
+  full-chain CE corpora (LoCoMo, MSC; no callback annotations) the
+  result is small negatives at both scales; we treat this as a
+  conservative read rather than positive evidence of transfer.
+  We do not claim universal generality; the cross-corpus table is
+  the scope statement.
 \item \textbf{The comparison fixes the backbone family.} We use a
   \emph{bare} pretrained Qwen3 backbone for RAG, so the RAG cells are
   not given the benefit of an instruction-tuned reading head. An
@@ -577,15 +740,17 @@ honestly).
   framing finding, not its strongest claim.} A future memres recipe
   with a writer-side extractive objective might force chain-specific
   bindings into $M_c$ and lift $\Delta_{\mathrm{sh}}$ above noise.
-\item \textbf{1.7B is n${=}\NSEEDSseventeen$ seeds, deliberately.} The
-  4-seed mean at 0.6B is the statistical headline; the 1.7B cell is
-  scoped as a \emph{direction-of-effect} corroboration, not a scaling
-  claim. The two 1.7B seeds are very tight ($+0.91$, $+0.94$;
-  per-seed $\sigma = 0.025$, $\approx 20\times$ tighter than the
-  per-seed spread at 0.6B), which is consistent with---but does not
-  prove---a stable scaling story; resolving that would require
-  $n{\geq}4$ at 1.7B and at least one cell at 7B+. We flag both as
-  out-of-scope for this paper.
+\item \textbf{1.7B is n${=}\NSEEDSseventeen$ seeds and the
+  parameter-scaling picture is incomplete.} The 4-seed mean at 0.6B
+  is the strongest statistical claim; the 1.7B cell is reported as
+  multi-seed corroboration, not a definitive scaling law. Every 1.7B
+  seed lands positive (per-chain pooled CI $\Dseventeenci$, every-seed
+  $\Delta_{\mathrm{cb}} > 0$) and the chain-shuffle confound is in
+  noise (\Dseventeendsh) at this scale too, but with $n{=}\NSEEDSseventeen$
+  we cannot rule out a single bad seed at, say, $n{=}10$. A confident
+  scaling claim past 1.7B would require both more 1.7B seeds and at
+  least one cell at 4B+; both are out-of-scope for this paper, and we
+  flag the absence rather than overstate the present evidence.
 \end{itemize}
 
 \section{Conclusion}
@@ -612,7 +777,7 @@ useful; we argue they should be combined.
 
 \paragraph{Code and data.} The Memory Residuals architecture, training
 loop, and evaluation harness are released in the supplementary zip.
-The training corpus is LongMemEval-S~\cite{yu2024longmemeval},
+The training corpus is LongMemEval-S~\cite{wu2024longmemeval},
 publicly available; we provide the pre-tokenised cache used by the
 evaluator (\texttt{paper\_artifacts/chains/lme\_val\_s512\_evpos.pt}).
 
@@ -755,7 +920,7 @@ launch scripts are released in the supplementary.
 (\texttt{memres\_supplementary.zip}) contains the architecture
 implementation, the training loop, the launchers, and the eval
 harness. The training/eval corpora are derived from the publicly
-available LongMemEval-S~\cite{yu2024longmemeval}; we ship the
+available LongMemEval-S~\cite{wu2024longmemeval}; we ship the
 pre-tokenised cache.
 
 \item {\bf Experimental setting / details}\\

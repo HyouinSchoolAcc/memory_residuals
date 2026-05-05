@@ -12,6 +12,7 @@ cd "$(dirname "$0")"
 
 python scripts/compute_numbers.py
 python scripts/render_numbers_tex.py
+python scripts/compute_xcorpus_numbers.py
 python scripts/make_p_a_headline.py
 python scripts/make_p_a_per_chain.py
 python scripts/make_p_a_mechanism.py

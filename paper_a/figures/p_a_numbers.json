@@ -44,42 +44,43 @@
   "memres_1p7b_v28": {
     "files": [
       "v28a_no_probe_seed1_final_lme_val_evpos.json",
-      "v28b_no_probe_seed2_final_lme_val_evpos.json"
+      "v28b_no_probe_seed2_final_lme_val_evpos.json",
+      "v28c_no_probe_seed3_1p7b_frozen_gh200_lme_val_evpos.json"
     ],
-    "n_seeds": 2,
+    "n_seeds": 3,
     "dnm_seed_mean": {
-      "n": 2,
-      "mean": 0.9264272508025169,
-      "std": 0.02499187534562429,
-      "sem": 0.017671924531459826,
+      "n": 3,
+      "mean": 0.9780469999710718,
+      "std": 0.09113776620764417,
+      "sem": 0.052618413853324546,
       "min": 0.908755326271057,
-      "max": 0.9440991753339767
+      "max": 1.0812864983081818
     },
     "dsh_seed_mean": {
-      "n": 2,
-      "mean": -0.005316709578037093,
-      "std": 0.005750732224159356,
-      "sem": 0.004066381752491077,
+      "n": 3,
+      "mean": -0.00470958968003569,
+      "std": 0.0042001481246070485,
+      "sem": 0.0024249566503781812,
       "min": -0.00938309133052817,
       "max": -0.001250327825546016
     },
     "evlift_seed_mean": {
-      "n": 2,
-      "mean": -0.001273836195468947,
-      "std": 0.008975876507170332,
-      "sem": 0.006346903145313164,
+      "n": 3,
+      "mean": 0.0019001553455989157,
+      "std": 0.008396775955347218,
+      "sem": 0.004847880858144694,
       "min": -0.007620739340782112,
-      "max": 0.005073066949844218
+      "max": 0.008248138427734641
     },
-    "n_per_chain_residuals_pooled": 100,
+    "n_per_chain_residuals_pooled": 150,
     "per_chain_pooled_bootstrap_95ci": [
-      0.6911720063611866,
-      1.1765325515419245
+      0.7923037122935056,
+      1.1837893423636752
     ],
-    "per_chain_pooled_mean": 0.926427250802517,
-    "per_chain_pooled_median": 0.5967914462089539,
-    "per_chain_pooled_pos_count": 85,
-    "per_chain_pooled_total": 100
+    "per_chain_pooled_mean": 0.9780469999710719,
+    "per_chain_pooled_median": 0.6069025993347168,
+    "per_chain_pooled_pos_count": 132,
+    "per_chain_pooled_total": 150
   },
   "rag_0p6b": {
     "nomem": {

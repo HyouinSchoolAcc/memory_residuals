@@ -101,11 +101,17 @@ def main() -> None:
             "v27b_no_probe_seed3_final_lme_val_evpos.json",
             "v27b_no_probe_seed4_final_lme_val_evpos.json",
         ],
+        # NOTE: v28a/b were the original local-launched cells (short tag).
+        # v28c/d were launched on the GH200 with the longer training-script tag
+        # baked into the eval JSON name. We list both naming conventions here
+        # so a refresh picks up whichever exists.
         "memres_1p7b_v28": [
             "v28a_no_probe_seed1_final_lme_val_evpos.json",
             "v28b_no_probe_seed2_final_lme_val_evpos.json",
             "v28c_no_probe_seed3_final_lme_val_evpos.json",
+            "v28c_no_probe_seed3_1p7b_frozen_gh200_lme_val_evpos.json",
             "v28d_no_probe_seed4_final_lme_val_evpos.json",
+            "v28d_no_probe_seed4_1p7b_frozen_gh200_lme_val_evpos.json",
         ],
     }
 
