@@ -93,22 +93,25 @@ def _bar_panel(ax, size_label: str, nums: dict) -> None:
     bar_objs = ax.bar(xs, points, yerr=yerr_arr, color=colors, edgecolor="black",
                       linewidth=0.8, capsize=4, error_kw={"linewidth": 0.8, "ecolor": "#1f2937"})
 
-    # Per-bar annotation: numeric Δ above bar; chain-positive count below x-axis
+    # Per-bar annotation: numeric Δ_cb above each bar.
     for i, (label, point, yerr, color, frac) in enumerate(bars):
-        # Δ value above bar
         annot_y = (point + yerr[1] + 0.06) if point >= 0 else 0.06
         ax.text(i, annot_y, f"{point:+.2f}", ha="center", va="bottom",
                 fontsize=8, color="black")
-        # n positive chains label
-        ax.text(i, -0.15, f"{frac}", ha="center", va="top",
-                fontsize=7, color="#475569", style="italic")
 
     ax.axhline(0, color="black", linewidth=0.5)
     ax.set_xticks(xs)
-    ax.set_xticklabels([b[0] for b in bars], fontsize=8.5)
+    # Combine method label and per-chain positive count into one multi-line
+    # tick label. Avoids overlap between separately-positioned text annotations
+    # and the auto-placed tick labels.
+    tick_labels = []
+    for b in bars:
+        method_label, _, _, _, frac = b
+        tick_labels.append(f"{method_label}\n$\\mathit{{{frac}}}$")
+    ax.set_xticklabels(tick_labels, fontsize=8.5)
     ax.set_ylabel(r"$\Delta_{\mathrm{cb}}$ (nats, callback CE)", fontsize=9)
     ax.set_title(f"Qwen3-{'0.6B' if '0p6b' in size_label else '1.7B'}", fontsize=10)
-    ax.set_ylim(-0.4, max(2.1, max(points) + 0.5))
+    ax.set_ylim(-0.05, max(2.1, max(points) + 0.5))
     ax.tick_params(axis="y", labelsize=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -121,15 +124,16 @@ def main() -> None:
     _bar_panel(axes[0], "0p6b", nums)
     _bar_panel(axes[1], "1p7b", nums)
 
-    # Single shared legend at the bottom
+    # Single shared legend at the bottom (use facecolor= so we don't trip the
+    # color-overrides-edgecolor warning).
     handles = [
-        plt.Rectangle((0, 0), 1, 1, color=COLOR_RAG,    edgecolor="black", linewidth=0.8, label="RAG (BM25 / dense)"),
-        plt.Rectangle((0, 0), 1, 1, color=COLOR_ORACLE, edgecolor="black", linewidth=0.8, label="Oracle RAG (gold evidence)"),
-        plt.Rectangle((0, 0), 1, 1, color=COLOR_MEMRES, edgecolor="black", linewidth=0.8, label="Memory Residuals (this work)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=COLOR_RAG,    edgecolor="black", linewidth=0.8, label="RAG (BM25 / dense)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=COLOR_ORACLE, edgecolor="black", linewidth=0.8, label="Oracle RAG (gold evidence)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=COLOR_MEMRES, edgecolor="black", linewidth=0.8, label="Memory Residuals (this work)"),
     ]
     fig.legend(handles=handles, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02),
                frameon=False, fontsize=8.5)
-    fig.text(0.5, 0.07, "italic numbers below x-axis: per-chain positive count out of 50",
+    fig.text(0.5, 0.06, "italic numbers below x-axis labels: per-chain positive count out of 50",
              ha="center", fontsize=7, color="#475569", style="italic")
     fig.suptitle(
         "Memory Residuals beat strong RAG including oracle-evidence on LongMemEval-S callback CE",

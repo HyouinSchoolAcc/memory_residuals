@@ -61,7 +61,7 @@ def main() -> None:
     ]
     rows = [(s, m, v, c) for (s, m, v, c) in cells if v is not None and not math.isnan(v)]
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.2), gridspec_kw={"width_ratios": [3, 2]})
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4), gridspec_kw={"width_ratios": [3, 2]})
 
     # === Left panel: Δ_shuffle ===
     ax = axes[0]
@@ -71,25 +71,38 @@ def main() -> None:
     colors = [r[3] for r in rows]
     bars = ax.bar(xs, points, color=colors, edgecolor="black", linewidth=0.7, width=0.7)
 
-    # Annotation: numeric value above each bar
+    # Set ylim FIRST so annotations are positioned correctly. Leave headroom for
+    # the per-bar value labels and the cluster headers ("0.6B" / "1.7B").
+    ymax = max(0.55, max(points) * 1.18)
+    ax.set_ylim(-0.06, ymax)
+
+    # Annotation: numeric value above each bar (with extra room for tiny bars)
     for i, (sz, lbl, v, c) in enumerate(rows):
-        ax.text(i, v + (0.012 if v >= 0 else -0.022), f"{v:+.3f}",
-                ha="center", va="bottom" if v >= 0 else "top", fontsize=7.5)
+        if abs(v) < 0.02:
+            # Tiny bars: place label clearly above the x-axis line so it doesn't
+            # collide with the axhline; never inside the bar.
+            ax.text(i, 0.025, f"{v:+.3f}",
+                    ha="center", va="bottom", fontsize=7.5, color="#1f2937")
+        else:
+            ax.text(i, v + (0.012 if v >= 0 else -0.022), f"{v:+.3f}",
+                    ha="center", va="bottom" if v >= 0 else "top", fontsize=7.5)
 
     ax.axhline(0, color="black", linewidth=0.5)
     ax.set_xticks(xs)
     ax.set_xticklabels([r[1] for r in rows], fontsize=8)
-    # Group separators
-    ax.axvline(2.5, color="#cbd5e1", linewidth=0.7, linestyle=":")
-    ax.text(1, ax.get_ylim()[1] * 1.02 if ax.get_ylim()[1] > 0 else 0.55, "0.6B",
-            ha="center", fontsize=9, color="#1f2937", transform=ax.get_xaxis_transform())
-    ax.text(4, ax.get_ylim()[1] * 1.02 if ax.get_ylim()[1] > 0 else 0.55, "1.7B",
-            ha="center", fontsize=9, color="#1f2937", transform=ax.get_xaxis_transform())
+    # Group separator between 0.6B (indices 0..2) and 1.7B (indices 3..5)
+    ax.axvline(2.5, color="#94a3b8", linewidth=0.8, linestyle=(0, (3, 3)))
+    # Cluster headers: place ABOVE the chart in axes coords (y=1.03 ≈ just above
+    # the top spine). Using transform=ax.get_xaxis_transform() means x is in
+    # data coords and y in axes fraction, so y=1.03 sits ~3% above the axis.
+    header_kw = dict(fontsize=10, color="#1f2937", fontweight="bold",
+                     transform=ax.get_xaxis_transform(), clip_on=False)
+    ax.text(1.0, 1.03, "Qwen3-0.6B", ha="center", va="bottom", **header_kw)
+    ax.text(4.0, 1.03, "Qwen3-1.7B", ha="center", va="bottom", **header_kw)
     ax.set_ylabel(r"$\Delta_{\mathrm{sh}}$ = CE$_{\mathrm{shuffle}}$ − CE$_{\mathrm{method}}$  [nats]", fontsize=9)
-    ax.set_title("Chain-shuffle confound", fontsize=10)
+    ax.set_title("Chain-shuffle confound", fontsize=10, pad=18)
     ax.tick_params(axis="y", labelsize=8)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
-    ax.set_ylim(-0.05, max(0.55, max(points) * 1.18))
 
     # === Right panel: evidence_lift (memres only) ===
     ax2 = axes[1]
@@ -106,14 +119,16 @@ def main() -> None:
     errs2 = [r[2] for r in rows2]
     ax2.bar(xs2, pts2, yerr=errs2, color=COLOR_MEMRES, edgecolor="black", linewidth=0.7,
             width=0.55, capsize=5, error_kw={"linewidth": 0.7, "ecolor": "#1f2937"})
+    # Place each value label above the error-bar cap, never inside the (tiny) bar
     for i, (lbl, v, e) in enumerate(rows2):
-        ax2.text(i, v + e + 0.008 if v >= 0 else v - e - 0.018, f"{v:+.3f}",
-                 ha="center", va="bottom" if v >= 0 else "top", fontsize=8)
+        y_top = max(v + e, 0.0) + 0.005
+        ax2.text(i, y_top, f"{v:+.3f}",
+                 ha="center", va="bottom", fontsize=8, color="#1f2937")
     ax2.axhline(0, color="black", linewidth=0.5)
     ax2.set_xticks(xs2)
     ax2.set_xticklabels([r[0] for r in rows2], fontsize=8.5)
     ax2.set_ylabel(r"$\mathrm{evidence\_lift}$ = CE$_{\mathrm{mem,floor}}$ − CE$_{\mathrm{mem}}$  [nats]", fontsize=9)
-    ax2.set_title("Evidence redaction (memres)", fontsize=10)
+    ax2.set_title("Evidence redaction (memres)", fontsize=10, pad=18)
     ax2.tick_params(axis="y", labelsize=8)
     ax2.spines["top"].set_visible(False); ax2.spines["right"].set_visible(False)
     ax2.set_ylim(-0.05, 0.05)
@@ -122,9 +137,9 @@ def main() -> None:
         "RAG localises evidence (large $\\Delta_{\\mathrm{sh}}$); "
         "MemRes encodes chain-conditional context "
         "($\\Delta_{\\mathrm{sh}}\\approx 0$, $\\mathrm{evidence\\_lift}\\approx 0$)",
-        fontsize=9.5, y=1.02,
+        fontsize=9.5, y=1.06,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(OUT_PATH, bbox_inches="tight", dpi=200)
     print(f"saved -> {OUT_PATH}")
 
