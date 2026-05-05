@@ -1,0 +1,214 @@
+{
+  "memres_0p6b_v27b": {
+    "files": [
+      "v27b_no_probe_final_lme_val_evpos.json",
+      "v27b_no_probe_seed2_final_lme_val_evpos.json",
+      "v27b_no_probe_seed3_final_lme_val_evpos.json",
+      "v27b_no_probe_seed4_final_lme_val_evpos.json"
+    ],
+    "n_seeds": 4,
+    "dnm_seed_mean": {
+      "n": 4,
+      "mean": 1.3226356968283657,
+      "std": 0.5300104329636217,
+      "sem": 0.26500521648181086,
+      "min": 0.797469344139099,
+      "max": 1.8330224967002873
+    },
+    "dsh_seed_mean": {
+      "n": 4,
+      "mean": -0.0019143813848494506,
+      "std": 0.010392068762578298,
+      "sem": 0.005196034381289149,
+      "min": -0.01666496753692659,
+      "max": 0.007704310417175453
+    },
+    "evlift_seed_mean": {
+      "n": 4,
+      "mean": 0.0008111572265624423,
+      "std": 0.0055716089456653,
+      "sem": 0.00278580447283265,
+      "min": -0.004799854755401789,
+      "max": 0.008040291070938288
+    },
+    "n_per_chain_residuals_pooled": 200,
+    "per_chain_pooled_bootstrap_95ci": [
+      1.1089548444077373,
+      1.5483515015244482
+    ],
+    "per_chain_pooled_mean": 1.3226356968283652,
+    "per_chain_pooled_median": 0.6688610315322876,
+    "per_chain_pooled_pos_count": 190,
+    "per_chain_pooled_total": 200
+  },
+  "memres_1p7b_v28": {
+    "files": [
+      "v28a_no_probe_seed1_final_lme_val_evpos.json",
+      "v28b_no_probe_seed2_final_lme_val_evpos.json"
+    ],
+    "n_seeds": 2,
+    "dnm_seed_mean": {
+      "n": 2,
+      "mean": 0.9264272508025169,
+      "std": 0.02499187534562429,
+      "sem": 0.017671924531459826,
+      "min": 0.908755326271057,
+      "max": 0.9440991753339767
+    },
+    "dsh_seed_mean": {
+      "n": 2,
+      "mean": -0.005316709578037093,
+      "std": 0.005750732224159356,
+      "sem": 0.004066381752491077,
+      "min": -0.00938309133052817,
+      "max": -0.001250327825546016
+    },
+    "evlift_seed_mean": {
+      "n": 2,
+      "mean": -0.001273836195468947,
+      "std": 0.008975876507170332,
+      "sem": 0.006346903145313164,
+      "min": -0.007620739340782112,
+      "max": 0.005073066949844218
+    },
+    "n_per_chain_residuals_pooled": 100,
+    "per_chain_pooled_bootstrap_95ci": [
+      0.6911720063611866,
+      1.1765325515419245
+    ],
+    "per_chain_pooled_mean": 0.926427250802517,
+    "per_chain_pooled_median": 0.5967914462089539,
+    "per_chain_pooled_pos_count": 85,
+    "per_chain_pooled_total": 100
+  },
+  "rag_0p6b": {
+    "nomem": {
+      "ce_rag": 4.3174645972251895,
+      "ce_nomem": 4.3174645972251895,
+      "pa_cb_drag": 0.0,
+      "pa_cb_dsh": NaN,
+      "stdev_per_chain_drag": 0.0,
+      "n_chains_per_chain_positive": 0,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "n_per_chain": 50
+    },
+    "bm25_top1": {
+      "ce_rag": 4.284320570230484,
+      "ce_nomem": 4.3174645972251895,
+      "pa_cb_drag": 0.0331440269947052,
+      "pa_cb_dsh": 0.5060143244266504,
+      "stdev_per_chain_drag": 1.1525594956236216,
+      "n_chains_per_chain_positive": 20,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.26054612913727754,
+        0.35521013212203967
+      ],
+      "n_per_chain": 50
+    },
+    "bm25_top3": {
+      "ce_rag": 4.3295920062065125,
+      "ce_nomem": 4.3174645972251895,
+      "pa_cb_drag": -0.012127408981323029,
+      "pa_cb_dsh": 0.46160432338714585,
+      "stdev_per_chain_drag": 1.1275330644104136,
+      "n_chains_per_chain_positive": 19,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.3043542209863662,
+        0.30766253399848914
+      ],
+      "n_per_chain": 50
+    },
+    "dense_top3": {
+      "ce_rag": 4.2694029092788695,
+      "ce_nomem": 4.3174645972251895,
+      "pa_cb_drag": 0.04806168794632004,
+      "pa_cb_dsh": 0.3936560058593752,
+      "stdev_per_chain_drag": 1.0830225665826738,
+      "n_chains_per_chain_positive": 20,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.23273997780680653,
+        0.3474302310645579
+      ],
+      "n_per_chain": 50
+    },
+    "oracle_top3": {
+      "ce_rag": 4.206398774385452,
+      "ce_nomem": 4.3174645972251895,
+      "pa_cb_drag": 0.11106582283973765,
+      "pa_cb_dsh": NaN,
+      "stdev_per_chain_drag": 1.2799582877478948,
+      "n_chains_per_chain_positive": 25,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.2244876854121685,
+        0.4592038745880125
+      ],
+      "n_per_chain": 50
+    }
+  },
+  "rag_1p7b": {
+    "nomem": {
+      "ce_rag": 4.702520688772202,
+      "ce_nomem": 4.702520688772202,
+      "pa_cb_drag": 0.0,
+      "pa_cb_dsh": NaN,
+      "stdev_per_chain_drag": 0.0,
+      "n_chains_per_chain_positive": 0,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        0.0,
+        0.0
+      ],
+      "n_per_chain": 50
+    },
+    "bm25_top3": {
+      "ce_rag": 4.449614820182323,
+      "ce_nomem": 4.702520688772202,
+      "pa_cb_drag": 0.2529058685898784,
+      "pa_cb_dsh": 0.32627931982278824,
+      "stdev_per_chain_drag": 1.0312638275830177,
+      "n_chains_per_chain_positive": 29,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.02530357589572668,
+        0.5417751575112343
+      ],
+      "n_per_chain": 50
+    },
+    "dense_top3": {
+      "ce_rag": 4.667610751092434,
+      "ce_nomem": 4.702520688772202,
+      "pa_cb_drag": 0.03490993767976747,
+      "pa_cb_dsh": 0.2286973920464508,
+      "stdev_per_chain_drag": 2.0738389688921646,
+      "n_chains_per_chain_positive": 32,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        -0.5943135358691216,
+        0.5520546086430544
+      ],
+      "n_per_chain": 50
+    },
+    "oracle_top3": {
+      "ce_rag": 4.314845835566521,
+      "ce_nomem": 4.702520688772202,
+      "pa_cb_drag": 0.38767485320568085,
+      "pa_cb_dsh": NaN,
+      "stdev_per_chain_drag": 1.1843768446627079,
+      "n_chains_per_chain_positive": 31,
+      "n_chains_per_chain": null,
+      "per_chain_drag_pooled_bootstrap_95ci": [
+        0.06711232636868954,
+        0.7089122461825608
+      ],
+      "n_per_chain": 50
+    }
+  }
+}
