@@ -39,9 +39,7 @@
 % results/eval_v27_v28_cross_corpus/*.json lands.
 \input{xcorpus_numbers}
 
-\title{Memory Residuals at Scale:\\
-       A Frozen-Backbone Recurrent Memory that\\
-       Beats RAG on Long-Horizon Callback Recall}
+\title{Memory Residuals v1}
 
 \author{
   Anonymous Authors \\
@@ -53,43 +51,40 @@
 \maketitle
 
 \begin{abstract}
-Adding long-horizon memory to a pretrained language model is typically
-done either by extending the context window---which scales quadratically
-in compute and is fragile beyond the pretraining length---or by
-attaching a retrieval index, which is decoupled from the LLM's training
-signal. We propose \textbf{Memory Residuals}: a fixed-size,
-jointly-trained recurrent memory matrix $M_c$ that is read and written
-by an \emph{otherwise frozen} pretrained LLM through a depth-routed
-cross-attention pathway, trained end-to-end with a single auxiliary
-loss that prevents the depth router's memory channel from collapsing.
-With 41.5\,M trainable parameters added on top of a frozen Qwen3-0.6B
-($\approx$\,6\,\% overhead) and $\sim$1.5\,h of single-H100 training on
-the LongMemEval-S 450-chain training split, the resulting model
-improves callback cross-entropy on LongMemEval-S validation by
-$\Delta_{\mathrm{cb}} = +1.32 \pm 0.53$~nats over no-memory across four
-seeds (chain-shuffle confound $0.000 \pm 0.010$). At matched
-compute, the absolute gain is $+1.21$~nats over the strongest dense-
-retrieval baseline ($+0.05$, 95\,\% CI $[-0.23, +0.35]$) and
-$+1.21$~nats over oracle RAG with gold evidence positions ($+0.11$,
-$[-0.22, +0.46]$); all RAG cells' 95\,\% CIs include zero, while
-memres' CI is $[+1.11, +1.55]$. The same recipe applied to Qwen3-1.7B
-gives $\Dseventeenmean$~nats ($n{=}\NSEEDSseventeen$ seeds, every
-seed positive, $\Delta_{\mathrm{sh}} = \Dseventeendsh$). At 1.7B, the
-LongMemEval-S-trained writer also transfers, with no further
-training, to two callback-style OOD corpora (synthd4
-$\xcSSeventeenDfourDnm$, synthd4v2 $\xcSSeventeenDfourVDnm$ across
-\xcSSeventeenDfourNseeds\ seeds, every seed positive on both),
-recovering ${\sim}70\,\%$ of the in-domain gain on benchmarks
-the headline checkpoints have never seen. Unlike RAG---whose gain is provably chain-specific via a
-large positive $\Delta_{\mathrm{sh}}$ but small in magnitude---memres
-delivers a large gain whose chain-shuffle confound is statistically
-zero. An evidence-redaction analysis ($\mathrm{evidence\_lift} =
-+0.001 \pm 0.006$) shows the memory encodes \emph{chain-conditional
-context} rather than literal evidence recall---a distinction prior
-work rarely measures. We argue that recurrent memory and retrieval
-attack different parts of the long-horizon problem: retrieval
-localises evidence; memres distils a chain into a context vector.
-They are complementary, not substitutable.
+This is an experimental study of \emph{memory bolt-ons} for pretrained
+language models. We ask whether a small residual pathway around an
+otherwise frozen backbone---a fixed-size jointly-trained recurrent
+memory matrix $M_c$ read and written through a depth-routed
+cross-attention channel, with a single simple gate per layer---can
+open up long-horizon callback behaviour that the bare backbone cannot
+reach. We call the construction \textbf{Memory Residuals}; this paper
+is best read as v1 of a line of work, not a finished architectural
+proposal. With 41.5\,M trainable parameters on top of a frozen
+Qwen3-0.6B ($\approx$\,6\,\% overhead) and ${\sim}1.5$\,h of
+single-H100 training on the LongMemEval-S 450-chain training split,
+the construction is sign-positive and reproducible across four seeds
+($\Delta_{\mathrm{cb}} = +1.32 \pm 0.53$~nats over no-memory, 95\,\%
+bootstrap CI $[+1.11, +1.55]$, chain-shuffle confound
+$0.000 \pm 0.010$). It scales to Qwen3-1.7B ($\Dseventeenmean$~nats,
+$n{=}\NSEEDSseventeen$ seeds, every seed positive,
+$\Delta_{\mathrm{sh}} = \Dseventeendsh$) and the LongMemEval-S-trained
+writer transfers, with no further training, to two unseen callback-
+style corpora (synthd4 $\xcSSeventeenDfourDnm$, synthd4v2
+$\xcSSeventeenDfourVDnm$ at 1.7B), recovering ${\sim}70\,\%$ of the
+in-domain gain. We frame these numbers as basic-but-promising
+learning capabilities for the bolt-on, not as a definitive
+architectural result: three controls (chain-shuffle,
+evidence-redaction $\mathrm{evidence\_lift} = +0.001 \pm 0.006$, and
+an oracle-RAG comparison) localise the gain to chain-conditional
+context compression rather than literal evidence recall, and the same
+controls predict where transfer fails (a third OOD corpus whose
+answers require literal storage,
+$\xcSSeventeenDfiveDnm$ at 1.7B). The natural use case for this kind
+of bolt-on is a life-long conversational agent on top of a fixed
+backbone, where a small jointly-trained memory module could replace
+ad-hoc retrieval; getting there from this paper requires a richer,
+human-curated long-horizon training corpus, which we treat as the
+obvious next step rather than a claim already established here.
 \end{abstract}
 
 \section{Introduction}
