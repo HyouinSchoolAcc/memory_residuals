@@ -1,0 +1,73 @@
+{
+  "design": {
+    "n_chains": 50,
+    "n_seeds_F3_ON": 3,
+    "n_seeds_F3_OFF": 4,
+    "n_perm": 10000,
+    "n_boot": 10000,
+    "rng_seed": 2026,
+    "F3_ON_seeds": [
+      "v24a_seed1_0p6b_lme_val.json",
+      "v24a_seed2_0p6b_lme_val.json",
+      "v24a_seed3_0p6b_lme_val.json"
+    ],
+    "F3_OFF_seeds": [
+      "v27b_seed1_0p6b_lme_val.json",
+      "v27b_seed2_0p6b_lme_val.json",
+      "v27b_seed3_0p6b_lme_val.json",
+      "v27b_seed4_0p6b_lme_val.json"
+    ]
+  },
+  "results": {
+    "observed_T_nats": 1.094540874958038,
+    "ci95_bootstrap_nats": [
+      0.7898145372619231,
+      1.4296222050786014
+    ],
+    "p_value_one_sided_perm": 0.0,
+    "p_value_two_sided_perm": 0.0,
+    "n_chains_F3OFF_beats_F3ON": 47,
+    "p_value_one_sided_sign": 1.8541612689659814e-11,
+    "median_delta_per_chain_nats": 0.5851012667020161,
+    "min_delta_per_chain_nats": -0.10105060537656149,
+    "max_delta_per_chain_nats": 4.672703107198079,
+    "F3_ON_mean_dnm_per_seed": [
+      0.3720065903663635,
+      0.08601593494415283,
+      0.2117344069480896
+    ],
+    "F3_OFF_mean_dnm_per_seed": [
+      0.802211275100708,
+      0.9399821090698243,
+      1.8290687644481658,
+      1.6999105942249297
+    ]
+  },
+  "per_seed_pair_winrates_out_of_50": {
+    "v27b_seed1_0p6b_lme_val__vs__v24a_seed1_0p6b_lme_val": 43,
+    "v27b_seed1_0p6b_lme_val__vs__v24a_seed2_0p6b_lme_val": 43,
+    "v27b_seed1_0p6b_lme_val__vs__v24a_seed3_0p6b_lme_val": 44,
+    "v27b_seed2_0p6b_lme_val__vs__v24a_seed1_0p6b_lme_val": 44,
+    "v27b_seed2_0p6b_lme_val__vs__v24a_seed2_0p6b_lme_val": 46,
+    "v27b_seed2_0p6b_lme_val__vs__v24a_seed3_0p6b_lme_val": 40,
+    "v27b_seed3_0p6b_lme_val__vs__v24a_seed1_0p6b_lme_val": 46,
+    "v27b_seed3_0p6b_lme_val__vs__v24a_seed2_0p6b_lme_val": 48,
+    "v27b_seed3_0p6b_lme_val__vs__v24a_seed3_0p6b_lme_val": 49,
+    "v27b_seed4_0p6b_lme_val__vs__v24a_seed1_0p6b_lme_val": 45,
+    "v27b_seed4_0p6b_lme_val__vs__v24a_seed2_0p6b_lme_val": 46,
+    "v27b_seed4_0p6b_lme_val__vs__v24a_seed3_0p6b_lme_val": 47
+  },
+  "annotation_1p7b": {
+    "v28a_seed1_1p7b_lme_val": {
+      "n_chains": 50,
+      "mean_dnm": 0.8803450787067413,
+      "n_pos_dnm": 44
+    },
+    "v28b_seed2_1p7b_lme_val": {
+      "n_chains": 50,
+      "mean_dnm": 0.9446714928746224,
+      "n_pos_dnm": 44
+    }
+  },
+  "png_path": "results\\exp2_chain_recipe\\permutation_test\\permutation_test.png"
+}

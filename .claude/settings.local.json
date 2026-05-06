@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/School/EC/Divergence 2%/memory_residuals/**)",
+      "Bash(python tools/permutation_test_f3.py)",
+      "Bash(python)",
+      "Bash(cp results/exp2_chain_recipe/neurips_2024.sty paper/drafts/neurips_2024.sty)"
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "design": {
+    "n_chains": 50,
+    "n_seeds_F3_ON": 3,
+    "n_seeds_F3_OFF": 4,
+    "n_perm": 10000,
+    "n_boot": 10000,
+    "rng_seed": 2026,
+    "F3_ON_seeds": [
+      "v24a_seed1_final_lme_val_evpos.json",
+      "v24a_seed2_final_lme_val_evpos.json",
+      "v24a_seed3_final_lme_val_evpos.json"
+    ],
+    "F3_OFF_seeds": [
+      "v27b_no_probe_final_lme_val_evpos.json",
+      "v27b_no_probe_seed2_final_lme_val_evpos.json",
+      "v27b_no_probe_seed3_final_lme_val_evpos.json",
+      "v27b_no_probe_seed4_final_lme_val_evpos.json"
+    ],
+    "eval_pipeline": "canonical (eval_callback.py via eval_v25_seed_pack_evpos)"
+  },
+  "results": {
+    "observed_T_nats": 1.1606368328134218,
+    "ci95_bootstrap_nats": [
+      0.8351393328557412,
+      1.5184231927543876
+    ],
+    "p_value_one_sided_perm": 0.0,
+    "p_value_two_sided_perm": 0.0,
+    "n_chains_F3OFF_beats_F3ON": 47,
+    "p_value_one_sided_sign": 1.8541612689659814e-11,
+    "median_delta_per_chain_nats": 0.6040566116571426,
+    "min_delta_per_chain_nats": -0.07312819361686707,
+    "max_delta_per_chain_nats": 4.929158568382263,
+    "F3_ON_mean_dnm_per_seed": [
+      0.22744024515151978,
+      0.06844733238220214,
+      0.1901090145111084
+    ],
+    "F3_OFF_mean_dnm_per_seed": [
+      0.7974693441390991,
+      0.9386627411842347,
+      1.8330224967002868,
+      1.7213882052898406
+    ]
+  },
+  "per_seed_pair_winrates_out_of_50": {
+    "v27b_no_probe_final_lme_val_evpos__vs__v24a_seed1_final_lme_val_evpos": 43,
+    "v27b_no_probe_final_lme_val_evpos__vs__v24a_seed2_final_lme_val_evpos": 43,
+    "v27b_no_probe_final_lme_val_evpos__vs__v24a_seed3_final_lme_val_evpos": 44,
+    "v27b_no_probe_seed2_final_lme_val_evpos__vs__v24a_seed1_final_lme_val_evpos": 44,
+    "v27b_no_probe_seed2_final_lme_val_evpos__vs__v24a_seed2_final_lme_val_evpos": 46,
+    "v27b_no_probe_seed2_final_lme_val_evpos__vs__v24a_seed3_final_lme_val_evpos": 42,
+    "v27b_no_probe_seed3_final_lme_val_evpos__vs__v24a_seed1_final_lme_val_evpos": 47,
+    "v27b_no_probe_seed3_final_lme_val_evpos__vs__v24a_seed2_final_lme_val_evpos": 48,
+    "v27b_no_probe_seed3_final_lme_val_evpos__vs__v24a_seed3_final_lme_val_evpos": 49,
+    "v27b_no_probe_seed4_final_lme_val_evpos__vs__v24a_seed1_final_lme_val_evpos": 45,
+    "v27b_no_probe_seed4_final_lme_val_evpos__vs__v24a_seed2_final_lme_val_evpos": 46,
+    "v27b_no_probe_seed4_final_lme_val_evpos__vs__v24a_seed3_final_lme_val_evpos": 47
+  },
+  "png_path": "results\\exp2_chain_recipe\\permutation_test_canonical\\permutation_test.png"
+}

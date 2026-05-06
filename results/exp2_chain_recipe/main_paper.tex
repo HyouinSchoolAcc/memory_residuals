@@ -451,6 +451,90 @@ shows audited checkpoints rather than an interpolated curve.}
 \label{fig:trajectory}
 \end{figure}
 
+\section{Headline Negative Result: F3 Readout Probe Is Harmful}
+\label{sec:f3_off}
+
+The natural fix for failure mode 6 (writer-objective failure, §6) is a
+\emph{readout probe}: an auxiliary loss that asks the readout to
+predict a chain-specific signal directly from $\Mc$.  Call this the F3
+probe.  We ran it as the v24a recipe at 0.6B and the v25a recipe at
+1.7B, with positive but modest results ($\dnm = +0.16 \pm 0.08$ nats
+at 0.6B, $n=3$ seeds; $+0.12$ nats at 1.7B, $n=2$ seeds, both on
+LongMemEval-S validation).  Switching the F3 probe off — that is,
+re-running with \verb|--readout_probe_loss_weight 0.0| as the only
+flag change — multiplies $\dnm$ by $\sim\!8\times$ at both scales:
+$+1.32 \pm 0.53$ nats at 0.6B ($n=4$ seeds, v27b) and $+0.93$ nats at
+1.7B ($n=2$ seeds, v28).  Two single-variable ablations confirm that
+the iterative readout depth (v27a) and the $\amem$-floor (v27c) are
+individually load-bearing: removing either drives $\dnm$ to
+$\approx 0$ or below.  Removing the F3 probe alone, by contrast,
+\emph{strengthens} the result.
+
+\begin{table}[t]
+\centering
+\caption{F3-OFF (v27b at 0.6B; v28 at 1.7B) versus F3-ON (v24a at 0.6B;
+v25a at 1.7B), evaluated on the same 50 LongMemEval-S validation
+chains.  The only flag that varies between F3-ON and F3-OFF is
+\texttt{--readout\_probe\_loss\_weight}; chain-shuffle $\dsh$ remains
+within $\pm 0.02$ nats throughout, supporting chain-specificity.
+Standard deviations reported across seeds.}
+\label{tab:f3_off_headline}
+\small
+\begin{tabular}{llrrr}
+\toprule
+Run & Scale (n seeds) & $\dnm$ (nats) & $\dsh$ (nats) & evidence\_lift \\
+\midrule
+v24a (F3-ON)  & 0.6B ($n=3$) & $+0.162 \pm 0.083$ & $+0.007 \pm 0.008$ & $+0.005 \pm 0.003$ \\
+v27b (F3-OFF) & 0.6B ($n=4$) & $+1.323 \pm 0.530$ & $+0.000 \pm 0.010$ & $+0.001 \pm 0.006$ \\
+\midrule
+v25a (F3-ON)  & 1.7B ($n=2$) & $+0.118$           & $+0.003$           & $-0.009$ \\
+v28  (F3-OFF) & 1.7B ($n=2$) & $+0.926$           & $-0.005$           & $-0.001$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Chain-Level Permutation Test.}
+The seed-level standard deviation at $n=4$ (0.530 nats) is large
+relative to the mean.  We therefore certify the effect against a
+chain-level paired sign-flip permutation test that exploits the 50
+paired chains rather than the 7 paired seeds.  For each chain $c$
+define $\delta_c = \mathrm{mean}_{\mathrm{F3\text{-}OFF}}[\mathrm{CE}_{\mathrm{nomem}}(c) - \mathrm{CE}_{\mathrm{mem}}(c)] - \mathrm{mean}_{\mathrm{F3\text{-}ON}}[\mathrm{CE}_{\mathrm{nomem}}(c) - \mathrm{CE}_{\mathrm{mem}}(c)]$;
+under $H_0$ (F3 has no causal effect on chain-level memory benefit),
+the F3-ON / F3-OFF labels are exchangeable per chain so
+$\mathrm{sign}(\delta_c)$ is i.i.d.\ $\pm 1$.  The observed mean is
+$+1.09$ nats per chain (95\% bootstrap CI $[+0.79, +1.43]$); zero of
+10{,}000 sign-flip permutations matched its magnitude (one-sided
+$p < 10^{-4}$).  The effect is not driven by a few chains: 47 of 50
+chains favor F3-OFF (one-sided sign-test $p = 1.9\times10^{-11}$), the
+per-chain median is $+0.59$ nats, and the single worst chain is
+within $0.1$ nats of zero.  Each of the twelve cross-seed pairwise
+comparisons has F3-OFF winning on at least 40 of 50 chains (range
+40--49); the 1.7B replication, $n=2$ seeds, records $44/50$ chains
+positive on $\dnm$ at each individual seed and is reported as
+supportive but not formally tested.  The test certifies the effect
+within our experimental envelope; it does not certify generalization
+across architectures, corpora, or scales beyond 1.7B.
+
+\paragraph{Why The F3 Probe Hurts.}
+The F3 probe asks the readout to recover a chain-identifying signal
+directly from $\Mc$.  The v27b/v28 result shows that joint LM-NLL
+training alone produces a richer chain-conditional context than
+supervising the readout for chain identification: the probe's
+gradient pulls the readout toward a chain-ID decoder, while the
+gradient LM-NLL provides asks the readout to compress the chain into
+a context vector that lowers next-token loss on \emph{any} future
+callback in the chain.  Removing the probe lets the latter dominate.
+The chain-shuffle confound $\dsh \approx 0$ across all six v27b/v28
+seeds confirms that the resulting $\Mc$ is chain-specific; the small
+$\mathrm{evidence\_lift}$ confirms that the writer is compressing
+chain-conditional context (style, topic, vocabulary, prior turns)
+rather than memorising the literal answer-bearing session.  This
+makes the F3 prescription a falsified ideology-level intervention:
+auxiliary readout supervision is the standard fix proposed in the
+joint-training literature and partially in the frozen-backbone
+literature for the writer-objective failure mode, and is empirically
+shown here to backfire.
+
 \section{Prescription: F2 NIAH Writer Warmup}
 
 The F2 prescription is to add a writer-side extractive objective before
