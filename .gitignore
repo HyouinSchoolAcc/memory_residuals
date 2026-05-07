@@ -18,7 +18,14 @@ output
 #   their launch command.
 
 # Training & sync logs (one .log per cell, paired with runs/<cell>/).
-logs/
+# Use logs/* (not logs/) so that explicit negations below can re-include
+# specific subtrees that ship as reviewer-relevant evidence.
+logs/*
+# Exception: the TTT-readout audit logs are reviewer-relevant evidence
+# for Paper C Table 5 / Appendix D, so they ship alongside the JSONs
+# in results/ttt_mc_v27b_v28/.
+!logs/ttt_mc_v27b_v28/
+logs/ttt_mc_v27b_v28/*.pid
 
 # Large pre-tokenised corpora. Built by tools/build_*; cited in
 # runs.md by filename. Too big for git; regenerable from source.
@@ -57,6 +64,12 @@ tools/cloud_watchdog/.ntfy_topic
 *.nav
 *.snm
 *.vrb
+
+# Re-include the TTT-readout audit logs (re-stated here because the
+# *.log / *.out LaTeX-byproduct rules above would otherwise re-ignore
+# them after the logs/* exception block).
+!logs/ttt_mc_v27b_v28/*.log
+!logs/ttt_mc_v27b_v28/*.out
 
 # Python bytecode cache (covers nested __pycache__ trees as well).
 **/__pycache__/

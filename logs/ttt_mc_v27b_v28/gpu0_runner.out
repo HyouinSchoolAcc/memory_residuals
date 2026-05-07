@@ -1,0 +1,337 @@
+============================================
+RUN: v27b_seed1 preset=0p6b mode=v_only ckpt=output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights:  36%|███▋      | 155/427 [00:00<00:00, 1382.77it/s]Loading weights:  70%|██████▉   | 298/427 [00:00<00:00, 1406.05it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 1408.88it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.361 ||W_K||=20.345 ||W_V||=20.365
+  chain 2/16 | mode=v_only | ev_loss 1.936 -> 1.663 | cb_ce writer=1.650 floor=1.688 ttt=2.062 | lift_floor-ttt=-0.374 | elapsed 21s
+  chain 4/16 | mode=v_only | ev_loss 1.449 -> 1.134 | cb_ce writer=3.177 floor=3.184 ttt=3.635 | lift_floor-ttt=-0.451 | elapsed 43s
+  chain 6/16 | mode=v_only | ev_loss 1.649 -> 1.360 | cb_ce writer=2.992 floor=3.044 ttt=3.253 | lift_floor-ttt=-0.209 | elapsed 65s
+  chain 8/16 | mode=v_only | ev_loss 1.700 -> 1.384 | cb_ce writer=2.928 floor=2.860 ttt=3.055 | lift_floor-ttt=-0.195 | elapsed 86s
+  chain 10/16 | mode=v_only | ev_loss 1.674 -> 1.374 | cb_ce writer=3.590 floor=3.624 ttt=6.067 | lift_floor-ttt=-2.444 | elapsed 108s
+  chain 12/16 | mode=v_only | ev_loss 1.699 -> 1.373 | cb_ce writer=2.144 floor=2.125 ttt=2.213 | lift_floor-ttt=-0.087 | elapsed 130s
+  chain 14/16 | mode=v_only | ev_loss 2.326 -> 2.002 | cb_ce writer=3.308 floor=3.299 ttt=3.318 | lift_floor-ttt=-0.019 | elapsed 150s
+  chain 16/16 | mode=v_only | ev_loss 1.535 -> 1.205 | cb_ce writer=3.221 floor=3.061 ttt=3.254 | lift_floor-ttt=-0.193 | elapsed 172s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout v_only) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.9071
+  ce_floor      : 2.9081
+  ce_ttt        : 3.3694
+  TTT lift vs floor : -0.4613  <-- DECISION
+  TTT lift vs writer: -0.4623
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed1__0p6b__v_only.json
+============================================
+RUN: v27b_seed1 preset=0p6b mode=qkv ckpt=output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 5578.57it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.361 ||W_K||=20.345 ||W_V||=20.365
+  chain 2/16 | mode=qkv | ev_loss 1.936 -> 1.620 | cb_ce writer=1.650 floor=1.688 ttt=2.603 | lift_floor-ttt=-0.914 | elapsed 22s
+  chain 4/16 | mode=qkv | ev_loss 1.449 -> 1.098 | cb_ce writer=3.177 floor=3.184 ttt=3.497 | lift_floor-ttt=-0.312 | elapsed 43s
+  chain 6/16 | mode=qkv | ev_loss 1.649 -> 1.281 | cb_ce writer=2.992 floor=3.044 ttt=3.430 | lift_floor-ttt=-0.386 | elapsed 64s
+  chain 8/16 | mode=qkv | ev_loss 1.700 -> 1.314 | cb_ce writer=2.928 floor=2.860 ttt=3.026 | lift_floor-ttt=-0.166 | elapsed 86s
+  chain 10/16 | mode=qkv | ev_loss 1.674 -> 1.325 | cb_ce writer=3.590 floor=3.624 ttt=5.537 | lift_floor-ttt=-1.913 | elapsed 108s
+  chain 12/16 | mode=qkv | ev_loss 1.699 -> 1.318 | cb_ce writer=2.144 floor=2.125 ttt=2.132 | lift_floor-ttt=-0.006 | elapsed 130s
+  chain 14/16 | mode=qkv | ev_loss 2.326 -> 1.934 | cb_ce writer=3.308 floor=3.299 ttt=3.456 | lift_floor-ttt=-0.157 | elapsed 151s
+  chain 16/16 | mode=qkv | ev_loss 1.535 -> 1.139 | cb_ce writer=3.221 floor=3.061 ttt=3.370 | lift_floor-ttt=-0.309 | elapsed 173s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.9071
+  ce_floor      : 2.9081
+  ce_ttt        : 3.2991
+  TTT lift vs floor : -0.3910  <-- DECISION
+  TTT lift vs writer: -0.3920
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed1__0p6b__qkv.json
+============================================
+RUN: v27b_seed1 preset=0p6b mode=qkv_reset ckpt=output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 7101.41it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.361 ||W_K||=20.345 ||W_V||=20.365
+  chain 2/16 | mode=qkv_reset | ev_loss 1.922 -> 1.599 | cb_ce writer=1.650 floor=1.688 ttt=3.342 | lift_floor-ttt=-1.653 | elapsed 21s
+  chain 4/16 | mode=qkv_reset | ev_loss 1.425 -> 1.069 | cb_ce writer=3.177 floor=3.184 ttt=3.914 | lift_floor-ttt=-0.730 | elapsed 43s
+  chain 6/16 | mode=qkv_reset | ev_loss 1.635 -> 1.278 | cb_ce writer=2.992 floor=3.044 ttt=3.152 | lift_floor-ttt=-0.108 | elapsed 65s
+  chain 8/16 | mode=qkv_reset | ev_loss 1.694 -> 1.361 | cb_ce writer=2.928 floor=2.860 ttt=2.866 | lift_floor-ttt=-0.006 | elapsed 86s
+  chain 10/16 | mode=qkv_reset | ev_loss 1.666 -> 1.334 | cb_ce writer=3.590 floor=3.624 ttt=5.879 | lift_floor-ttt=-2.255 | elapsed 108s
+  chain 12/16 | mode=qkv_reset | ev_loss 1.715 -> 1.338 | cb_ce writer=2.144 floor=2.125 ttt=2.082 | lift_floor-ttt=+0.043 | elapsed 129s
+  chain 14/16 | mode=qkv_reset | ev_loss 2.300 -> 1.976 | cb_ce writer=3.308 floor=3.299 ttt=3.198 | lift_floor-ttt=+0.101 | elapsed 151s
+  chain 16/16 | mode=qkv_reset | ev_loss 1.518 -> 1.159 | cb_ce writer=3.221 floor=3.061 ttt=3.220 | lift_floor-ttt=-0.159 | elapsed 173s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv_reset) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed1_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.9071
+  ce_floor      : 2.9081
+  ce_ttt        : 3.2885
+  TTT lift vs floor : -0.3803  <-- DECISION
+  TTT lift vs writer: -0.3814
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed1__0p6b__qkv_reset.json
+============================================
+RUN: v27b_seed2 preset=0p6b mode=v_only ckpt=output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights:  95%|█████████▍| 405/427 [00:00<00:00, 3932.81it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 4059.34it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.390 ||W_K||=20.372 ||W_V||=20.373
+  chain 2/16 | mode=v_only | ev_loss 1.916 -> 1.634 | cb_ce writer=1.699 floor=1.743 ttt=1.931 | lift_floor-ttt=-0.188 | elapsed 21s
+  chain 4/16 | mode=v_only | ev_loss 1.443 -> 1.139 | cb_ce writer=3.660 floor=3.641 ttt=4.528 | lift_floor-ttt=-0.886 | elapsed 43s
+  chain 6/16 | mode=v_only | ev_loss 1.640 -> 1.311 | cb_ce writer=3.454 floor=3.445 ttt=3.185 | lift_floor-ttt=+0.260 | elapsed 65s
+  chain 8/16 | mode=v_only | ev_loss 1.691 -> 1.409 | cb_ce writer=3.279 floor=3.343 ttt=3.422 | lift_floor-ttt=-0.080 | elapsed 86s
+  chain 10/16 | mode=v_only | ev_loss 1.665 -> 1.358 | cb_ce writer=3.251 floor=3.190 ttt=4.694 | lift_floor-ttt=-1.503 | elapsed 108s
+  chain 12/16 | mode=v_only | ev_loss 1.720 -> 1.420 | cb_ce writer=2.117 floor=2.085 ttt=2.076 | lift_floor-ttt=+0.009 | elapsed 130s
+  chain 14/16 | mode=v_only | ev_loss 2.321 -> 1.968 | cb_ce writer=3.028 floor=3.032 ttt=3.270 | lift_floor-ttt=-0.238 | elapsed 151s
+  chain 16/16 | mode=v_only | ev_loss 1.527 -> 1.164 | cb_ce writer=2.226 floor=2.170 ttt=2.672 | lift_floor-ttt=-0.502 | elapsed 173s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout v_only) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.6489
+  ce_floor      : 2.6526
+  ce_ttt        : 3.3012
+  TTT lift vs floor : -0.6485  <-- DECISION
+  TTT lift vs writer: -0.6523
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed2__0p6b__v_only.json
+============================================
+RUN: v27b_seed2 preset=0p6b mode=qkv ckpt=output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 7774.55it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.390 ||W_K||=20.372 ||W_V||=20.373
+  chain 2/16 | mode=qkv | ev_loss 1.916 -> 1.545 | cb_ce writer=1.699 floor=1.743 ttt=2.567 | lift_floor-ttt=-0.823 | elapsed 22s
+  chain 4/16 | mode=qkv | ev_loss 1.443 -> 1.072 | cb_ce writer=3.660 floor=3.641 ttt=4.572 | lift_floor-ttt=-0.930 | elapsed 44s
+  chain 6/16 | mode=qkv | ev_loss 1.640 -> 1.242 | cb_ce writer=3.454 floor=3.445 ttt=3.204 | lift_floor-ttt=+0.241 | elapsed 67s
+  chain 8/16 | mode=qkv | ev_loss 1.691 -> 1.350 | cb_ce writer=3.279 floor=3.343 ttt=3.313 | lift_floor-ttt=+0.030 | elapsed 89s
+  chain 10/16 | mode=qkv | ev_loss 1.665 -> 1.296 | cb_ce writer=3.251 floor=3.190 ttt=6.074 | lift_floor-ttt=-2.884 | elapsed 111s
+  chain 12/16 | mode=qkv | ev_loss 1.720 -> 1.342 | cb_ce writer=2.117 floor=2.085 ttt=2.133 | lift_floor-ttt=-0.048 | elapsed 133s
+  chain 14/16 | mode=qkv | ev_loss 2.321 -> 1.885 | cb_ce writer=3.028 floor=3.032 ttt=3.260 | lift_floor-ttt=-0.227 | elapsed 155s
+  chain 16/16 | mode=qkv | ev_loss 1.527 -> 1.083 | cb_ce writer=2.226 floor=2.170 ttt=3.384 | lift_floor-ttt=-1.214 | elapsed 178s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.6489
+  ce_floor      : 2.6526
+  ce_ttt        : 3.8430
+  TTT lift vs floor : -1.1904  <-- DECISION
+  TTT lift vs writer: -1.1941
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed2__0p6b__qkv.json
+============================================
+RUN: v27b_seed2 preset=0p6b mode=qkv_reset ckpt=output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights:  82%|████████▏ | 350/427 [00:00<00:00, 3486.28it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 3526.92it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.390 ||W_K||=20.372 ||W_V||=20.373
+  chain 2/16 | mode=qkv_reset | ev_loss 1.912 -> 1.589 | cb_ce writer=1.699 floor=1.743 ttt=1.847 | lift_floor-ttt=-0.104 | elapsed 22s
+  chain 4/16 | mode=qkv_reset | ev_loss 1.435 -> 1.057 | cb_ce writer=3.660 floor=3.641 ttt=3.889 | lift_floor-ttt=-0.248 | elapsed 43s
+  chain 6/16 | mode=qkv_reset | ev_loss 1.642 -> 1.268 | cb_ce writer=3.454 floor=3.445 ttt=3.313 | lift_floor-ttt=+0.132 | elapsed 65s
+  chain 8/16 | mode=qkv_reset | ev_loss 1.690 -> 1.357 | cb_ce writer=3.279 floor=3.343 ttt=3.358 | lift_floor-ttt=-0.016 | elapsed 87s
+  chain 10/16 | mode=qkv_reset | ev_loss 1.658 -> 1.342 | cb_ce writer=3.251 floor=3.190 ttt=5.558 | lift_floor-ttt=-2.368 | elapsed 108s
+  chain 12/16 | mode=qkv_reset | ev_loss 1.719 -> 1.358 | cb_ce writer=2.117 floor=2.085 ttt=2.151 | lift_floor-ttt=-0.066 | elapsed 130s
+  chain 14/16 | mode=qkv_reset | ev_loss 2.287 -> 1.925 | cb_ce writer=3.028 floor=3.032 ttt=3.183 | lift_floor-ttt=-0.150 | elapsed 152s
+  chain 16/16 | mode=qkv_reset | ev_loss 1.504 -> 1.105 | cb_ce writer=2.226 floor=2.170 ttt=2.381 | lift_floor-ttt=-0.211 | elapsed 174s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv_reset) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed2_0p6b_frozen_local/final
+  n_chains      : 16
+  ce_writer     : 2.6489
+  ce_floor      : 2.6526
+  ce_ttt        : 3.3724
+  TTT lift vs floor : -0.7198  <-- DECISION
+  TTT lift vs writer: -0.7235
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed2__0p6b__qkv_reset.json
+============================================
+RUN: v27b_seed3 preset=0p6b mode=v_only ckpt=output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights:  87%|████████▋ | 372/427 [00:00<00:00, 3645.60it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 3726.93it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.374 ||W_K||=20.354 ||W_V||=20.391
+  chain 2/16 | mode=v_only | ev_loss 1.900 -> 1.659 | cb_ce writer=1.412 floor=1.417 ttt=2.236 | lift_floor-ttt=-0.819 | elapsed 21s
+  chain 4/16 | mode=v_only | ev_loss 1.450 -> 1.123 | cb_ce writer=2.909 floor=2.911 ttt=3.642 | lift_floor-ttt=-0.730 | elapsed 43s
+  chain 6/16 | mode=v_only | ev_loss 1.658 -> 1.364 | cb_ce writer=3.313 floor=3.319 ttt=3.199 | lift_floor-ttt=+0.120 | elapsed 65s
+  chain 8/16 | mode=v_only | ev_loss 1.707 -> 1.397 | cb_ce writer=2.717 floor=2.726 ttt=2.942 | lift_floor-ttt=-0.216 | elapsed 86s
+  chain 10/16 | mode=v_only | ev_loss 1.669 -> 1.385 | cb_ce writer=1.964 floor=1.875 ttt=3.631 | lift_floor-ttt=-1.756 | elapsed 108s
+  chain 12/16 | mode=v_only | ev_loss 1.728 -> 1.371 | cb_ce writer=2.247 floor=2.234 ttt=2.365 | lift_floor-ttt=-0.131 | elapsed 130s
+  chain 14/16 | mode=v_only | ev_loss 2.341 -> 1.935 | cb_ce writer=3.147 floor=3.151 ttt=3.546 | lift_floor-ttt=-0.395 | elapsed 151s
+  chain 16/16 | mode=v_only | ev_loss 1.543 -> 1.184 | cb_ce writer=2.066 floor=2.051 ttt=2.247 | lift_floor-ttt=-0.196 | elapsed 173s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout v_only) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.4540
+  ce_floor      : 2.4525
+  ce_ttt        : 3.2610
+  TTT lift vs floor : -0.8085  <-- DECISION
+  TTT lift vs writer: -0.8069
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed3__0p6b__v_only.json
+============================================
+RUN: v27b_seed3 preset=0p6b mode=qkv ckpt=output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 9872.43it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.374 ||W_K||=20.354 ||W_V||=20.391
+  chain 2/16 | mode=qkv | ev_loss 1.900 -> 1.589 | cb_ce writer=1.412 floor=1.417 ttt=1.653 | lift_floor-ttt=-0.237 | elapsed 22s
+  chain 4/16 | mode=qkv | ev_loss 1.450 -> 1.068 | cb_ce writer=2.909 floor=2.911 ttt=4.126 | lift_floor-ttt=-1.215 | elapsed 43s
+  chain 6/16 | mode=qkv | ev_loss 1.658 -> 1.306 | cb_ce writer=3.313 floor=3.319 ttt=3.452 | lift_floor-ttt=-0.134 | elapsed 65s
+  chain 8/16 | mode=qkv | ev_loss 1.707 -> 1.337 | cb_ce writer=2.717 floor=2.726 ttt=2.911 | lift_floor-ttt=-0.184 | elapsed 86s
+  chain 10/16 | mode=qkv | ev_loss 1.669 -> 1.343 | cb_ce writer=1.964 floor=1.875 ttt=2.523 | lift_floor-ttt=-0.647 | elapsed 108s
+  chain 12/16 | mode=qkv | ev_loss 1.728 -> 1.319 | cb_ce writer=2.247 floor=2.234 ttt=2.115 | lift_floor-ttt=+0.119 | elapsed 130s
+  chain 14/16 | mode=qkv | ev_loss 2.341 -> 1.887 | cb_ce writer=3.147 floor=3.151 ttt=3.485 | lift_floor-ttt=-0.335 | elapsed 152s
+  chain 16/16 | mode=qkv | ev_loss 1.543 -> 1.131 | cb_ce writer=2.066 floor=2.051 ttt=2.171 | lift_floor-ttt=-0.119 | elapsed 174s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.4540
+  ce_floor      : 2.4525
+  ce_ttt        : 2.9775
+  TTT lift vs floor : -0.5250  <-- DECISION
+  TTT lift vs writer: -0.5235
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed3__0p6b__qkv.json
+============================================
+RUN: v27b_seed3 preset=0p6b mode=qkv_reset ckpt=output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 7588.17it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.374 ||W_K||=20.354 ||W_V||=20.391
+  chain 2/16 | mode=qkv_reset | ev_loss 1.904 -> 1.513 | cb_ce writer=1.412 floor=1.417 ttt=2.937 | lift_floor-ttt=-1.521 | elapsed 22s
+  chain 4/16 | mode=qkv_reset | ev_loss 1.425 -> 1.070 | cb_ce writer=2.909 floor=2.911 ttt=3.510 | lift_floor-ttt=-0.599 | elapsed 43s
+  chain 6/16 | mode=qkv_reset | ev_loss 1.632 -> 1.274 | cb_ce writer=3.313 floor=3.319 ttt=3.360 | lift_floor-ttt=-0.041 | elapsed 65s
+  chain 8/16 | mode=qkv_reset | ev_loss 1.693 -> 1.355 | cb_ce writer=2.717 floor=2.726 ttt=2.870 | lift_floor-ttt=-0.144 | elapsed 87s
+  chain 10/16 | mode=qkv_reset | ev_loss 1.660 -> 1.317 | cb_ce writer=1.964 floor=1.875 ttt=7.202 | lift_floor-ttt=-5.326 | elapsed 108s
+  chain 12/16 | mode=qkv_reset | ev_loss 1.709 -> 1.286 | cb_ce writer=2.247 floor=2.234 ttt=2.225 | lift_floor-ttt=+0.009 | elapsed 130s
+  chain 14/16 | mode=qkv_reset | ev_loss 2.316 -> 1.911 | cb_ce writer=3.147 floor=3.151 ttt=3.339 | lift_floor-ttt=-0.189 | elapsed 151s
+  chain 16/16 | mode=qkv_reset | ev_loss 1.537 -> 1.174 | cb_ce writer=2.066 floor=2.051 ttt=2.385 | lift_floor-ttt=-0.334 | elapsed 173s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv_reset) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.4540
+  ce_floor      : 2.4525
+  ce_ttt        : 3.4998
+  TTT lift vs floor : -1.0473  <-- DECISION
+  TTT lift vs writer: -1.0458
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed3__0p6b__qkv_reset.json
+============================================
+RUN: v27b_seed4 preset=0p6b mode=v_only ckpt=output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights:  84%|████████▍ | 358/427 [00:00<00:00, 3571.93it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 3625.89it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.424 ||W_K||=20.425 ||W_V||=20.371
+  chain 2/16 | mode=v_only | ev_loss 1.906 -> 1.492 | cb_ce writer=1.270 floor=1.255 ttt=3.427 | lift_floor-ttt=-2.172 | elapsed 20s
+  chain 4/16 | mode=v_only | ev_loss 1.447 -> 1.071 | cb_ce writer=3.426 floor=3.453 ttt=4.284 | lift_floor-ttt=-0.831 | elapsed 42s
+  chain 6/16 | mode=v_only | ev_loss 1.626 -> 1.215 | cb_ce writer=3.180 floor=3.156 ttt=3.568 | lift_floor-ttt=-0.412 | elapsed 64s
+  chain 8/16 | mode=v_only | ev_loss 1.690 -> 1.338 | cb_ce writer=2.966 floor=3.014 ttt=3.112 | lift_floor-ttt=-0.098 | elapsed 86s
+  chain 10/16 | mode=v_only | ev_loss 1.672 -> 1.375 | cb_ce writer=3.197 floor=3.352 ttt=4.425 | lift_floor-ttt=-1.073 | elapsed 108s
+  chain 12/16 | mode=v_only | ev_loss 1.748 -> 1.297 | cb_ce writer=2.541 floor=2.536 ttt=2.965 | lift_floor-ttt=-0.429 | elapsed 130s
+  chain 14/16 | mode=v_only | ev_loss 2.336 -> 1.897 | cb_ce writer=3.401 floor=3.385 ttt=3.596 | lift_floor-ttt=-0.211 | elapsed 152s
+  chain 16/16 | mode=v_only | ev_loss 1.542 -> 1.098 | cb_ce writer=2.463 floor=2.482 ttt=2.493 | lift_floor-ttt=-0.010 | elapsed 175s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout v_only) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.6360
+  ce_floor      : 2.6422
+  ce_ttt        : 3.3642
+  TTT lift vs floor : -0.7220  <-- DECISION
+  TTT lift vs writer: -0.7282
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed4__0p6b__v_only.json
+============================================
+RUN: v27b_seed4 preset=0p6b mode=qkv ckpt=output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 10144.65it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.424 ||W_K||=20.425 ||W_V||=20.371
+  chain 2/16 | mode=qkv | ev_loss 1.906 -> 1.335 | cb_ce writer=1.270 floor=1.255 ttt=3.300 | lift_floor-ttt=-2.045 | elapsed 21s
+  chain 4/16 | mode=qkv | ev_loss 1.447 -> 0.926 | cb_ce writer=3.426 floor=3.453 ttt=4.191 | lift_floor-ttt=-0.738 | elapsed 43s
+  chain 6/16 | mode=qkv | ev_loss 1.626 -> 1.074 | cb_ce writer=3.180 floor=3.156 ttt=3.937 | lift_floor-ttt=-0.781 | elapsed 65s
+  chain 8/16 | mode=qkv | ev_loss 1.690 -> 1.231 | cb_ce writer=2.966 floor=3.014 ttt=2.889 | lift_floor-ttt=+0.126 | elapsed 87s
+  chain 10/16 | mode=qkv | ev_loss 1.672 -> 1.195 | cb_ce writer=3.197 floor=3.352 ttt=2.262 | lift_floor-ttt=+1.090 | elapsed 109s
+  chain 12/16 | mode=qkv | ev_loss 1.748 -> 1.177 | cb_ce writer=2.541 floor=2.536 ttt=2.592 | lift_floor-ttt=-0.057 | elapsed 130s
+  chain 14/16 | mode=qkv | ev_loss 2.336 -> 1.788 | cb_ce writer=3.401 floor=3.385 ttt=3.525 | lift_floor-ttt=-0.141 | elapsed 151s
+  chain 16/16 | mode=qkv | ev_loss 1.542 -> 0.997 | cb_ce writer=2.463 floor=2.482 ttt=2.512 | lift_floor-ttt=-0.030 | elapsed 174s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.6360
+  ce_floor      : 2.6422
+  ce_ttt        : 3.6182
+  TTT lift vs floor : -0.9759  <-- DECISION
+  TTT lift vs writer: -0.9821
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed4__0p6b__qkv.json
+============================================
+RUN: v27b_seed4 preset=0p6b mode=qkv_reset ckpt=output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+============================================
+loading output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+Loading weights:   0%|          | 0/427 [00:00<?, ?it/s]Loading weights: 100%|██████████| 427/427 [00:00<00:00, 8226.54it/s]
+loading paper_artifacts/chains/lme_val_s512_evpos.pt
+readout snapshot: ||W_Q||=20.424 ||W_K||=20.425 ||W_V||=20.371
+  chain 2/16 | mode=qkv_reset | ev_loss 1.924 -> 1.394 | cb_ce writer=1.270 floor=1.255 ttt=2.712 | lift_floor-ttt=-1.456 | elapsed 22s
+  chain 4/16 | mode=qkv_reset | ev_loss 1.428 -> 0.976 | cb_ce writer=3.426 floor=3.453 ttt=4.614 | lift_floor-ttt=-1.161 | elapsed 44s
+  chain 6/16 | mode=qkv_reset | ev_loss 1.605 -> 1.037 | cb_ce writer=3.180 floor=3.156 ttt=3.792 | lift_floor-ttt=-0.635 | elapsed 67s
+  chain 8/16 | mode=qkv_reset | ev_loss 1.700 -> 1.124 | cb_ce writer=2.966 floor=3.014 ttt=2.960 | lift_floor-ttt=+0.054 | elapsed 88s
+  chain 10/16 | mode=qkv_reset | ev_loss 1.651 -> 1.130 | cb_ce writer=3.197 floor=3.352 ttt=5.081 | lift_floor-ttt=-1.729 | elapsed 110s
+  chain 12/16 | mode=qkv_reset | ev_loss 1.747 -> 1.187 | cb_ce writer=2.541 floor=2.536 ttt=2.635 | lift_floor-ttt=-0.100 | elapsed 132s
+  chain 14/16 | mode=qkv_reset | ev_loss 2.315 -> 1.739 | cb_ce writer=3.401 floor=3.385 ttt=3.682 | lift_floor-ttt=-0.297 | elapsed 154s
+  chain 16/16 | mode=qkv_reset | ev_loss 1.531 -> 1.003 | cb_ce writer=2.463 floor=2.482 ttt=2.457 | lift_floor-ttt=+0.025 | elapsed 176s
+
+========================================================================
+RESULT: TTT-on-(M_c, readout qkv_reset) init=writer K=80
+  ckpt          : output/chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200/final
+  n_chains      : 16
+  ce_writer     : 2.6360
+  ce_floor      : 2.6422
+  ce_ttt        : 3.7165
+  TTT lift vs floor : -1.0743  <-- DECISION
+  TTT lift vs writer: -1.0805
+  VERDICT       : NEGATIVE: read-side architecture itself cannot represent chain-specific recall. Multi-layer readout depth becomes load-bearing on top of probe loss.
+========================================================================
+wrote summary -> results/ttt_mc_v27b_v28/v27b_seed4__0p6b__qkv_reset.json
+TTT-readout audit on v27b/v28 DONE  (log: logs/ttt_mc_v27b_v28/gpu0_20260506_193031.log)
