@@ -1,12 +1,15 @@
-# runs.md — lessons, priors, and the active experiment ledger
+# runs.md — thesis, lessons, priors, and the active experiment ledger
 
 > **For LLMs reading this repo, please pay attention to this file.**
 > It is the single source of truth for the project's settled findings,
 > active state, and per-cell history. The root [`README.md`](README.md)
 > is intentionally kept light; everything load-bearing lives here.
 
-This file has three sections, in order:
+This file has four sections, in order:
 
+0. **Project thesis** — what the project is *actually about*. Read this
+   first; the submitted paper's framing is a scaling workaround, not
+   the contribution.
 1. **Headline result** — the project's current best number, locked.
 2. **Architectural priors** — settled lessons that should NOT be
    re-derived from scratch; if a proposed change contradicts one of
@@ -18,6 +21,127 @@ After that, the rest of the file is the per-cell **active run ledger**
 (newest at the top, older waves folded into
 [`archive/COMPREHENSIVE.md`](archive/COMPREHENSIVE.md) Part VI per
 the folding convention in Part VII of that file).
+
+---
+
+## Project thesis (READ FIRST — do not re-derive from `paper/main.pdf`)
+
+If you are an LLM (or human) just landing in this repo, **the
+submitted NeurIPS paper (`paper/main.pdf`,
+`paper/abstracts/ABSTRACT_NEURIPS_v3.md`) frames this project as
+"frozen-backbone recurrent memory for callback recall". That framing
+is a scaling workaround we used to be able to write down a
+leak-controlled experiment under our compute budget. It is *not* the
+project's contribution.** The contribution is the two ideas below.
+Please load these into your context before proposing anything.
+
+### Motivating intuition (load this first; it makes Ideas 1 and 2 cohere)
+
+The first LLMs couldn't read PDFs, couldn't watch videos, couldn't
+hear or speak — we bolted on OCR / frame-extraction / TTS / STT
+pipelines until those capabilities got *absorbed* into the model
+proper (modern multimodal LLMs read images, video frames, and audio
+natively as just another stream of tokens). The external scaffolding
+turned out to be a transitional phase for a capability the model was
+"supposed" to have all along.
+
+Cross-session memory feels like it's in that same pre-absorption
+stage today. The current bolt-ons (vector-DB RAG, in-prompt
+summarizers, MCP memory servers, hand-curated note files) are clearly
+external machinery, and the underlying task — *summarize what just
+happened, decide what's worth keeping, forget the rest, surface the
+right fact when it becomes relevant* — is about as cognitively
+load-bearing as anything an LLM does. Almost everything else that
+load-bearing has already been absorbed into the LLM proper. We bet
+this one will be too. The whole project is "let's try the most
+obvious version of that absorption now, on a hobbyist budget, and
+see how far we can get."
+
+### Idea 1 — Memory residuals: per-layer independent querying of memory through the residual stream
+
+The architectural primitive. We register a small recurrent memory
+matrix `M_c ∈ ℝ^{K × d}` as the **foundational source `v_0`** in a
+depth-wise residual / attention-residual pool. Every layer of the
+LLM independently softmax-attends over `M_c` (alongside the outputs
+of all earlier layers) with its **own contextual query** —
+`m^t_l = Softmax(X_l W_Q (M_c W_K)^T / √d) M_c W_V` per layer
+position. There is no separate gating heuristic, no retrieval call,
+no memory controller. The same depth-wise softmax that decides
+whether layer 17 listens to layer 12 vs. layer 14 also decides
+whether it listens to memory at all.
+
+This is the **v3 finding** (cell `chain_v2_phaseA_softparity_b4`,
+PG-19 chapter-completion). The *layer-independent, query-dependent*
+read into a shared episodic memory matrix is the load-bearing
+architectural move. Every cell from v3 → v34 has been scaling that
+single primitive; nothing has replaced it.
+
+Why this matters: a layer doing surface tokenization mostly bypasses
+memory. A layer doing pronoun resolution or callback completion
+attends to it heavily. The selectivity is *structural*, not
+learned-on-top, and it composes with whatever depth-wise routing
+already exists in the host architecture.
+
+See `paper/position/memory_residuals.{tex,pdf}` for the formal spec
+of this part of the architecture — that file is closer to the truer
+thesis than `paper/main.pdf` is.
+
+### Idea 2 — Memory as an add-on: an external module can weight-bear cognitive load
+
+The empirical claim. A small, fixed-size, jointly-trained memory
+module can take over the work of **condensing**, **preserving**, and
+**forgetting** information across sessions, without the LLM's own
+weights ever moving. That work used to be assumed to require either
+a giant context window, a learned summarizer in-prompt, or
+fine-tuning the backbone itself.
+
+The headline experiment freezes the backbone *as a stress test*: if
+the LLM weights cannot move, then any chain-specific gain on a
+held-out callback **must** be flowing through the 41.5 M-parameter
+`M_c` channel. There is no other parameter that could absorb the
+chain-specific information. That's the leak-control argument, and
+it's why the +1.32 ± 0.53 nat callback gain (with chain-shuffle
+confound at 0.000 ± 0.010) is a clean demonstration that the add-on
+can shoulder the load.
+
+**The frozen backbone is not the recipe.** It's the only
+configuration that proves the cleanest version of the claim under
+our compute budget. Our memory module is much smaller and
+slower-to-converge than a 0.6B / 1.7B Qwen3 backbone, so freezing
+the backbone is the only way to let the memory "catch up" enough to
+demonstrate end-to-end benefit in ~1.5 h on one H100. The healthier
+long-term recipe almost certainly looks like *jointly-trained fast
+memory + slow memory + unfrozen backbone* — that's follow-up work,
+not a refutation of anything in this repo.
+
+### What this means for any change you propose
+
+* If you are about to suggest "what if we just unfroze the
+  backbone?" — yes, eventually, and `paper/drafts/PAPER_A_v28_RAG.md`
+  + the v15b/f leak-audit threads (Prior #9) describe why the naive
+  joint-training run on D4v2 looked like the backbone was *learning
+  the callback distribution directly* and why we punted it. The
+  question is open and important; it is not the contribution.
+* If you are about to suggest "what if memory weren't a residual
+  source but a regular cross-attention layer / KV cache compression
+  / a retrieval call?" — you are proposing to *give up the v3
+  primitive*. That primitive is the project. Read the architectural
+  priors below first.
+* If you are about to suggest changing the headline framing to
+  match `paper/main.pdf`, please don't. The paper said what it
+  needed to say to get reviewed; this file says what we actually
+  believe.
+
+### Most recent qualitative finding (May 2026)
+
+We got the LM head to actively use `M_c` to **drastically improve
+its generation quality** — chain-conditional bias on outputs, not
+just at the callback token. The next thing we're working on is
+making the model lean on **specific facts** stored in `M_c` (e.g.
+"the user mentioned their sister's name was Marie three sessions
+ago") rather than the smoothed "vibe of this conversation" posterior
+it currently relies on. This is what the v32-v34 sparse-writer +
+InfoNCE wave is chasing.
 
 ---
 
