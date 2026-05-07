@@ -44,8 +44,9 @@ declare -a CELLS_0P6B=(
   "v27b_seed4|chain_v27b_v24a_no_probe_seed4_0p6b_frozen_gh200"
 )
 declare -a CELLS_1P7B=(
-  "v28a_seed1|chain_v28a_v25a_no_probe_seed1_1p7b_frozen_gh200"
-  "v28b_seed2|chain_v28b_v25a_no_probe_seed2_1p7b_frozen_gh200"
+  "v28a_seed1|chain_v28a_no_probe_seed1_1p7b_frozen_gh200"
+  "v28b_seed2|chain_v28b_no_probe_seed2_1p7b_frozen_gh200"
+  "v28c_seed3|chain_v28c_no_probe_seed3_1p7b_frozen_gh200"
 )
 
 CORPUS=paper_artifacts/chains/lme_val_s512_evpos.pt

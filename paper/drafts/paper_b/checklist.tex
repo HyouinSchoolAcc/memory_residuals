@@ -1,0 +1,74 @@
+% NeurIPS 2026 Paper Checklist for "Attention Parity Beats ReZero".
+% This file is \input{}-ed at the end of the appendix in main.tex.
+
+\section*{NeurIPS Paper Checklist}
+
+\begin{enumerate}
+
+\item {\bf Claims}
+    \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The abstract and \S\ref{sec:intro} state three concrete numerical claims --- ${\sim}2/5$ steps to plateau, $3\times$ routing-mass gap, and $2.5\times$ counterfactual sensitivity --- and \S\ref{sec:headtohead} (Table~\ref{tab:headtohead_traj}) and \S\ref{sec:routing_trace} (Tables~\ref{tab:routing_mass}, \ref{tab:counterfactual}) substantiate each at the stated checkpoints.  We are explicit that the result is at the $0.6$B scale on a single seed (\S\ref{sec:limits}); we do not claim transfer to LoCoMo on the chain-recurrent training cell.
+
+\item {\bf Limitations}
+    \item[] Question: Does the paper discuss the limitations of the work performed by the authors?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:limits} lists the four limitations we know about: (i) single seed for the matched-compute trajectory, (ii) $0.6$B-class scale, (iii) held-out causal effect ceiling at $\Delta(d{=}\mathrm{ALL}) \approx +0.013$ nat under plain NLL on PG-19, (iv) the shuffle baseline is uniform-but-not-adversarial.
+
+\item {\bf Theory assumptions and proofs}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper is empirical.  No formal theorems are stated.  The architectural ``parity'' claim --- that the augmented model produces bit-identical logits to the bare backbone at step~$0$ --- is verified numerically in Table~\ref{tab:init_parity} rather than proved.
+
+\item {\bf Experimental result reproducibility}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:setup} pins the backbone (Qwen3-0.6B, frozen), the exact memory hyper-parameters ($K{=}128$, $L_E{=}4$, $N{=}8$ blocks), the optimiser ($\eta_m{=}3{\cdot}10^{-4}$, $\eta_b{=}3{\cdot}10^{-5}$, AdamW $(0.9, 0.95)$, weight decay $0.1$, cosine schedule, $200$ warmup, $5\%$ min-LR), the training loop (TBPTT $k{=}8$, batch $4$ chains, grad-accum $4$, $6{,}000$ steps, single H100 80~GB at bf16), the data (4995 PG-19 books + 30 TV transcripts at $S{=}512$), and the seed ($42$, identical across the three primitives).  The launcher scripts and modeling code are in the supplementary zip.
+
+\item {\bf Open access to data and code}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The supplementary zip contains the modeling code (\texttt{modeling\_memres.py}), the pair-recipe trainer (\texttt{train\_phase1.py}), the named-preset configurations (\texttt{presets.py}), the seven launcher scripts, and the three figure PDFs.  The PG-19 corpus is publicly available; the TV transcripts will be released with the deanonymised camera-ready version under their original licenses.  An anonymised public mirror is available at \url{<anonymised-for-review>}.
+
+\item {\bf Experimental setting/details}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: All training and eval details required to interpret the numerical claims are in \S\ref{sec:setup}, with extended hyper-parameter values reproduced verbatim in the launcher scripts (\texttt{scripts/train\_v11g\_ap\_baseline\_gh200.sh} for the \textsc{attention\_parity} baseline cell and its sister scripts for the variants).
+
+\item {\bf Experiment statistical significance}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The routing-mass probe reports $n=156$ score positions across $40$ held-out chains; the counterfactual probe reports mean~$\pm$~standard deviation across $n=30$ held-out chains.  We report sigma multiples in \S\ref{sec:routing_trace} (parity $d{=}1$: $1.4\sigma$; \textsc{attn\_base}: ${\sim}0.5\sigma$).  The matched-compute trajectory is from a single seed by design (matched-seed comparison across primitives); we say so explicitly in \S\ref{sec:limits}.
+
+\item {\bf Experiments compute resources}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:setup} reports a single H100 80~GB at bf16 with gradient checkpointing for each of the three primitive runs; throughput ${\approx}10{,}800$ tokens/s; ${\sim}10$ wall-clock hours per $6{,}000$-step run.  Total reported compute ${\approx}30$ H100-hours for the three matched primitive runs plus ${\sim}5$ H100-hours for the routing-trace and counterfactual probes.  Preliminary v11 ablation runs (Appendix supplementary scripts) added ${\sim}40$ H100-hours of failed/refined cells before the matched-compute comparison was finalised.
+
+\item {\bf Code of ethics}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The work uses publicly available text corpora (PG-19, LoCoMo, MSC) and a publicly available pretrained backbone (Qwen3-0.6B, Apache-2.0) for an architectural-comparison study with no human subjects, no personally identifiable data, and no deployed system.  We have reviewed the NeurIPS Code of Ethics and find no special-circumstance issues.
+
+\item {\bf Broader impacts}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The contribution is a routing-primitive comparison for a specific architectural recipe (off-sequence recurrent memory in pretrained Transformers).  Positive impact: more sample-efficient, more interpretable long-horizon memory in conversational LLMs.  Negative impact: like any improvement in long-horizon memory it could be repurposed to surveil prior interactions if deployed without user consent; this is a property of any persistent-memory architecture and is independent of the routing primitive studied here.
+
+\item {\bf Safeguards}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper does not release a high-risk pretrained model; the released artefacts are the architectural code, the training scripts, and the figures.  The base model (Qwen3-0.6B) is already publicly released by the upstream authors.
+
+\item {\bf Licenses for existing assets}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Qwen3-0.6B is released under Apache-2.0 by Qwen Team~\cite{qwen3}; PG-19 is released under Apache-2.0 by~\cite{rae2019compressive}; LoCoMo is released under MIT by~\cite{maharana2024locomo}; MSC is released under CC-BY-NC-4.0 by~\cite{xu2022msc}; the TV transcripts are sourced under fair-use research-only terms and are not redistributed.  All licenses are respected by the present non-commercial research use.
+
+\item {\bf New assets}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The new assets released alongside this paper are the modeling code, the pair-recipe trainer, the named-preset configurations, and the launcher scripts; documentation is provided in the supplementary \texttt{README.md} and the in-code docstrings.  No new dataset is released.
+
+\item {\bf Crowdsourcing and research with human subjects}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper does not involve crowdsourcing or research with human subjects.
+
+\item {\bf Institutional review board (IRB) approvals or equivalent for research with human subjects}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper does not involve research with human subjects.
+
+\item {\bf Declaration of LLM usage}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: Large language models were used as writing/editing aides during manuscript preparation but did not contribute to the core methodology, the architectural design, the training cell, or the analysis of results.  Per the NeurIPS LLM policy, this does not require declaration.
+
+\end{enumerate}

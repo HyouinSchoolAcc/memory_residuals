@@ -1,0 +1,232 @@
+{
+  "args": {
+    "input": [
+      "results/eval/routing_v3sp_val.json",
+      "results/eval/routing_v3ab_val.json",
+      "results/eval/routing_v3sp_locomo.json",
+      "results/eval/routing_v3ab_locomo.json"
+    ],
+    "n_boot": 5000,
+    "seed": 42,
+    "top_k": 5,
+    "output": "results/eval/routing_trace_bootstrap_v3.json"
+  },
+  "results": [
+    {
+      "input": "results/eval/routing_v3sp_val.json",
+      "memres_mode": "attention_parity",
+      "n_chains_corpus": 40,
+      "n_score_positions_corpus": 156,
+      "n_sublayers": 55,
+      "bootstrap": {
+        "mean_mem": 0.0004775082742658445,
+        "mean_shuffle": 0.000458168277645632,
+        "gap_pct": 4.221155755172314,
+        "ci_mem": [
+          0.0004509272969001141,
+          0.0005019106430431197
+        ],
+        "ci_shuffle": [
+          0.00042510951282805965,
+          0.0004911749053506425
+        ],
+        "ci_gap_pct": [
+          -3.8488308799014286,
+          12.42392686311287
+        ],
+        "n_chains": 34,
+        "n_samples_mem": 136,
+        "n_samples_shuffle": 64,
+        "n_boot": 5000,
+        "init_floor": 6.099320507318397e-06,
+        "init_floor_multiple_mem": 78.28876572282047,
+        "top_k_sublayers": [
+          {
+            "sublayer": 32,
+            "gap_alpha": 0.00040023879659344683
+          },
+          {
+            "sublayer": 9,
+            "gap_alpha": 0.0003123672099496059
+          },
+          {
+            "sublayer": 20,
+            "gap_alpha": 0.00024645841682933295
+          },
+          {
+            "sublayer": 6,
+            "gap_alpha": 0.00017358989631593123
+          },
+          {
+            "sublayer": 14,
+            "gap_alpha": 0.0001346375387969458
+          }
+        ],
+        "max_sublayer_gap_alpha": 0.00040023879659344683,
+        "max_sublayer_alpha_mem": 0.004448480019844402
+      }
+    },
+    {
+      "input": "results/eval/routing_v3ab_val.json",
+      "memres_mode": "attention_base",
+      "n_chains_corpus": 40,
+      "n_score_positions_corpus": 156,
+      "n_sublayers": 55,
+      "bootstrap": {
+        "mean_mem": 0.0001446546817562652,
+        "mean_shuffle": 0.00014531987639211332,
+        "gap_pct": -0.45774511537102475,
+        "ci_mem": [
+          0.00014089998272378228,
+          0.0001484532924027084
+        ],
+        "ci_shuffle": [
+          0.00014180747042632607,
+          0.00014862039492233338
+        ],
+        "ci_gap_pct": [
+          -3.703685590981276,
+          2.5243823979937074
+        ],
+        "n_chains": 34,
+        "n_samples_mem": 136,
+        "n_samples_shuffle": 64,
+        "n_boot": 5000,
+        "init_floor": 6.099320507318397e-06,
+        "init_floor_multiple_mem": 23.716524091937497,
+        "top_k_sublayers": [
+          {
+            "sublayer": 1,
+            "gap_alpha": 4.023891935088248e-05
+          },
+          {
+            "sublayer": 0,
+            "gap_alpha": 1.792136257696851e-05
+          },
+          {
+            "sublayer": 4,
+            "gap_alpha": 6.455697802798988e-06
+          },
+          {
+            "sublayer": 15,
+            "gap_alpha": 7.807062618255689e-07
+          },
+          {
+            "sublayer": 51,
+            "gap_alpha": 7.398961718919249e-07
+          }
+        ],
+        "max_sublayer_gap_alpha": 4.023891935088248e-05,
+        "max_sublayer_alpha_mem": 0.0026596743286280357
+      }
+    },
+    {
+      "input": "results/eval/routing_v3sp_locomo.json",
+      "memres_mode": "attention_parity",
+      "n_chains_corpus": 10,
+      "n_score_positions_corpus": 40,
+      "n_sublayers": 55,
+      "bootstrap": {
+        "mean_mem": 0.0003087323836454043,
+        "mean_shuffle": 0.00031114788747069557,
+        "gap_pct": -0.7763201752474678,
+        "ci_mem": [
+          0.0002877737954076664,
+          0.0003288626213598501
+        ],
+        "ci_shuffle": [
+          0.00028860022574627814,
+          0.0003342760098243098
+        ],
+        "ci_gap_pct": [
+          -13.113986854731735,
+          10.721927222597063
+        ],
+        "n_chains": 10,
+        "n_samples_mem": 40,
+        "n_samples_shuffle": 30,
+        "n_boot": 5000,
+        "init_floor": 6.099320507318397e-06,
+        "init_floor_multiple_mem": 50.61750456874094,
+        "top_k_sublayers": [
+          {
+            "sublayer": 20,
+            "gap_alpha": 7.226047217262694e-05
+          },
+          {
+            "sublayer": 2,
+            "gap_alpha": 5.198156452614457e-05
+          },
+          {
+            "sublayer": 17,
+            "gap_alpha": 4.409772464829373e-05
+          },
+          {
+            "sublayer": 32,
+            "gap_alpha": 1.7436357082608396e-05
+          },
+          {
+            "sublayer": 28,
+            "gap_alpha": 1.191082377100959e-05
+          }
+        ],
+        "max_sublayer_gap_alpha": 7.226047217262694e-05,
+        "max_sublayer_alpha_mem": 0.003060980645644455
+      }
+    },
+    {
+      "input": "results/eval/routing_v3ab_locomo.json",
+      "memres_mode": "attention_base",
+      "n_chains_corpus": 10,
+      "n_score_positions_corpus": 40,
+      "n_sublayers": 55,
+      "bootstrap": {
+        "mean_mem": 0.0001755344744170609,
+        "mean_shuffle": 0.00017574525194745505,
+        "gap_pct": -0.1199335561322438,
+        "ci_mem": [
+          0.00017320785168007175,
+          0.00017760277673675446
+        ],
+        "ci_shuffle": [
+          0.000172483158477559,
+          0.00017861121102229972
+        ],
+        "ci_gap_pct": [
+          -2.839436083569096,
+          2.5234519139110496
+        ],
+        "n_chains": 10,
+        "n_samples_mem": 40,
+        "n_samples_shuffle": 30,
+        "n_boot": 5000,
+        "init_floor": 6.099320507318397e-06,
+        "init_floor_multiple_mem": 28.779349143309027,
+        "top_k_sublayers": [
+          {
+            "sublayer": 5,
+            "gap_alpha": 1.1599989242204803e-05
+          },
+          {
+            "sublayer": 9,
+            "gap_alpha": 5.013633225373396e-07
+          },
+          {
+            "sublayer": 0,
+            "gap_alpha": 4.811685068189153e-07
+          },
+          {
+            "sublayer": 20,
+            "gap_alpha": 3.8518675463851816e-07
+          },
+          {
+            "sublayer": 19,
+            "gap_alpha": 3.650697010137196e-07
+          }
+        ],
+        "max_sublayer_gap_alpha": 1.1599989242204803e-05,
+        "max_sublayer_alpha_mem": 0.0031646306734029093
+      }
+    }
+  ]
+}
