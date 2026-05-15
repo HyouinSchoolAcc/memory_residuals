@@ -521,6 +521,49 @@ Part VI; v15–v28 active state in the per-cell ledger below.
 # Active run ledger (newest at the top)
 
 
+## Backlog — planned corpora / probes (not started)
+
+Things we want to land in `paper_artifacts/chains/` and `tools/build_*`
+but haven't yet. Newest at the top. Promote to a real cell entry below
+when a training or eval cell actually starts using one.
+
+### PersonaMem-v2 (Wang et al., UPenn) — add as third long-context eval corpus
+
+* **Why.** PersonaMem-v2 stresses *implicit* preference recall over
+  long (~128 k-token) chat histories — a regime LME-S only partly
+  covers and LoCoMo doesn't cover at all. Frontier LLMs reportedly
+  sit at 37–48 % on it; Tencent's L0→L3 RAG-pipeline plugin
+  (`Tencent/TencentDB-Agent-Memory`) reports ~76 %. Value for memres
+  is two-fold: (i) implicit preferences are the closest public proxy
+  to the "lean on **specific facts** in `M_c`" follow-up flagged in
+  `README.md` — a vector-DB shouldn't dominate by default when the
+  relevant token isn't lexically present in history; (ii) it makes a
+  shared-scoreboard comparison vs the bolt-on regime possible, which
+  the v27b/v28 paper currently lacks.
+* **License.** MIT (HF: `bowen-upenn/PersonaMem-v2`). Vendorable in
+  principle, but **does not go in git** per the `paper_artifacts/`
+  convention — built locally and cited by filename only.
+* **Planned builder.** `tools/build_personamem.py` — same shape as
+  `tools/build_synthetic_d5.py`: HF download → chain-format conversion
+  → tokenisation with the active backbone tokenizer → `.pt` shards at
+  `paper_artifacts/chains/personamem_v2_{train,val}_s512_evpos.pt`.
+  (Already covered by `paper_artifacts/chains/*.pt` in `.gitignore`.)
+* **Planned eval entry.** Add a `--corpora paper_artifacts/chains/personamem_v2_val_s512_evpos.pt`
+  row to the v27b / v28 / v34 eval sweeps. First check is *no
+  retraining*: run existing v27b 0.6B ckpts against PersonaMem-v2 val
+  and measure Δ_cb. Decision threshold for "worth a paper update":
+  Δ_cb > 0.5 nats with Δ_sh-random tolerated up to v27b's ±0.010 band.
+* **Comparison hygiene.** Tencent's 48 → 76 % is *frontier-LLM + RAG
+  pipeline*, not a like-for-like comparison with a 0.6B / 1.7B
+  frozen-backbone + 41.5 M `M_c`. Before reporting any memres delta,
+  run the open-weight Qwen3 baseline (no memres, no RAG) on
+  PersonaMem-v2 so the comparison axes are clean.
+* **Status.** NOT STARTED — opened 2026-05-14, no owner. Promote to a
+  real ledger entry below once the builder is written or a training
+  cell uses the corpus.
+
+---
+
 ## v29 → v34 — New moe-i framework: synthd5 architectural ceiling, sparse writer breaks it, InfoNCE on LME lifts Δ_sh (2026-05-05 ~03:25 EDT, GH200 wave finished, local v34a still running)
 
 ### TL;DR
