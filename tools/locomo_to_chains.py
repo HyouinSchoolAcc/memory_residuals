@@ -37,7 +37,7 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--in_path",
-        default="../memory_residuals_data/hf_corpora/locomo/raw/locomo10.json",
+        default="../../memory_residuals_data/hf_corpora/locomo/raw/locomo10.json",
         type=Path,
     )
     p.add_argument(

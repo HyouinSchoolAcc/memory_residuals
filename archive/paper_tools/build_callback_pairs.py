@@ -61,7 +61,7 @@ def chain_to_pair(rows: list[dict], history_sessions: int) -> dict | None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--data_root", type=Path, default=Path("../memory_residuals_data"))
+    p.add_argument("--data_root", type=Path, default=Path("../../memory_residuals_data"))
     p.add_argument("--out_dir", type=Path,
                    default=Path("paper_artifacts/pairs_eval"))
     p.add_argument("--history_sessions", type=int, default=4)

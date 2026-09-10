@@ -47,7 +47,7 @@ Typical usage on the GH200 (where disk / bandwidth is plentiful)::
 
     python tools/build_synthetic_dialogue_chains.py \
         --sources ultrachat pippa soda \
-        --out_dir ../memory_residuals_data/mega_stage \
+        --out_dir ../../memory_residuals_data/mega_stage \
         --max_chains_per_source 40000 \
         --turns_per_session 4 \
         --min_turns_per_session 2

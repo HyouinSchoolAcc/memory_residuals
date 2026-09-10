@@ -281,7 +281,7 @@ def write_markdown(stats: dict[str, Any], output_md: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--data-root", type=Path, default=Path("../memory_residuals_data"))
+    p.add_argument("--data-root", type=Path, default=Path("../../memory_residuals_data"))
     p.add_argument("--tokenizer", default="Qwen/Qwen3-0.6B")
     p.add_argument("--output-json", type=Path, default=Path("paper_artifacts/data_audit.json"))
     p.add_argument("--output-md", type=Path, default=Path("paper_artifacts/data_audit.md"))

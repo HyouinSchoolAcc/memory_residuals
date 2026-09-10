@@ -1,0 +1,922 @@
+{
+  "model_path": "runs/chain_v32a_sparse_synthd5_seed1_0p6b_frozen_local/final",
+  "corpus": "paper_artifacts/chains/synthd5_random_codes_val_s512.pt",
+  "n_chains_scored": 100,
+  "ce_mean": {
+    "nomem": 6.2919651317596434,
+    "s1_zero": 6.311972329616546,
+    "s1s2_last": 6.331850757598877,
+    "s1s2_mean": 6.332073633670807,
+    "full": 4.965826337337494,
+    "shuffle": 4.970468306541443
+  },
+  "delta_vs_nomem": {
+    "s1_zero": -0.02000719785690297,
+    "s1s2_last": -0.03988562583923372,
+    "s1s2_mean": -0.04010850191116333,
+    "full": 1.3261387944221497,
+    "shuffle": 1.3214968252182002
+  },
+  "per_chain": [
+    {
+      "nomem": 6.446257591247559,
+      "s1_zero": 6.570877552032471,
+      "s1s2_last": 6.439632415771484,
+      "s1s2_mean": 6.491025924682617,
+      "full": 4.5193586349487305,
+      "shuffle": 4.488370418548584,
+      "chain_id": "synthetic_random_codes_00000_locker_code_QEQ6D_n2ev"
+    },
+    {
+      "nomem": 5.872472763061523,
+      "s1_zero": 5.8853607177734375,
+      "s1s2_last": 5.868363380432129,
+      "s1s2_mean": 5.919218063354492,
+      "full": 5.996656894683838,
+      "shuffle": 5.9880547523498535,
+      "chain_id": "synthetic_random_codes_00001_apartment_5ITOK_n2ev"
+    },
+    {
+      "nomem": 6.492489814758301,
+      "s1_zero": 6.717181205749512,
+      "s1s2_last": 6.648990631103516,
+      "s1s2_mean": 6.611934185028076,
+      "full": 4.874668598175049,
+      "shuffle": 4.836139678955078,
+      "chain_id": "synthetic_random_codes_00002_apartment_WHPX7_n2ev"
+    },
+    {
+      "nomem": 7.331754207611084,
+      "s1_zero": 7.415282249450684,
+      "s1s2_last": 7.306521892547607,
+      "s1s2_mean": 7.373004913330078,
+      "full": 6.348589897155762,
+      "shuffle": 6.35195255279541,
+      "chain_id": "synthetic_random_codes_00003_employee_id_HB7FI_n2ev"
+    },
+    {
+      "nomem": 4.510680675506592,
+      "s1_zero": 4.567193508148193,
+      "s1s2_last": 4.433528423309326,
+      "s1s2_mean": 4.49929141998291,
+      "full": 3.850153684616089,
+      "shuffle": 3.856060028076172,
+      "chain_id": "synthetic_random_codes_00004_pin_161LK_n2ev"
+    },
+    {
+      "nomem": 9.388456344604492,
+      "s1_zero": 9.675658226013184,
+      "s1s2_last": 9.684332847595215,
+      "s1s2_mean": 9.632125854492188,
+      "full": 6.1557936668396,
+      "shuffle": 6.169260025024414,
+      "chain_id": "synthetic_random_codes_00005_pin_VOUP3_n2ev"
+    },
+    {
+      "nomem": 5.813521862030029,
+      "s1_zero": 5.948978424072266,
+      "s1s2_last": 5.909092903137207,
+      "s1s2_mean": 5.889047622680664,
+      "full": 4.762139320373535,
+      "shuffle": 4.654365539550781,
+      "chain_id": "synthetic_random_codes_00006_tracking_9RAP7_n2ev"
+    },
+    {
+      "nomem": 8.530468940734863,
+      "s1_zero": 8.452463150024414,
+      "s1s2_last": 8.622919082641602,
+      "s1s2_mean": 8.570535659790039,
+      "full": 6.495547294616699,
+      "shuffle": 6.500705718994141,
+      "chain_id": "synthetic_random_codes_00007_tracking_EL9BO_n2ev"
+    },
+    {
+      "nomem": 5.046261787414551,
+      "s1_zero": 5.012098789215088,
+      "s1s2_last": 5.1625165939331055,
+      "s1s2_mean": 5.160333156585693,
+      "full": 4.079799175262451,
+      "shuffle": 4.102355480194092,
+      "chain_id": "synthetic_random_codes_00008_locker_code_Z21F9_n2ev"
+    },
+    {
+      "nomem": 8.252628326416016,
+      "s1_zero": 8.524822235107422,
+      "s1s2_last": 8.433876991271973,
+      "s1s2_mean": 8.422985076904297,
+      "full": 5.241106033325195,
+      "shuffle": 5.287890911102295,
+      "chain_id": "synthetic_random_codes_00009_tracking_ENZGS_n2ev"
+    },
+    {
+      "nomem": 4.588038444519043,
+      "s1_zero": 4.619811058044434,
+      "s1s2_last": 4.693103313446045,
+      "s1s2_mean": 4.737931251525879,
+      "full": 3.4754321575164795,
+      "shuffle": 3.4367587566375732,
+      "chain_id": "synthetic_random_codes_00010_tracking_6M89A_n2ev"
+    },
+    {
+      "nomem": 6.072485446929932,
+      "s1_zero": 6.270564556121826,
+      "s1s2_last": 6.320188522338867,
+      "s1s2_mean": 6.3920207023620605,
+      "full": 4.5689697265625,
+      "shuffle": 4.638671875,
+      "chain_id": "synthetic_random_codes_00011_voucher_SS9Y1_n2ev"
+    },
+    {
+      "nomem": 6.842492580413818,
+      "s1_zero": 6.733476161956787,
+      "s1s2_last": 6.661279201507568,
+      "s1s2_mean": 6.657001495361328,
+      "full": 5.871310234069824,
+      "shuffle": 5.906095504760742,
+      "chain_id": "synthetic_random_codes_00012_pin_SC4FF_n2ev"
+    },
+    {
+      "nomem": 7.562373161315918,
+      "s1_zero": 7.4435248374938965,
+      "s1s2_last": 7.576455116271973,
+      "s1s2_mean": 7.594662666320801,
+      "full": 5.270378112792969,
+      "shuffle": 5.340676307678223,
+      "chain_id": "synthetic_random_codes_00013_tracking_CNRBC_n2ev"
+    },
+    {
+      "nomem": 8.656251907348633,
+      "s1_zero": 8.33475112915039,
+      "s1s2_last": 8.575019836425781,
+      "s1s2_mean": 8.54959774017334,
+      "full": 6.199037551879883,
+      "shuffle": 6.318386077880859,
+      "chain_id": "synthetic_random_codes_00014_tracking_WTO6C_n2ev"
+    },
+    {
+      "nomem": 4.789558410644531,
+      "s1_zero": 4.974586009979248,
+      "s1s2_last": 4.98646354675293,
+      "s1s2_mean": 4.9987311363220215,
+      "full": 3.5830211639404297,
+      "shuffle": 3.529228925704956,
+      "chain_id": "synthetic_random_codes_00015_voucher_1X8XJ_n2ev"
+    },
+    {
+      "nomem": 5.1843180656433105,
+      "s1_zero": 5.363819599151611,
+      "s1s2_last": 5.4187750816345215,
+      "s1s2_mean": 5.423759937286377,
+      "full": 4.197140693664551,
+      "shuffle": 4.273079872131348,
+      "chain_id": "synthetic_random_codes_00016_apartment_2MO8V_n2ev"
+    },
+    {
+      "nomem": 6.595343589782715,
+      "s1_zero": 6.719731330871582,
+      "s1s2_last": 6.753375053405762,
+      "s1s2_mean": 6.767364501953125,
+      "full": 5.009839057922363,
+      "shuffle": 5.0289716720581055,
+      "chain_id": "synthetic_random_codes_00017_tracking_V9RKR_n2ev"
+    },
+    {
+      "nomem": 6.701391220092773,
+      "s1_zero": 6.4849724769592285,
+      "s1s2_last": 6.4067864418029785,
+      "s1s2_mean": 6.3839216232299805,
+      "full": 5.33003568649292,
+      "shuffle": 5.322654724121094,
+      "chain_id": "synthetic_random_codes_00018_employee_id_F0BMC_n2ev"
+    },
+    {
+      "nomem": 9.269573211669922,
+      "s1_zero": 9.230504989624023,
+      "s1s2_last": 9.151666641235352,
+      "s1s2_mean": 9.168312072753906,
+      "full": 7.166259765625,
+      "shuffle": 7.267877101898193,
+      "chain_id": "synthetic_random_codes_00019_employee_id_LV1WT_n2ev"
+    },
+    {
+      "nomem": 4.277712821960449,
+      "s1_zero": 4.330642223358154,
+      "s1s2_last": 4.485650062561035,
+      "s1s2_mean": 4.4608025550842285,
+      "full": 4.0809478759765625,
+      "shuffle": 4.150171279907227,
+      "chain_id": "synthetic_random_codes_00020_apartment_25BK3_n2ev"
+    },
+    {
+      "nomem": 4.8787841796875,
+      "s1_zero": 4.7297444343566895,
+      "s1s2_last": 4.763423442840576,
+      "s1s2_mean": 4.747745513916016,
+      "full": 3.5055291652679443,
+      "shuffle": 3.5503671169281006,
+      "chain_id": "synthetic_random_codes_00021_employee_id_Q3R6G_n2ev"
+    },
+    {
+      "nomem": 6.355604648590088,
+      "s1_zero": 6.255194664001465,
+      "s1s2_last": 6.433833122253418,
+      "s1s2_mean": 6.396350860595703,
+      "full": 5.069227695465088,
+      "shuffle": 5.073044300079346,
+      "chain_id": "synthetic_random_codes_00022_tracking_VVSVR_n2ev"
+    },
+    {
+      "nomem": 5.395741939544678,
+      "s1_zero": 5.467199325561523,
+      "s1s2_last": 5.603571891784668,
+      "s1s2_mean": 5.593378067016602,
+      "full": 4.160877704620361,
+      "shuffle": 4.228958606719971,
+      "chain_id": "synthetic_random_codes_00023_tracking_OP374_n2ev"
+    },
+    {
+      "nomem": 4.370190620422363,
+      "s1_zero": 4.355881214141846,
+      "s1s2_last": 4.4302263259887695,
+      "s1s2_mean": 4.42531156539917,
+      "full": 3.3703877925872803,
+      "shuffle": 3.3522491455078125,
+      "chain_id": "synthetic_random_codes_00024_locker_code_84V1L_n2ev"
+    },
+    {
+      "nomem": 4.583762168884277,
+      "s1_zero": 4.551767349243164,
+      "s1s2_last": 4.759303569793701,
+      "s1s2_mean": 4.699038505554199,
+      "full": 3.4539859294891357,
+      "shuffle": 3.5095062255859375,
+      "chain_id": "synthetic_random_codes_00025_apartment_8S3VZ_n2ev"
+    },
+    {
+      "nomem": 4.710251808166504,
+      "s1_zero": 4.598824977874756,
+      "s1s2_last": 4.6025614738464355,
+      "s1s2_mean": 4.596349716186523,
+      "full": 5.27942419052124,
+      "shuffle": 5.220645427703857,
+      "chain_id": "synthetic_random_codes_00026_flight_DU872_n2ev"
+    },
+    {
+      "nomem": 6.751288890838623,
+      "s1_zero": 6.79005765914917,
+      "s1s2_last": 6.832953929901123,
+      "s1s2_mean": 6.761263847351074,
+      "full": 5.086775302886963,
+      "shuffle": 4.890051364898682,
+      "chain_id": "synthetic_random_codes_00027_tracking_0VEPJ_n2ev"
+    },
+    {
+      "nomem": 10.071867942810059,
+      "s1_zero": 9.999510765075684,
+      "s1s2_last": 9.975379943847656,
+      "s1s2_mean": 9.97330093383789,
+      "full": 7.145842552185059,
+      "shuffle": 7.198581218719482,
+      "chain_id": "synthetic_random_codes_00028_flight_FIHOF_n2ev"
+    },
+    {
+      "nomem": 7.362800598144531,
+      "s1_zero": 7.63334846496582,
+      "s1s2_last": 7.533316612243652,
+      "s1s2_mean": 7.476269721984863,
+      "full": 4.816379070281982,
+      "shuffle": 4.790722846984863,
+      "chain_id": "synthetic_random_codes_00029_apartment_SJK0M_n2ev"
+    },
+    {
+      "nomem": 6.247197151184082,
+      "s1_zero": 6.306915283203125,
+      "s1s2_last": 6.348763465881348,
+      "s1s2_mean": 6.375057697296143,
+      "full": 4.257416725158691,
+      "shuffle": 4.343545436859131,
+      "chain_id": "synthetic_random_codes_00030_locker_code_JBD60_n2ev"
+    },
+    {
+      "nomem": 7.415934085845947,
+      "s1_zero": 7.323248386383057,
+      "s1s2_last": 7.333675861358643,
+      "s1s2_mean": 7.308105945587158,
+      "full": 4.981444835662842,
+      "shuffle": 4.984763145446777,
+      "chain_id": "synthetic_random_codes_00031_locker_code_CJQ9O_n2ev"
+    },
+    {
+      "nomem": 5.340531826019287,
+      "s1_zero": 5.3146653175354,
+      "s1s2_last": 5.336686134338379,
+      "s1s2_mean": 5.326243877410889,
+      "full": 3.8880326747894287,
+      "shuffle": 3.8776862621307373,
+      "chain_id": "synthetic_random_codes_00032_tracking_8HO4L_n2ev"
+    },
+    {
+      "nomem": 4.878070831298828,
+      "s1_zero": 4.821052551269531,
+      "s1s2_last": 4.887330532073975,
+      "s1s2_mean": 4.841161251068115,
+      "full": 4.062925815582275,
+      "shuffle": 4.12254524230957,
+      "chain_id": "synthetic_random_codes_00033_pin_4MF4S_n2ev"
+    },
+    {
+      "nomem": 8.878896713256836,
+      "s1_zero": 8.66916275024414,
+      "s1s2_last": 8.722824096679688,
+      "s1s2_mean": 8.672842979431152,
+      "full": 6.868203639984131,
+      "shuffle": 6.947856903076172,
+      "chain_id": "synthetic_random_codes_00034_confirmation_AXPVB_n2ev"
+    },
+    {
+      "nomem": 5.104802131652832,
+      "s1_zero": 4.9558000564575195,
+      "s1s2_last": 5.074180603027344,
+      "s1s2_mean": 5.0974555015563965,
+      "full": 4.62708044052124,
+      "shuffle": 4.539867401123047,
+      "chain_id": "synthetic_random_codes_00035_flight_3LIDY_n2ev"
+    },
+    {
+      "nomem": 6.284707546234131,
+      "s1_zero": 6.343308925628662,
+      "s1s2_last": 6.335855007171631,
+      "s1s2_mean": 6.404683589935303,
+      "full": 7.171107292175293,
+      "shuffle": 7.300482749938965,
+      "chain_id": "synthetic_random_codes_00036_confirmation_INCIU_n2ev"
+    },
+    {
+      "nomem": 4.708934783935547,
+      "s1_zero": 4.803578853607178,
+      "s1s2_last": 4.9816460609436035,
+      "s1s2_mean": 4.973830699920654,
+      "full": 3.8918468952178955,
+      "shuffle": 3.934441328048706,
+      "chain_id": "synthetic_random_codes_00037_voucher_D4962_n2ev"
+    },
+    {
+      "nomem": 6.814263343811035,
+      "s1_zero": 6.773952484130859,
+      "s1s2_last": 6.828492641448975,
+      "s1s2_mean": 6.870658874511719,
+      "full": 6.336526393890381,
+      "shuffle": 6.384674072265625,
+      "chain_id": "synthetic_random_codes_00038_tracking_SEL40_n2ev"
+    },
+    {
+      "nomem": 5.676966190338135,
+      "s1_zero": 6.126562118530273,
+      "s1s2_last": 5.9412078857421875,
+      "s1s2_mean": 5.936333656311035,
+      "full": 4.556056499481201,
+      "shuffle": 4.472720146179199,
+      "chain_id": "synthetic_random_codes_00039_apartment_DED9C_n2ev"
+    },
+    {
+      "nomem": 7.225403785705566,
+      "s1_zero": 7.062309265136719,
+      "s1s2_last": 7.096908092498779,
+      "s1s2_mean": 7.103881359100342,
+      "full": 5.059606552124023,
+      "shuffle": 5.132330417633057,
+      "chain_id": "synthetic_random_codes_00040_flight_YTV6U_n2ev"
+    },
+    {
+      "nomem": 9.748211860656738,
+      "s1_zero": 9.67184066772461,
+      "s1s2_last": 9.625883102416992,
+      "s1s2_mean": 9.737704277038574,
+      "full": 6.530698299407959,
+      "shuffle": 6.760462760925293,
+      "chain_id": "synthetic_random_codes_00041_tracking_QEZIZ_n2ev"
+    },
+    {
+      "nomem": 5.305845260620117,
+      "s1_zero": 5.476781368255615,
+      "s1s2_last": 5.43044376373291,
+      "s1s2_mean": 5.41583776473999,
+      "full": 4.282878398895264,
+      "shuffle": 4.318240642547607,
+      "chain_id": "synthetic_random_codes_00042_flight_9JASZ_n2ev"
+    },
+    {
+      "nomem": 7.043887138366699,
+      "s1_zero": 6.994182586669922,
+      "s1s2_last": 7.075007915496826,
+      "s1s2_mean": 7.094445705413818,
+      "full": 5.493431091308594,
+      "shuffle": 5.420766830444336,
+      "chain_id": "synthetic_random_codes_00043_tracking_QR9GG_n2ev"
+    },
+    {
+      "nomem": 6.9252848625183105,
+      "s1_zero": 6.794458389282227,
+      "s1s2_last": 6.759973049163818,
+      "s1s2_mean": 6.76096248626709,
+      "full": 6.232554912567139,
+      "shuffle": 6.22614860534668,
+      "chain_id": "synthetic_random_codes_00044_employee_id_JCSD2_n2ev"
+    },
+    {
+      "nomem": 5.877992630004883,
+      "s1_zero": 5.880428314208984,
+      "s1s2_last": 5.880774974822998,
+      "s1s2_mean": 5.880313873291016,
+      "full": 4.879005432128906,
+      "shuffle": 4.870693206787109,
+      "chain_id": "synthetic_random_codes_00045_employee_id_N3LVG_n2ev"
+    },
+    {
+      "nomem": 4.971792697906494,
+      "s1_zero": 5.066331386566162,
+      "s1s2_last": 5.04324197769165,
+      "s1s2_mean": 5.027254104614258,
+      "full": 4.120068073272705,
+      "shuffle": 4.159060001373291,
+      "chain_id": "synthetic_random_codes_00046_confirmation_87JZW_n2ev"
+    },
+    {
+      "nomem": 5.171586990356445,
+      "s1_zero": 5.0200066566467285,
+      "s1s2_last": 5.003705024719238,
+      "s1s2_mean": 5.036628246307373,
+      "full": 4.351227760314941,
+      "shuffle": 4.484949111938477,
+      "chain_id": "synthetic_random_codes_00047_flight_R96I5_n2ev"
+    },
+    {
+      "nomem": 7.623007774353027,
+      "s1_zero": 7.535118103027344,
+      "s1s2_last": 7.862428188323975,
+      "s1s2_mean": 7.8633527755737305,
+      "full": 6.828271389007568,
+      "shuffle": 6.8108229637146,
+      "chain_id": "synthetic_random_codes_00048_confirmation_ATCW3_n2ev"
+    },
+    {
+      "nomem": 6.392866134643555,
+      "s1_zero": 6.507891654968262,
+      "s1s2_last": 6.510777473449707,
+      "s1s2_mean": 6.481162071228027,
+      "full": 4.589524745941162,
+      "shuffle": 4.537630081176758,
+      "chain_id": "synthetic_random_codes_00049_locker_code_J3EW4_n2ev"
+    },
+    {
+      "nomem": 4.574624538421631,
+      "s1_zero": 4.700714588165283,
+      "s1s2_last": 4.591653347015381,
+      "s1s2_mean": 4.6607537269592285,
+      "full": 4.060943126678467,
+      "shuffle": 4.017724514007568,
+      "chain_id": "synthetic_random_codes_00050_flight_93UV9_n2ev"
+    },
+    {
+      "nomem": 5.221217155456543,
+      "s1_zero": 5.010693550109863,
+      "s1s2_last": 5.183399200439453,
+      "s1s2_mean": 5.155973434448242,
+      "full": 4.450738430023193,
+      "shuffle": 4.546239376068115,
+      "chain_id": "synthetic_random_codes_00051_apartment_8WQKB_n2ev"
+    },
+    {
+      "nomem": 6.446771144866943,
+      "s1_zero": 6.542045593261719,
+      "s1s2_last": 6.614415168762207,
+      "s1s2_mean": 6.639549255371094,
+      "full": 4.768515586853027,
+      "shuffle": 4.697037696838379,
+      "chain_id": "synthetic_random_codes_00052_voucher_A37VC_n2ev"
+    },
+    {
+      "nomem": 6.531102180480957,
+      "s1_zero": 6.551152229309082,
+      "s1s2_last": 6.653752326965332,
+      "s1s2_mean": 6.6229705810546875,
+      "full": 5.313413619995117,
+      "shuffle": 5.327583312988281,
+      "chain_id": "synthetic_random_codes_00053_employee_id_N4WWO_n2ev"
+    },
+    {
+      "nomem": 6.4986958503723145,
+      "s1_zero": 6.6810760498046875,
+      "s1s2_last": 6.712113380432129,
+      "s1s2_mean": 6.667821884155273,
+      "full": 4.9943437576293945,
+      "shuffle": 5.069633483886719,
+      "chain_id": "synthetic_random_codes_00054_locker_code_PWT7T_n2ev"
+    },
+    {
+      "nomem": 3.1989502906799316,
+      "s1_zero": 3.231320381164551,
+      "s1s2_last": 3.270416736602783,
+      "s1s2_mean": 3.257108449935913,
+      "full": 3.277327060699463,
+      "shuffle": 3.2731451988220215,
+      "chain_id": "synthetic_random_codes_00055_employee_id_887G1_n2ev"
+    },
+    {
+      "nomem": 6.792841911315918,
+      "s1_zero": 6.794702529907227,
+      "s1s2_last": 6.8619842529296875,
+      "s1s2_mean": 6.874493598937988,
+      "full": 5.003779888153076,
+      "shuffle": 5.109169960021973,
+      "chain_id": "synthetic_random_codes_00056_voucher_D6UI9_n2ev"
+    },
+    {
+      "nomem": 8.533452987670898,
+      "s1_zero": 8.664657592773438,
+      "s1s2_last": 8.652084350585938,
+      "s1s2_mean": 8.650775909423828,
+      "full": 6.511505126953125,
+      "shuffle": 6.48128080368042,
+      "chain_id": "synthetic_random_codes_00057_locker_code_TSFQB_n2ev"
+    },
+    {
+      "nomem": 4.444939613342285,
+      "s1_zero": 4.43637228012085,
+      "s1s2_last": 4.458129405975342,
+      "s1s2_mean": 4.449127674102783,
+      "full": 3.993551731109619,
+      "shuffle": 3.9541585445404053,
+      "chain_id": "synthetic_random_codes_00058_employee_id_4UMY4_n2ev"
+    },
+    {
+      "nomem": 6.260687828063965,
+      "s1_zero": 6.40946102142334,
+      "s1s2_last": 6.384532451629639,
+      "s1s2_mean": 6.346782684326172,
+      "full": 5.15125846862793,
+      "shuffle": 5.127602577209473,
+      "chain_id": "synthetic_random_codes_00059_locker_code_OSZ7D_n2ev"
+    },
+    {
+      "nomem": 5.610898971557617,
+      "s1_zero": 5.463260173797607,
+      "s1s2_last": 5.504506587982178,
+      "s1s2_mean": 5.492917537689209,
+      "full": 3.7864670753479004,
+      "shuffle": 3.8008217811584473,
+      "chain_id": "synthetic_random_codes_00060_pin_4BPI5_n2ev"
+    },
+    {
+      "nomem": 7.4413371086120605,
+      "s1_zero": 7.427338600158691,
+      "s1s2_last": 7.369668483734131,
+      "s1s2_mean": 7.432063102722168,
+      "full": 5.863727569580078,
+      "shuffle": 5.80006217956543,
+      "chain_id": "synthetic_random_codes_00061_tracking_NZVV6_n2ev"
+    },
+    {
+      "nomem": 3.8339104652404785,
+      "s1_zero": 3.7334225177764893,
+      "s1s2_last": 3.796875,
+      "s1s2_mean": 3.819227695465088,
+      "full": 3.608208179473877,
+      "shuffle": 3.590858221054077,
+      "chain_id": "synthetic_random_codes_00062_confirmation_5DP04_n2ev"
+    },
+    {
+      "nomem": 4.328823089599609,
+      "s1_zero": 4.291810035705566,
+      "s1s2_last": 4.399871826171875,
+      "s1s2_mean": 4.388828277587891,
+      "full": 3.8112194538116455,
+      "shuffle": 3.8151893615722656,
+      "chain_id": "synthetic_random_codes_00063_confirmation_5K1BE_n2ev"
+    },
+    {
+      "nomem": 7.755521774291992,
+      "s1_zero": 7.6168341636657715,
+      "s1s2_last": 7.481582164764404,
+      "s1s2_mean": 7.507195472717285,
+      "full": 6.390031814575195,
+      "shuffle": 6.41720724105835,
+      "chain_id": "synthetic_random_codes_00064_pin_NM7KM_n2ev"
+    },
+    {
+      "nomem": 7.912528991699219,
+      "s1_zero": 7.8990912437438965,
+      "s1s2_last": 7.640536308288574,
+      "s1s2_mean": 7.592822074890137,
+      "full": 6.842933654785156,
+      "shuffle": 6.830296993255615,
+      "chain_id": "synthetic_random_codes_00065_flight_LWYL9_n2ev"
+    },
+    {
+      "nomem": 6.47808837890625,
+      "s1_zero": 6.214845180511475,
+      "s1s2_last": 6.158234596252441,
+      "s1s2_mean": 6.139687538146973,
+      "full": 4.936105251312256,
+      "shuffle": 4.977652549743652,
+      "chain_id": "synthetic_random_codes_00066_pin_2HHGU_n2ev"
+    },
+    {
+      "nomem": 7.406659126281738,
+      "s1_zero": 7.4085164070129395,
+      "s1s2_last": 7.239864349365234,
+      "s1s2_mean": 7.277770519256592,
+      "full": 5.024216651916504,
+      "shuffle": 4.94921875,
+      "chain_id": "synthetic_random_codes_00067_flight_R4ZHT_n2ev"
+    },
+    {
+      "nomem": 4.568435192108154,
+      "s1_zero": 4.509664058685303,
+      "s1s2_last": 4.542612552642822,
+      "s1s2_mean": 4.549542427062988,
+      "full": 4.019091606140137,
+      "shuffle": 4.065774917602539,
+      "chain_id": "synthetic_random_codes_00068_pin_7LGU7_n2ev"
+    },
+    {
+      "nomem": 7.843883037567139,
+      "s1_zero": 8.081259727478027,
+      "s1s2_last": 7.8041090965271,
+      "s1s2_mean": 7.811152458190918,
+      "full": 5.591029644012451,
+      "shuffle": 5.486489295959473,
+      "chain_id": "synthetic_random_codes_00069_flight_AZVF4_n2ev"
+    },
+    {
+      "nomem": 5.115312099456787,
+      "s1_zero": 5.092193603515625,
+      "s1s2_last": 5.159741401672363,
+      "s1s2_mean": 5.182514190673828,
+      "full": 3.9364185333251953,
+      "shuffle": 3.952465534210205,
+      "chain_id": "synthetic_random_codes_00070_pin_7CPL2_n2ev"
+    },
+    {
+      "nomem": 6.221384048461914,
+      "s1_zero": 6.116292953491211,
+      "s1s2_last": 6.18587064743042,
+      "s1s2_mean": 6.176234245300293,
+      "full": 4.975637435913086,
+      "shuffle": 5.077961444854736,
+      "chain_id": "synthetic_random_codes_00071_locker_code_OTQ95_n2ev"
+    },
+    {
+      "nomem": 4.717817783355713,
+      "s1_zero": 4.827332019805908,
+      "s1s2_last": 4.9517717361450195,
+      "s1s2_mean": 4.915183067321777,
+      "full": 4.143667697906494,
+      "shuffle": 4.116939067840576,
+      "chain_id": "synthetic_random_codes_00072_voucher_Z68JG_n2ev"
+    },
+    {
+      "nomem": 8.762591361999512,
+      "s1_zero": 8.699580192565918,
+      "s1s2_last": 8.561105728149414,
+      "s1s2_mean": 8.630550384521484,
+      "full": 6.1193366050720215,
+      "shuffle": 6.117988586425781,
+      "chain_id": "synthetic_random_codes_00073_locker_code_QCCBF_n2ev"
+    },
+    {
+      "nomem": 4.732276439666748,
+      "s1_zero": 4.971120357513428,
+      "s1s2_last": 4.979942321777344,
+      "s1s2_mean": 4.974853515625,
+      "full": 3.5764355659484863,
+      "shuffle": 3.5820558071136475,
+      "chain_id": "synthetic_random_codes_00074_flight_M9X59_n2ev"
+    },
+    {
+      "nomem": 4.371354103088379,
+      "s1_zero": 4.326129913330078,
+      "s1s2_last": 4.447906017303467,
+      "s1s2_mean": 4.447609901428223,
+      "full": 3.3815677165985107,
+      "shuffle": 3.418649196624756,
+      "chain_id": "synthetic_random_codes_00075_employee_id_75O7Q_n2ev"
+    },
+    {
+      "nomem": 7.731096267700195,
+      "s1_zero": 7.8638153076171875,
+      "s1s2_last": 7.847084045410156,
+      "s1s2_mean": 7.8597002029418945,
+      "full": 4.777111053466797,
+      "shuffle": 4.669244289398193,
+      "chain_id": "synthetic_random_codes_00076_apartment_TY9N2_n2ev"
+    },
+    {
+      "nomem": 5.913705348968506,
+      "s1_zero": 5.993002891540527,
+      "s1s2_last": 6.1162261962890625,
+      "s1s2_mean": 6.099245071411133,
+      "full": 5.171505451202393,
+      "shuffle": 5.15982723236084,
+      "chain_id": "synthetic_random_codes_00077_tracking_XWYUK_n2ev"
+    },
+    {
+      "nomem": 4.404881954193115,
+      "s1_zero": 4.410592555999756,
+      "s1s2_last": 4.430490016937256,
+      "s1s2_mean": 4.425271034240723,
+      "full": 3.6871140003204346,
+      "shuffle": 3.7825844287872314,
+      "chain_id": "synthetic_random_codes_00078_tracking_179CV_n2ev"
+    },
+    {
+      "nomem": 5.552703380584717,
+      "s1_zero": 5.487517833709717,
+      "s1s2_last": 5.441103458404541,
+      "s1s2_mean": 5.409087657928467,
+      "full": 4.378448486328125,
+      "shuffle": 4.322725772857666,
+      "chain_id": "synthetic_random_codes_00079_pin_4NNI9_n2ev"
+    },
+    {
+      "nomem": 6.661036014556885,
+      "s1_zero": 6.746783256530762,
+      "s1s2_last": 6.8391804695129395,
+      "s1s2_mean": 6.823590278625488,
+      "full": 5.284482955932617,
+      "shuffle": 5.212499618530273,
+      "chain_id": "synthetic_random_codes_00080_voucher_O02FW_n2ev"
+    },
+    {
+      "nomem": 7.264005184173584,
+      "s1_zero": 7.428147792816162,
+      "s1s2_last": 7.479074001312256,
+      "s1s2_mean": 7.517102241516113,
+      "full": 6.2510576248168945,
+      "shuffle": 6.216163158416748,
+      "chain_id": "synthetic_random_codes_00081_voucher_SZMM9_n2ev"
+    },
+    {
+      "nomem": 5.695841312408447,
+      "s1_zero": 5.395402431488037,
+      "s1s2_last": 5.578307628631592,
+      "s1s2_mean": 5.554534435272217,
+      "full": 3.9324135780334473,
+      "shuffle": 3.9973104000091553,
+      "chain_id": "synthetic_random_codes_00082_flight_JG0YJ_n2ev"
+    },
+    {
+      "nomem": 4.979564189910889,
+      "s1_zero": 5.165790557861328,
+      "s1s2_last": 5.118165969848633,
+      "s1s2_mean": 5.117072582244873,
+      "full": 3.737433671951294,
+      "shuffle": 3.6864755153656006,
+      "chain_id": "synthetic_random_codes_00083_pin_3FYBQ_n2ev"
+    },
+    {
+      "nomem": 4.821904182434082,
+      "s1_zero": 4.721358776092529,
+      "s1s2_last": 4.711730003356934,
+      "s1s2_mean": 4.615611553192139,
+      "full": 3.83909010887146,
+      "shuffle": 3.896841526031494,
+      "chain_id": "synthetic_random_codes_00084_pin_5E0HW_n2ev"
+    },
+    {
+      "nomem": 5.646604537963867,
+      "s1_zero": 5.712937355041504,
+      "s1s2_last": 5.745615482330322,
+      "s1s2_mean": 5.7640509605407715,
+      "full": 4.356217861175537,
+      "shuffle": 4.347520351409912,
+      "chain_id": "synthetic_random_codes_00085_locker_code_9O5GE_n2ev"
+    },
+    {
+      "nomem": 10.77509880065918,
+      "s1_zero": 10.9635009765625,
+      "s1s2_last": 10.990734100341797,
+      "s1s2_mean": 10.946901321411133,
+      "full": 9.962265014648438,
+      "shuffle": 9.997047424316406,
+      "chain_id": "synthetic_random_codes_00086_confirmation_VTCHO_n2ev"
+    },
+    {
+      "nomem": 6.867735862731934,
+      "s1_zero": 6.911436557769775,
+      "s1s2_last": 6.980137348175049,
+      "s1s2_mean": 6.982987403869629,
+      "full": 5.617384910583496,
+      "shuffle": 5.639705657958984,
+      "chain_id": "synthetic_random_codes_00087_tracking_S7LMU_n2ev"
+    },
+    {
+      "nomem": 8.021414756774902,
+      "s1_zero": 8.291336059570312,
+      "s1s2_last": 8.255393028259277,
+      "s1s2_mean": 8.311046600341797,
+      "full": 6.935995101928711,
+      "shuffle": 6.8338518142700195,
+      "chain_id": "synthetic_random_codes_00088_voucher_IKTMH_n2ev"
+    },
+    {
+      "nomem": 5.09079122543335,
+      "s1_zero": 5.097848415374756,
+      "s1s2_last": 5.133520126342773,
+      "s1s2_mean": 5.100255489349365,
+      "full": 3.902252197265625,
+      "shuffle": 3.832852602005005,
+      "chain_id": "synthetic_random_codes_00089_pin_99RLC_n2ev"
+    },
+    {
+      "nomem": 4.682185649871826,
+      "s1_zero": 4.680667877197266,
+      "s1s2_last": 4.637661933898926,
+      "s1s2_mean": 4.697933673858643,
+      "full": 3.803868055343628,
+      "shuffle": 3.820204973220825,
+      "chain_id": "synthetic_random_codes_00090_confirmation_78GY7_n2ev"
+    },
+    {
+      "nomem": 7.024012565612793,
+      "s1_zero": 7.205986976623535,
+      "s1s2_last": 7.190617561340332,
+      "s1s2_mean": 7.18384313583374,
+      "full": 4.914675712585449,
+      "shuffle": 4.90162467956543,
+      "chain_id": "synthetic_random_codes_00091_apartment_Z4ISW_n2ev"
+    },
+    {
+      "nomem": 9.438140869140625,
+      "s1_zero": 9.638121604919434,
+      "s1s2_last": 9.319271087646484,
+      "s1s2_mean": 9.351054191589355,
+      "full": 6.406310081481934,
+      "shuffle": 6.384748458862305,
+      "chain_id": "synthetic_random_codes_00092_apartment_YE5NZ_n2ev"
+    },
+    {
+      "nomem": 4.62839412689209,
+      "s1_zero": 4.760484218597412,
+      "s1s2_last": 4.827155113220215,
+      "s1s2_mean": 4.87089204788208,
+      "full": 3.8128838539123535,
+      "shuffle": 3.8158302307128906,
+      "chain_id": "synthetic_random_codes_00093_tracking_Z62K1_n2ev"
+    },
+    {
+      "nomem": 4.749614238739014,
+      "s1_zero": 4.784966945648193,
+      "s1s2_last": 4.8651041984558105,
+      "s1s2_mean": 4.875241756439209,
+      "full": 3.6414971351623535,
+      "shuffle": 3.6328742504119873,
+      "chain_id": "synthetic_random_codes_00094_employee_id_X6V4R_n2ev"
+    },
+    {
+      "nomem": 6.3027215003967285,
+      "s1_zero": 6.4068145751953125,
+      "s1s2_last": 6.465568542480469,
+      "s1s2_mean": 6.4777984619140625,
+      "full": 5.118799209594727,
+      "shuffle": 5.160767555236816,
+      "chain_id": "synthetic_random_codes_00095_voucher_XGRR0_n2ev"
+    },
+    {
+      "nomem": 8.0673828125,
+      "s1_zero": 8.04945182800293,
+      "s1s2_last": 8.054038047790527,
+      "s1s2_mean": 8.041582107543945,
+      "full": 6.064910411834717,
+      "shuffle": 6.097189903259277,
+      "chain_id": "synthetic_random_codes_00096_locker_code_EQET1_n2ev"
+    },
+    {
+      "nomem": 7.773210525512695,
+      "s1_zero": 7.5551862716674805,
+      "s1s2_last": 7.86250638961792,
+      "s1s2_mean": 7.799583435058594,
+      "full": 6.5732011795043945,
+      "shuffle": 6.504110336303711,
+      "chain_id": "synthetic_random_codes_00097_pin_MAWOO_n2ev"
+    },
+    {
+      "nomem": 6.082372665405273,
+      "s1_zero": 6.213286399841309,
+      "s1s2_last": 6.2567596435546875,
+      "s1s2_mean": 6.233001708984375,
+      "full": 4.153748989105225,
+      "shuffle": 4.193679332733154,
+      "chain_id": "synthetic_random_codes_00098_apartment_S0Z7J_n2ev"
+    },
+    {
+      "nomem": 5.076982021331787,
+      "s1_zero": 4.906484127044678,
+      "s1s2_last": 4.880037784576416,
+      "s1s2_mean": 4.905933380126953,
+      "full": 4.7559733390808105,
+      "shuffle": 4.446403980255127,
+      "chain_id": "synthetic_random_codes_00099_flight_0Y0GY_n2ev"
+    }
+  ]
+}

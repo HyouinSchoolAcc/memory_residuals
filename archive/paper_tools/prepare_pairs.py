@@ -141,7 +141,7 @@ def cap_and_shuffle(rows: list[dict[str, Any]], max_rows: int | None, seed: int)
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--data-root", type=Path, default=Path("../memory_residuals_data"))
+    p.add_argument("--data-root", type=Path, default=Path("../../memory_residuals_data"))
     p.add_argument("--out-dir", type=Path, default=Path("paper_artifacts/pairs"))
     p.add_argument("--history-sessions", type=int, default=4)
     p.add_argument("--min-history-chars", type=int, default=256)

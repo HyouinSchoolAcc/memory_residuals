@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# v17b_f2_codes_0p6b_joint_local (LOCAL GPU 1)
+# F2 + JOINT TRAINING control cell.
+#
+# Per the v15 OPEN AUDIT: v15b (0.6B joint train, no F2) showed
+# evidence_lift ~ 0 because the LM head learned the corpus prior
+# directly, leaving no work for memory.  v17b tests whether F2
+# (writer-side extractive supervision routed through the probe head,
+# NOT the LM head) installs enough chain-specific gradient on the
+# writer to defeat the joint-training pathology.
+#
+# Predicted outcome if right (per v17_wildcards §1+§4 composition):
+#   * probe_loss drops from log(V)~12 to <=4 nats by step 600
+#     (writer encodes chain content despite joint-train pressure)
+#   * evidence_lift > +0.05 by step 1500 (LM-head learns to use the
+#     non-degenerate M_c during the joint phase).
+#
+# Predicted outcome if wrong:
+#   * probe_loss drops to ~4 (writer learns under direct supervision)
+#     but evidence_lift stays ~0 (LM head ignores M_c regardless).
+#   This would mean the readout/router is also broken under joint
+#   training (cf. v17_wildcards §2 -- DeltaNet writer escape).
+#
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+OUT_DIR="output/chain_v17b_f2_codes_0p6b_joint_local"
+LOG_DIR="logs"
+mkdir -p "$LOG_DIR"
+
+CUDA_VISIBLE_DEVICES=1 nohup python -u src/train_chain.py \
+    --preset qwen3-0.6b-large \
+    --memres_mode attention_parity \
+    --router_recent_bias_init 4 --router_mem_bias_init 0 \
+    --memres_update_mode gated --memres_extract_source hidden_14 \
+    --memres_extract_input_norm \
+    --memres_gate_init 0.0 --memres_readout_norm_init 0.05 \
+    --memres_writer_kind slot_attention --memres_slot_attention_iters 3 \
+    --memres_queries_init orthogonal --memres_slot_positional \
+    --memres_judge_qk_layernorm \
+    --writer_warmup_steps 0 --writer_warmup_router_bias 0.0 --writer_warmup_anneal_steps 0 \
+    --writer_probe_enabled \
+    --writer_probe_loss_weight 1.0 \
+    --writer_probe_warmup_steps 200 \
+    --writer_probe_n_queries 1 \
+    --train_chains paper_artifacts/chains/synthd5_random_codes_train_s512.pt \
+    --eval_chains  paper_artifacts/chains/synthd5_random_codes_val_s512.pt \
+    --window_k 3 --batch_size 4 --grad_accum 2 \
+    --lr 1e-4 --lr_backbone 5e-6 --steps 2500 --warmup 200 --max_norm 1.0 \
+    --memory_dropout 0.10 --context_dropout 0.05 \
+    --neg_chain_weight 0.0 \
+    --callback_loss_weight 5.0 --callback_window_bias 0.0 \
+    --curriculum_evidence_bias 1.0 --curriculum_competition_bias 0.0 \
+    --burn_in_max 0 --mask_padding_loss --score_tail_frac 1.0 \
+    --mask_evidence_session_loss \
+    --kill_on_memory_collapse --kill_on_memory_collapse_min_step 200 \
+    --eval_every 100 --save_every 500 \
+    --eval_n_chains 24 --eval_window 8 \
+    --phase_aligned_eval_n_chains 64 \
+    --diag_routing_n_chains 8 \
+    --diagnose_grad_groups --diagnose_memory_dynamics \
+    --diagnose_memory_dynamics_n_chains 8 \
+    --gradient_checkpointing \
+    --save_best_metric evidence_lift \
+    --run_name chain_v17b_f2_codes_0p6b_joint_local \
+    --out_dir "$OUT_DIR" \
+    > "$LOG_DIR/chain_v17b_f2_codes_0p6b_joint_local.log" 2>&1 &
+echo "v17b launched pid=$!"

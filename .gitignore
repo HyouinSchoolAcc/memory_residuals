@@ -88,6 +88,14 @@ env.local.sh
 .env
 .env.local
 
+# Patent draft material — never commit until filed; even after filing
+# treat as confidential strategic IP. Provisionals are unpublished by
+# USPTO and you should keep them that way until non-provisional issue.
+PATENT_PROVISIONAL_DRAFT.md
+PATENT_ATTORNEY_CALL_BRIEF.md
+patent/
+patent_filing/
+
 # Staging directory for `tools/build_supplementary_zips.py`. The
 # anonymised + caches-stripped tree lives here before being zipped.
 # Only the resulting *_supplementary.zip files are committed.

@@ -1,0 +1,128 @@
+{
+  "baseline": [
+    {
+      "H": 1024,
+      "prompt_len": 1536,
+      "prefill_ms": 19.183907003025524,
+      "decode_ms_per_tok": 19.521570953202172,
+      "peak_vram_gib": 1.3453779220581055,
+      "kv_cache_bytes": 176160768
+    },
+    {
+      "H": 2048,
+      "prompt_len": 2560,
+      "prefill_ms": 23.17980099178385,
+      "decode_ms_per_tok": 18.92092853131544,
+      "peak_vram_gib": 1.480647087097168,
+      "kv_cache_bytes": 293601280
+    },
+    {
+      "H": 4096,
+      "prompt_len": 4608,
+      "prefill_ms": 41.71903801034205,
+      "decode_ms_per_tok": 12.02061509388841,
+      "peak_vram_gib": 1.752039909362793,
+      "kv_cache_bytes": 528482304
+    },
+    {
+      "H": 8192,
+      "prompt_len": 8704,
+      "prefill_ms": 94.4755930104293,
+      "decode_ms_per_tok": 12.667015812439786,
+      "peak_vram_gib": 2.292262077331543,
+      "kv_cache_bytes": 998244352
+    },
+    {
+      "H": 16384,
+      "prompt_len": 16896,
+      "prefill_ms": 243.25837100332137,
+      "decode_ms_per_tok": 12.498738015665367,
+      "peak_vram_gib": 3.375391960144043,
+      "kv_cache_bytes": 1937768448
+    },
+    {
+      "H": 32768,
+      "prompt_len": 33280,
+      "prefill_ms": 718.8802290038439,
+      "decode_ms_per_tok": 12.891255484419162,
+      "peak_vram_gib": 5.539698600769043,
+      "kv_cache_bytes": 3816816640
+    }
+  ],
+  "memres": [
+    {
+      "H": 1024,
+      "prompt_len": 512,
+      "prefill_ms": 22.874907997902483,
+      "decode_ms_per_tok": 22.229464718748204,
+      "peak_vram_gib": 1.6265649795532227,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 2,
+      "write_ms_per_session_median": 34.09870099858381
+    },
+    {
+      "H": 2048,
+      "prompt_len": 512,
+      "prefill_ms": 22.902656986843795,
+      "decode_ms_per_tok": 22.12523092180163,
+      "peak_vram_gib": 1.626572608947754,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 4,
+      "write_ms_per_session_median": 8.28513500164263
+    },
+    {
+      "H": 4096,
+      "prompt_len": 512,
+      "prefill_ms": 22.817839999333955,
+      "decode_ms_per_tok": 22.143244671951834,
+      "peak_vram_gib": 1.6265878677368164,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 8,
+      "write_ms_per_session_median": 8.228045502619352
+    },
+    {
+      "H": 8192,
+      "prompt_len": 512,
+      "prefill_ms": 22.787940004491247,
+      "decode_ms_per_tok": 22.201286781182716,
+      "peak_vram_gib": 1.6266183853149414,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 16,
+      "write_ms_per_session_median": 8.189945001504384
+    },
+    {
+      "H": 16384,
+      "prompt_len": 512,
+      "prefill_ms": 22.797173005528748,
+      "decode_ms_per_tok": 22.130654687543938,
+      "peak_vram_gib": 1.6266794204711914,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 32,
+      "write_ms_per_session_median": 8.210801497625653
+    },
+    {
+      "H": 32768,
+      "prompt_len": 512,
+      "prefill_ms": 22.770800002035685,
+      "decode_ms_per_tok": 22.10196935948261,
+      "peak_vram_gib": 1.6268014907836914,
+      "kv_cache_bytes": 58720256,
+      "mc_bytes": 262144,
+      "n_sessions_written": 64,
+      "write_ms_per_session_median": 8.189508000214119
+    }
+  ],
+  "meta": {
+    "session_len": 512,
+    "decode_steps": 64,
+    "reps": 5,
+    "baseline_model": "Qwen/Qwen3-0.6B",
+    "memres_path": "runs/chain_v27b_v24a_no_probe_seed3_0p6b_frozen_gh200/final",
+    "gpu": "NVIDIA H100 NVL"
+  }
+}
